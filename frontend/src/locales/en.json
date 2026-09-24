@@ -994,6 +994,7 @@
     "registerAnother": "Register another"
   },
   "bulk": {
+    "fileLabel": "Sales sheet (Excel or CSV)",
     "title": "Bulk import",
     "templateCsv": "CSV template",
     "templateXlsx": "Excel template",

@@ -18,3 +18,6 @@ src/assets/fonts/*.otf
 src/assets/fonts/*.ttf
 src/assets/fonts/*.woff
 src/assets/fonts/*.woff2
+
+# Throwaway demo data for the e2e demo server
+e2e/demo-data

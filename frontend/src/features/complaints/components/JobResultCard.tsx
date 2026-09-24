@@ -13,9 +13,9 @@ import { AttachmentGallery } from "./AttachmentGallery";
 type ReplacedRow = JobResultView["partsReplaced"][number];
 const col = createColumnHelper<ReplacedRow>();
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-overline text-text-muted">{label}</dt>
       <dd className="mt-1 text-body">{children}</dd>
     </div>
@@ -55,9 +55,9 @@ export function JobResultCard({ job, title }: { job: JobResultView; title?: stri
           <Field label={t("jobResult.completed")}>{formatDateTime(job.completedAt, i18n.language)}</Field>
           <Field label={t("jobResult.signOff")}>{t("jobResult.signedBy", { name: job.signOffName })}</Field>
           {job.notes ? (
-            <div className="sm:col-span-2">
-              <Field label={t("jobResult.notes")}>{job.notes}</Field>
-            </div>
+            <Field label={t("jobResult.notes")} className="sm:col-span-2">
+              {job.notes}
+            </Field>
           ) : null}
         </dl>
         <DataTable

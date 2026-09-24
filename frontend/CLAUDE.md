@@ -38,6 +38,11 @@ The existing look must stay exactly as it is. Only features and behaviour change
   adding it.
 - Text changes (for example removing Fieldpiece wording) are fine. Visual changes aren't.
 - `nav-items.ts` is data (routes, roles, labels) and may change. Its icons must come from lucide-react.
+- Approved exceptions (Phase 5): `DataTable` takes an optional per-column `meta.className`, applied to that column's
+  header and cells in the desktop table only (default behaviour unchanged). Use it with `hidden xl:table-cell` to hide
+  lower-priority columns below 1280px (DL07 on a 1024px tablet); that breakpoint class is approved.
+- The demo is supported on Google Chrome only (desktop, and Chrome on the phone). Don't add cross-browser testing or
+  fixes; Playwright runs on Chromium only.
 
 ## Code rules
 

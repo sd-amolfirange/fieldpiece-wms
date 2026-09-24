@@ -20,9 +20,9 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { useCurrentRole } from "@/lib/session";
 import { unitsApi } from "../api";
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-overline text-text-muted">{label}</dt>
       <dd className="mt-1 text-body">{children}</dd>
     </div>
@@ -45,9 +45,9 @@ export function UnitFactsCard({ unit, showOwner = true }: { unit: UnitView; show
         <Field label={t("units.fields.installed")}>
           {formatDate(unit.installDate, i18n.language) || "—"}
         </Field>
-        <div className="sm:col-span-2">
-          <Field label={t("units.fields.location")}>{unit.location || "—"}</Field>
-        </div>
+        <Field label={t("units.fields.location")} className="sm:col-span-2">
+          {unit.location || "—"}
+        </Field>
         {showOwner ? <Field label={t("units.fields.customer")}>{unit.customerName ?? "—"}</Field> : null}
         <Field label={t("units.fields.dealer")}>{unit.dealerName ?? "—"}</Field>
       </dl>

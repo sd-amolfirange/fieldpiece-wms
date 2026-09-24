@@ -149,7 +149,9 @@ export function DataTable<T>({
       ) : (
         <>
           {/* Desktop / tablet table */}
-          <div className="hidden overflow-x-auto md:block">
+          {/* Focusable, named region so keyboard users can scroll a wide table (WCAG scrollable-region-focusable). */}
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by keyboard */}
+          <div className="hidden overflow-x-auto md:block" tabIndex={0} role="region" aria-label={caption}>
             <table className="w-full border-collapse text-start">
               <caption className="sr-only">{caption}</caption>
               <thead className="bg-ink-50">

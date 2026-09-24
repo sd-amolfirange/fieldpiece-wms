@@ -29,9 +29,9 @@ import { useComplaint, useSendToService } from "../hooks";
 
 const STEPS: ComplaintStatus[] = ["NEW", "WITH_SERVICE", "RESOLVED"];
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-overline text-text-muted">{label}</dt>
       <dd className="mt-1 text-body">{children}</dd>
     </div>
@@ -157,9 +157,9 @@ export default function ComplaintDetailPage() {
               </Field>
             </>
           )}
-          <div className="sm:col-span-2">
-            <Field label={t("complaints.fields.fault")}>{c.description}</Field>
-          </div>
+          <Field label={t("complaints.fields.fault")} className="sm:col-span-2">
+            {c.description}
+          </Field>
         </dl>
         <div>
           <h4 className="text-overline mb-2 text-text-muted">{t("complaints.photos")}</h4>

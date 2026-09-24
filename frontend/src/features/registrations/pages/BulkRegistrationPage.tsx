@@ -256,7 +256,11 @@ export default function BulkRegistrationPage() {
                 </NativeSelect>
               </FormField>
             ) : null}
+            <label htmlFor="bulk-file" className="sr-only">
+              {t("bulk.fileLabel")}
+            </label>
             <FileDropzone
+              id="bulk-file"
               value={files}
               onChange={onFiles}
               maxFiles={1}
