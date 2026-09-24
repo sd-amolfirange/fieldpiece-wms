@@ -1,5 +1,7 @@
 # Running the HVAC Warranty demo
 
+**Supported browser: Google Chrome only** (Chrome on the laptop, Chrome on the phone). Other browsers aren't tested.
+
 The repository has three parts:
 
 | Folder                 | What it is                                                                                                                                                                                                                                                                           |
@@ -70,10 +72,10 @@ compiled into the app. The shared password is **`Demo#2026`** if you type it by 
 | Customer     | `customer.rk@demo.wms`    | R. Kulkarni's units and complaints (phone layout)                 |
 | Dealer (2nd) | `dealer.breeze@demo.wms`  | Breeze Point only                                                 |
 
-**Use a separate browser profile (or a private window, or a different browser) for each role.** The sign-in is
-remembered with one cookie per browser profile, so two tabs in the same profile end up as the same user after a
-reload. A simple set-up is Chrome for Admin, a Chrome guest window for Dealer, Edge for Distributor, and the phone
-for Customer.
+**Use a separate Chrome profile for each role.** The sign-in is remembered with one cookie per browser profile, so
+two tabs in the same profile end up as the same user after a reload. Create the profiles once (Chrome → profile
+icon at the top right → **Add** → "Continue without an account"), named Admin, Dealer, Distributor and Customer.
+Use the Customer profile only if you show the customer screens on the laptop; normally the customer is the phone.
 
 ## 4. Open the demo on a phone (HTTPS)
 
@@ -113,8 +115,8 @@ accepts `*.trycloudflare.com` and `*.ngrok-free.app` hosts. Option A is faster o
 
 ## 5. Reset demo data
 
-- **In the app:** Admin → Simulate → **Reset demo data** (the Simulate screen arrives in Phase 3). Until then,
-  `POST /api/simulate/reset` as the admin does the same.
+- **In the app (use this):** sign in as Admin → **Administration** → **Simulate** tab → **Reset demo data** →
+  confirm. Everyone stays signed in; every screen shows the starting data again.
 - **From the command line**, with the server stopped:
 
   ```bash
@@ -131,21 +133,58 @@ demo.
 
 Each of the three folders has `typecheck`, `lint`, `test` and `build` scripts.
 
-| Where                  | Command                       | What it does                                                                                                   |
-| ---------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `backend/demo-server/` | `npm run sample-xlsx`         | Recreates `demo-assets/coolair_sales_week38.xlsx` (25 rows; rows 7, 15 and 22 contain the 3 deliberate errors) |
-| `backend/demo-server/` | `npm run build` / `npm start` | Bundles the server into `dist/index.js` and runs it with plain Node (API only)                                 |
-| `backend/demo-server/` | `npm test`                    | Seed, scoping, permissions and endpoint tests                                                                  |
-| `shared/wms-domain/`   | `npm test`                    | Warranty, entitlement, row-check and claim-step tests                                                          |
-| `frontend/`            | `npm test`                    | UI and integration tests. Their MSW mocks run the backend demo core, test-only.                                |
-| `frontend/`            | `npm run build:showcase`      | The demo build used by `npm run demo`                                                                          |
+| Where                  | Command                       | What it does                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/demo-server/` | `npm run sample-xlsx`         | Recreates `demo-assets/coolair_sales_week38.xlsx` (25 rows; rows 7, 15 and 22 contain the 3 deliberate errors)                                                                                                                                                                                    |
+| `backend/demo-server/` | `npm run build` / `npm start` | Bundles the server into `dist/index.js` and runs it with plain Node (API only)                                                                                                                                                                                                                    |
+| `backend/demo-server/` | `npm test`                    | Seed, scoping, permissions and endpoint tests                                                                                                                                                                                                                                                     |
+| `shared/wms-domain/`   | `npm test`                    | Warranty, entitlement, row-check and claim-step tests                                                                                                                                                                                                                                             |
+| `frontend/`            | `npm test`                    | UI and integration tests. Their MSW mocks run the backend demo core, test-only.                                                                                                                                                                                                                   |
+| `frontend/`            | `npm run build:showcase`      | The demo build used by `npm run demo`                                                                                                                                                                                                                                                             |
+| `frontend/`            | `npm run e2e`                 | Playwright (Chromium): one spec per workflow W1–W7, every screen's "must contain" list, and an accessibility scan. Starts its own demo server on port 4100 and app on 5174 with throwaway data, so it doesn't touch the demo data on port 4000. Run `npx playwright install chromium` once first. |
 
-## 7. Troubleshooting
+## 7. Demo day
 
-| Problem                                    | Fix                                                     |
-| ------------------------------------------ | ------------------------------------------------------- |
-| `EADDRINUSE` on start                      | Another process uses port 4000: stop it, or set `PORT`. |
-| "No frontend build found"                  | Start with `npm run demo` in `backend/demo-server/`.    |
-| Signed in as the wrong user after a reload | Two roles share a browser profile; see section 3.       |
-| Phone camera doesn't open                  | The page isn't HTTPS: use the tunnel URL (section 4).   |
-| Data looks wrong                           | Reset demo data (section 5).                            |
+Follow this order on the morning of the demo. It is the pre-demo checklist in `docs/Demo workflows.md`, spelled out.
+
+1. **Start the server** (laptop): `cd backend/demo-server` → `npm run demo`. Wait for "Demo app on
+   http://localhost:4000".
+2. **Start the tunnel** for the phone (section 4): `cloudflared tunnel --url http://localhost:4000`. Note the
+   `https://…trycloudflare.com` address. Use this address in **every** window below, not `localhost`, so the QR
+   labels point to the address the phone can open.
+3. **Open the four Chrome profiles** (section 3) at the tunnel address and sign in:
+
+   | Chrome profile | Sign in as                          | Window size                 |
+   | -------------- | ----------------------------------- | --------------------------- |
+   | Admin          | Admin: WMS office admin             | Full screen (desktop)       |
+   | Dealer         | Dealer: CoolAir Traders, Pune       | Desktop or tablet width     |
+   | Distributor    | Distributor: NorthStar Distribution | Desktop                     |
+   | Customer       | Customer: R. Kulkarni               | Only if not using the phone |
+
+4. **Reset demo data** in the Admin window: Administration → Simulate → **Reset demo data** → confirm. Do this last,
+   after signing in, so counts start clean. The seed dates units from the day you reset.
+5. **Phone:** open Chrome at the tunnel address, sign in as **Customer: R. Kulkarni**, and allow the camera when asked
+   (the first QR scan asks once). Keep a fault photo in the phone's gallery for W3.
+6. **QR label for W2:** in the Admin window open **Units** → `AER-SPL15-240917` → **Print label** (or keep that page
+   on screen for the phone to scan).
+7. **Bulk file for W1:** keep `demo-assets/coolair_sales_week38.xlsx` ready on the Dealer laptop.
+8. **Run order:** W1, W2, W3, W4, W6, W5, W7 (`docs/Demo workflows.md`). Nothing else needs resetting between
+   workflows.
+
+**The failed row in the Integration log is on purpose.** The seed includes one outbound **CRM update that failed**
+("CRM did not respond within 30 s."). It is there so you can show **Retry** in W6 step 4: open Administration →
+Integration log, find the row with status **Failed**, click **Retry**; it changes to **Sent** and its attempt count
+goes up. A reset puts the failed row back.
+
+After the demo: stop the tunnel (Ctrl+C) and the server.
+
+## 8. Troubleshooting
+
+| Problem                                    | Fix                                                                                                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EADDRINUSE` on start                      | Another process uses port 4000: stop it, or set `PORT`.                                                                                                                        |
+| "No frontend build found"                  | Start with `npm run demo` in `backend/demo-server/`.                                                                                                                           |
+| Signed in as the wrong user after a reload | Two roles share a browser profile; see section 3.                                                                                                                              |
+| Phone camera doesn't open                  | The page isn't HTTPS: use the tunnel URL (section 4). If Chrome blocked it, tap the lock icon → Permissions → Camera → Allow, or type the serial in the box under the scanner. |
+| Something looks wrong in another browser   | Only Chrome is supported. Open the demo in Chrome.                                                                                                                             |
+| Data looks wrong                           | Reset demo data (section 5).                                                                                                                                                   |
