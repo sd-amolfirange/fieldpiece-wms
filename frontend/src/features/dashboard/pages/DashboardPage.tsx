@@ -1,18 +1,44 @@
-import { ClipboardList, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
+import { ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
-import { buttonVariants, Card, KpiTile } from "@/components/ui";
+import { buttonVariants, KpiTile } from "@/components/ui";
+import { can } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/session";
-import type { Role } from "@/types";
-import { ClaimsByStatusChart } from "../components/ClaimsByStatusChart";
+import type { DashboardSummary } from "../types";
 import { useDashboardSummary } from "../hooks";
 
-// Section 8.2: role-specific dashboard. Each role block is a starting point; fill in per the table.
+// Role home: A01 (admin), DL01 (dealer / distributor), CU02 (customer; its unit cards arrive in Phase 2).
+// The demo server scopes the numbers to the signed-in account.
 
-const show = (role: Role | undefined, ...roles: Role[]) =>
-  !!role && (role === "admin" || roles.includes(role));
+function tiles(summary: DashboardSummary): { key: string; value: number }[] {
+  switch (summary.role) {
+    case "admin":
+      return [
+        { key: "units", value: summary.units },
+        { key: "active", value: summary.active },
+        { key: "expiring30", value: summary.expiring30 },
+        { key: "expired", value: summary.expired },
+        { key: "openClaims", value: summary.openClaims },
+      ];
+    case "customer":
+      return [
+        { key: "myUnits", value: summary.units },
+        { key: "active", value: summary.active },
+        { key: "expiringSoon", value: summary.expiringSoon },
+        { key: "openComplaints", value: summary.openComplaints },
+      ];
+    default:
+      return [
+        { key: "registrationsThisMonth", value: summary.registrationsThisMonth },
+        { key: "pending", value: summary.pending },
+        { key: "rejected", value: summary.rejected },
+        { key: "openComplaints", value: summary.openComplaints },
+        { key: "claimsInProgress", value: summary.claimsInProgress },
+      ];
+  }
+}
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -21,16 +47,24 @@ export default function DashboardPage() {
   const summary = useDashboardSummary();
 
   const primaryAction =
-    role === "technician" || role === "distributor" ? (
+    can(role, "registrations:create") && role !== "admin" ? (
       <Link to="/registrations/new" className={buttonVariants()}>
         <ShieldCheck size={20} strokeWidth={1.75} aria-hidden />
-        {t("registrations.new")}
+        {t("nav.registerUnit")}
+      </Link>
+    ) : can(role, "registrations:self") ? (
+      <Link to="/register" className={buttonVariants()}>
+        <ShieldCheck size={20} strokeWidth={1.75} aria-hidden />
+        {t("nav.registerProduct")}
       </Link>
     ) : null;
 
   return (
     <>
-      <PageHeader title={t("dashboard.greeting", { name: user?.name ?? "" })} actions={primaryAction} />
+      <PageHeader
+        title={t("dashboard.greeting", { name: user?.orgName ?? user?.name ?? "" })}
+        actions={primaryAction}
+      />
 
       {summary.error ? <ErrorState error={summary.error} onRetry={() => void summary.refetch()} /> : null}
 
@@ -41,65 +75,10 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : summary.data ? (
-        <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {show(role, "distributor") ? (
-              <KpiTile
-                label={t("dashboard.registrationsThisMonth")}
-                value={summary.data.registrationsThisMonth.value}
-                change={summary.data.registrationsThisMonth.change}
-                sparkline={summary.data.registrationsThisMonth.sparkline}
-              />
-            ) : null}
-            <KpiTile
-              label={t("dashboard.openClaims")}
-              value={summary.data.openClaims.value}
-              change={summary.data.openClaims.change}
-              invertChange
-            />
-            {show(role, "distributor", "claims_agent") ? (
-              <KpiTile
-                label={t("dashboard.avgResolutionDays")}
-                value={summary.data.avgResolutionDays.value}
-                change={summary.data.avgResolutionDays.change}
-                invertChange
-              />
-            ) : null}
-            {show(role, "claims_agent") ? (
-              <>
-                <KpiTile
-                  label={t("dashboard.slaBreached")}
-                  value={summary.data.slaBreached.value}
-                  change={summary.data.slaBreached.change}
-                  invertChange
-                  tone="danger"
-                />
-                <KpiTile label={t("dashboard.unassigned")} value={summary.data.unassigned} />
-              </>
-            ) : null}
-          </div>
-
-          {show(role, "claims_agent") ? <ClaimsByStatusChart data={summary.data.claimsByStatus} /> : null}
-
-          {role === "technician" ? (
-            <Card title={t("dashboard.myProducts")}>
-              {/* TODO: "My products" cards from GET /registrations?owner=me */}
-              <EmptyState icon={ShieldCheck} message={t("registrations.empty")} />
-            </Card>
-          ) : null}
-
-          {/* TODO per Section 8.2: agent queue sorted by SLA, service-center RMA lists,
-              distributor expiring warranties, admin claim rate by SKU / cost / top failures. */}
-          <Card
-            title={t("dashboard.recentClaims")}
-            actions={
-              <Link to="/claims" className="text-sm text-info underline underline-offset-2">
-                {t("common.viewAll")}
-              </Link>
-            }
-          >
-            <EmptyState icon={ClipboardList} message={t("common.comingSoon")} className="py-6" />
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {tiles(summary.data).map((tile) => (
+            <KpiTile key={tile.key} label={t(`dashboard.tiles.${tile.key}`)} value={tile.value} />
+          ))}
         </div>
       ) : null}
     </>

@@ -1,15 +1,36 @@
 import { can, hasRole, isStaff } from "./permissions";
 
 describe("permissions", () => {
-  it("gives distributors bulk registration but not technicians", () => {
-    expect(can("distributor", "registrations:bulk")).toBe(true);
-    expect(can("technician", "registrations:bulk")).toBe(false);
+  it("keeps review, void, service hand-off, claim actions and simulation with the admin", () => {
+    for (const permission of [
+      "registrations:inbox",
+      "units:void",
+      "complaints:send",
+      "claims:act",
+      "admin:manage",
+      "simulate:run",
+    ] as const) {
+      expect(can("admin", permission)).toBe(true);
+      expect(can("dealer", permission)).toBe(false);
+      expect(can("distributor", permission)).toBe(false);
+      expect(can("customer", permission)).toBe(false);
+    }
   });
 
-  it("keeps internal notes away from customers", () => {
-    expect(can("technician", "claims:internal_notes")).toBe(false);
-    expect(can("distributor", "claims:internal_notes")).toBe(false);
-    expect(can("claims_agent", "claims:internal_notes")).toBe(true);
+  it("lets dealers and distributors register, bulk import and see claims read-only", () => {
+    for (const role of ["dealer", "distributor"] as const) {
+      expect(can(role, "registrations:create")).toBe(true);
+      expect(can(role, "registrations:bulk")).toBe(true);
+      expect(can(role, "claims:view")).toBe(true);
+      expect(can(role, "claims:act")).toBe(false);
+    }
+  });
+
+  it("gives customers self-registration and complaints only", () => {
+    expect(can("customer", "registrations:self")).toBe(true);
+    expect(can("customer", "complaints:create")).toBe(true);
+    expect(can("customer", "claims:view")).toBe(false);
+    expect(can("customer", "units:list")).toBe(false);
   });
 
   it("denies everything without a role", () => {
@@ -18,12 +39,12 @@ describe("permissions", () => {
   });
 
   it("checks role lists", () => {
-    expect(hasRole("admin", ["admin", "claims_agent"])).toBe(true);
-    expect(hasRole("technician", ["admin"])).toBe(false);
+    expect(hasRole("admin", ["admin", "dealer"])).toBe(true);
+    expect(hasRole("customer", ["admin"])).toBe(false);
   });
 
-  it("identifies staff roles", () => {
-    expect(isStaff("service_center")).toBe(true);
+  it("treats only the admin as office staff", () => {
+    expect(isStaff("admin")).toBe(true);
     expect(isStaff("distributor")).toBe(false);
   });
 });

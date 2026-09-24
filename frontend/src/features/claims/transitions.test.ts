@@ -79,27 +79,26 @@ describe("claim state machine", () => {
 });
 
 describe("role permissions", () => {
-  it("lets technicians submit and respond, but never review", () => {
-    expect(actionsFor("DRAFT", "technician")).toEqual(["submit"]);
-    expect(actionsFor("NEEDS_INFO", "technician")).toEqual(["respond"]);
-    expect(actionsFor("IN_REVIEW", "technician")).toEqual([]);
-    expect(canPerform("IN_REVIEW", "approve", "technician")).toBe(false);
+  it("lets dealers submit and respond, but never review", () => {
+    expect(actionsFor("DRAFT", "dealer")).toEqual(["submit"]);
+    expect(actionsFor("NEEDS_INFO", "dealer")).toEqual(["respond"]);
+    expect(actionsFor("IN_REVIEW", "dealer")).toEqual([]);
+    expect(canPerform("IN_REVIEW", "approve", "dealer")).toBe(false);
   });
 
-  it("gives claims agents the review decisions", () => {
-    expect(actionsFor("SUBMITTED", "claims_agent")).toEqual(["start_review"]);
-    expect(actionsFor("IN_REVIEW", "claims_agent")).toEqual(["request_info", "approve", "reject"]);
-    expect(actionsFor("RECEIVED", "claims_agent")).toEqual([]);
+  it("gives the admin the review decisions", () => {
+    expect(actionsFor("SUBMITTED", "admin")).toEqual(["start_review"]);
+    expect(actionsFor("IN_REVIEW", "admin")).toEqual(["request_info", "approve", "reject"]);
   });
 
-  it("gives the service center receiving and resolution", () => {
-    expect(actionsFor("IN_TRANSIT", "service_center")).toEqual(["mark_received"]);
-    expect(actionsFor("RECEIVED", "service_center")).toEqual([
-      "mark_repaired",
-      "mark_replaced",
-      "mark_credited",
-    ]);
-    expect(canPerform("IN_REVIEW", "approve", "service_center")).toBe(false);
+  it("gives the admin receiving and resolution", () => {
+    expect(actionsFor("IN_TRANSIT", "admin")).toEqual(["mark_received"]);
+    expect(actionsFor("RECEIVED", "admin")).toEqual(["mark_repaired", "mark_replaced", "mark_credited"]);
+    expect(canPerform("IN_TRANSIT", "mark_received", "distributor")).toBe(false);
+  });
+
+  it("gives customers nothing", () => {
+    CLAIM_TRANSITIONS.forEach((t) => expect(canPerform(t.from, t.action, "customer")).toBe(false));
   });
 
   it("lets admins do everything", () => {

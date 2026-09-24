@@ -38,15 +38,25 @@
     "adminPolicies": "Warranty policies",
     "adminSettings": "Settings",
     "checkWarranty": "Check warranty",
+    "home": "Home",
+    "units": "Units",
+    "models": "Models & parts",
+    "complaints": "Complaints",
+    "registerUnit": "Register a unit",
+    "bulkImport": "Bulk import",
+    "mySoldUnits": "My sold units",
+    "complaintsAndClaims": "Complaints & claims",
+    "myUnits": "My units",
+    "registerProduct": "Register a product",
+    "myComplaints": "My complaints",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
   },
   "roles": {
-    "technician": "Technician",
+    "admin": "Admin",
+    "dealer": "Dealer",
     "distributor": "Distributor",
-    "claims_agent": "Claims agent",
-    "service_center": "Service center",
-    "admin": "Admin"
+    "customer": "Customer"
   },
   "common": {
     "loading": "Loading",
@@ -60,7 +70,7 @@
     "optional": "Optional",
     "exportCsv": "Export CSV",
     "viewAll": "View all",
-    "comingSoon": "This screen is scaffolded. Build it out following Section 8 of the build guide.",
+    "comingSoon": "This screen is being built. It's planned for the phase shown below.",
     "pageOf": "Page {{page}} of {{pages}}",
     "previousPage": "Previous page",
     "nextPage": "Next page",
@@ -132,8 +142,17 @@
     "sendResetLink": "Send reset link",
     "resetSent": "If that email has an account, a reset link is on its way.",
     "backToSignIn": "Back to sign in",
-    "mockRole": "Sign in as (mock only)",
+    "mockRole": "Sign in as",
     "mockNotice": "Mock sign-in. The real identity provider (OIDC with PKCE) is still to be confirmed.",
+    "demoNotice": "Demo sign-in: pick a demo account below, or type its email. The password is demo.",
+    "pickAccount": "Choose a demo account",
+    "demoAccounts": {
+      "admin": "Admin: WMS office admin",
+      "dealer": "Dealer: CoolAir Traders, Pune",
+      "distributor": "Distributor: NorthStar Distribution",
+      "customer": "Customer: R. Kulkarni",
+      "breeze": "Dealer: Breeze Point, Nashik"
+    },
     "invalidCredentials": "Email or password is wrong. Check them and try again.",
     "checkWarrantyLink": "Just want to check a warranty?"
   },
@@ -170,7 +189,21 @@
     "topFailures": "Top failure categories",
     "vsPrevious": "vs previous period",
     "viewData": "View data",
-    "viewChart": "View chart"
+    "viewChart": "View chart",
+    "tiles": {
+      "units": "Units",
+      "active": "Active warranties",
+      "expiring30": "Expiring within 30 days",
+      "expired": "Expired",
+      "openClaims": "Open claims",
+      "myUnits": "My units",
+      "expiringSoon": "Expiring soon",
+      "openComplaints": "Open complaints",
+      "registrationsThisMonth": "Registrations this month",
+      "pending": "Pending",
+      "rejected": "Rejected",
+      "claimsInProgress": "Claims in progress"
+    }
   },
   "registrations": {
     "title": "Registrations",
@@ -251,5 +284,137 @@
   "customers": { "title": "Customers", "detailTitle": "Customer" },
   "products": { "title": "Products", "detailTitle": "Product {{sku}}" },
   "reports": { "title": "Reports" },
-  "admin": { "users": "Users", "policies": "Warranty policies", "settings": "Settings" }
+  "admin": { "users": "Users", "policies": "Warranty policies", "settings": "Settings" },
+  "screens": {
+    "phase": "{{code}} (Phase {{phase}})",
+    "A02": {
+      "title": "Registration inbox",
+      "mustContain": [
+        "Queue from every channel with source badge (Dealer, Portal, Email, ERP…)",
+        "Filters: pending, exceptions, duplicates",
+        "Bulk approve"
+      ]
+    },
+    "A03": {
+      "title": "Registration review",
+      "mustContain": [
+        "Submitted data next to invoice image",
+        "Duplicate / model-mismatch warnings",
+        "Approve, reject with reason, merge"
+      ]
+    },
+    "A04": {
+      "title": "Units",
+      "mustContain": ["Search by serial, customer, dealer", "Status pill per unit", "Manual add, bulk upload"]
+    },
+    "A05": {
+      "title": "Unit detail",
+      "mustContain": [
+        "Part-wise warranty table with status pills",
+        "QR label, certificate PDF",
+        "Service & claim history",
+        "Void warranty with reason"
+      ]
+    },
+    "A06": {
+      "title": "Models & parts",
+      "mustContain": ["Model list by brand", "Model template: parts, warranty months, parts/labour coverage"]
+    },
+    "A07": {
+      "title": "Complaints",
+      "mustContain": ["List with source (Customer / Dealer / Admin)", "Status: New → With service → Resolved"]
+    },
+    "A08": {
+      "title": "Complaint detail",
+      "mustContain": [
+        "Entitlement panel: parts / labour free or chargeable",
+        "Send to service system",
+        "Job result: parts replaced, serials, photos, sign-off"
+      ]
+    },
+    "A09": {
+      "title": "Claims",
+      "mustContain": ["List by brand and status", "Submitted, Approved, Paid, Rejected counts"]
+    },
+    "A10": {
+      "title": "Claim detail",
+      "mustContain": [
+        "Evidence pulled from job result",
+        "RMA number, amount",
+        "Submit, approve, reject, mark paid",
+        "Finance posting status"
+      ]
+    },
+    "A11": {
+      "title": "Dealers & users",
+      "mustContain": ["Distributor → dealer hierarchy", "Dealer accounts and logins"]
+    },
+    "A12": {
+      "title": "Integration log",
+      "mustContain": [
+        "Every message in/out: CRM, ERP, Finance, Service system, OEM",
+        "Direction, status, retry, payload view"
+      ]
+    },
+    "A13": {
+      "title": "Simulate panel",
+      "mustContain": ["Demo-only: fire ERP invoice, email, job result, OEM decision", "Reset demo data"]
+    },
+    "DL02": {
+      "title": "Bulk import",
+      "mustContain": [
+        "Download Excel / CSV template",
+        "Upload → row-by-row validation",
+        "Error report, fix inline, resubmit",
+        "Upload history"
+      ]
+    },
+    "DL03": {
+      "title": "Register a unit",
+      "mustContain": ["Single form or QR scan", "Customer details, serial, model, install date, invoice"]
+    },
+    "DL04": {
+      "title": "My sold units",
+      "mustContain": [
+        "Units registered by this dealer (distributor: all its dealers)",
+        "Search, status pills"
+      ]
+    },
+    "DL05": {
+      "title": "Unit detail (read-only)",
+      "mustContain": ["Part-wise warranty status", "Certificate download for the customer"]
+    },
+    "DL06": {
+      "title": "Raise complaint",
+      "mustContain": ["On behalf of the customer, with photo", "Entitlement preview"]
+    },
+    "DL07": {
+      "title": "Complaints & claims",
+      "mustContain": ["Status tracker per complaint", "Claim status (view only)"]
+    },
+    "CU01": {
+      "title": "Register a product",
+      "mustContain": [
+        "Opens from QR with serial and model pre-filled",
+        "Purchase date, invoice upload",
+        "Pending approval message"
+      ]
+    },
+    "CU03": {
+      "title": "Unit detail",
+      "mustContain": [
+        "Part-wise warranty: unit, compressor, PCB…",
+        "Download warranty certificate",
+        "Service history"
+      ]
+    },
+    "CU04": {
+      "title": "Raise complaint",
+      "mustContain": ["Pick unit, describe fault, add photo", "Shows what is covered before submitting"]
+    },
+    "CU05": {
+      "title": "Complaint tracking",
+      "mustContain": ["Timeline: raised → with service → resolved", "New part warranty shown after repair"]
+    }
+  }
 }

@@ -3,7 +3,6 @@ import { z } from "zod";
 export const loginSchema = z.object({
   email: z.string().trim().min(1, "Enter your email.").email("Enter a valid email, like name@company.com."),
   password: z.string().min(1, "Enter your password."),
-  role: z.enum(["technician", "distributor", "claims_agent", "service_center", "admin"]).optional(),
 });
 export type LoginForm = z.infer<typeof loginSchema>;
 

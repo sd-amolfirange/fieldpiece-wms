@@ -1,61 +1,55 @@
 import type { Role } from "@/types";
 
-// UI-only permission helper (Section 1.1). It decides what to HIDE, nothing more.
-// The API must enforce every permission. Never rely on UI hiding for security.
+// UI-only permission helper. It decides what to HIDE, nothing more.
+// The demo server scopes every response and refuses every action the caller isn't allowed to take.
 
 export type Permission =
-  | "registrations:view"
-  | "registrations:create"
-  | "registrations:bulk"
+  | "registrations:inbox" // A02/A03 registration inbox and review
+  | "registrations:create" // DL03 register a unit (admin: manual add)
+  | "registrations:bulk" // DL02 bulk import
+  | "registrations:self" // CU01 customer self-registration
+  | "units:list" // A04 / DL04
+  | "units:void"
+  | "units:qr_label"
+  | "models:manage" // A06
+  | "complaints:create"
+  | "complaints:send" // hand a complaint to the service system
   | "claims:view"
+  | "claims:act" // submit, approve, reject, mark paid
+  | "admin:manage" // A11, A12
+  | "simulate:run" // A13
+  // Legacy permissions still referenced by the old claim pages until their rebuild.
   | "claims:create"
   | "claims:review"
-  | "claims:internal_notes"
-  | "rma:view"
-  | "rma:inspect"
-  | "customers:view"
-  | "products:view"
-  | "products:edit"
-  | "reports:view"
-  | "admin:manage";
+  | "claims:internal_notes";
 
 const rolePermissions: Record<Role, readonly Permission[]> = {
-  technician: ["registrations:view", "registrations:create", "claims:view", "claims:create", "products:view"],
-  distributor: [
-    "registrations:view",
-    "registrations:create",
-    "registrations:bulk",
-    "claims:view",
-    "claims:create",
-    "customers:view",
-    "products:view",
-  ],
-  claims_agent: [
-    "claims:view",
-    "claims:review",
-    "claims:internal_notes",
-    "rma:view",
-    "customers:view",
-    "products:view",
-    "reports:view",
-  ],
-  service_center: ["claims:view", "claims:internal_notes", "rma:view", "rma:inspect", "products:view"],
   admin: [
-    "registrations:view",
+    "registrations:inbox",
     "registrations:create",
     "registrations:bulk",
+    "units:list",
+    "units:void",
+    "units:qr_label",
+    "models:manage",
+    "complaints:create",
+    "complaints:send",
     "claims:view",
-    "claims:create",
+    "claims:act",
+    "admin:manage",
+    "simulate:run",
     "claims:review",
     "claims:internal_notes",
-    "rma:view",
-    "rma:inspect",
-    "customers:view",
-    "products:view",
-    "products:edit",
-    "reports:view",
-    "admin:manage",
   ],
+  distributor: [
+    "registrations:create",
+    "registrations:bulk",
+    "units:list",
+    "complaints:create",
+    "claims:view",
+  ],
+  dealer: ["registrations:create", "registrations:bulk", "units:list", "complaints:create", "claims:view"],
+  customer: ["registrations:self", "complaints:create"],
 };
 
 export function can(role: Role | undefined | null, permission: Permission): boolean {
@@ -67,6 +61,5 @@ export function hasRole(role: Role | undefined | null, allowed: readonly Role[])
   return !!role && allowed.includes(role);
 }
 
-/** Staff roles see internal notes and SLA details that customers never see. */
-export const isStaff = (role: Role | undefined | null) =>
-  role === "claims_agent" || role === "service_center" || role === "admin";
+/** Office staff see internal notes and integration details that dealers and customers never see. */
+export const isStaff = (role: Role | undefined | null) => role === "admin";

@@ -1,7 +1,10 @@
-// Shared domain types (Section 7). Keep in sync with the backend OpenAPI spec;
-// replace with `openapi-typescript` output once the spec exists.
+// LEGACY types from the original scaffold. Only the screens that are now unreachable (RMA, customers,
+// reports, policies, settings, public check) and pages awaiting their rebuild still use them.
+// New code imports the HVAC demo model from "@/domain".
 
-export type Role = "technician" | "distributor" | "claims_agent" | "service_center" | "admin";
+import type { Role, SessionUser } from "@/domain";
+
+export type { Role, SessionUser };
 
 export type ProductFamily =
   "meters" | "gauges" | "vacuum" | "leak_detection" | "combustion" | "airflow" | "recovery" | "other";
@@ -131,13 +134,4 @@ export interface Address {
   region: string;
   postalCode: string;
   country: string;
-}
-
-export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  distributorId?: string;
-  currency: string; // ISO 4217, used for money formatting
 }

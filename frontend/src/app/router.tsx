@@ -2,39 +2,34 @@ import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import type { Role } from "@/types";
 import { AppLayout } from "./AppLayout";
+import type { ScreenCode } from "./pages/ScreenPlaceholderPage";
 import { RequireRole } from "./RequireRole";
 import { RootLayout } from "./RootLayout";
 import { RouteError } from "./RouteError";
 
-// Route table (Section 6.2). Keep in sync with components/layout/nav-items.ts.
-// Pages are lazy-loaded so each feature ships in its own chunk.
+// Route table for the demo (docs/implementation-plan.md, section 2). Keep in sync with
+// components/layout/nav-items.ts. Screens a later phase builds render ScreenPlaceholderPage.
+// The out-of-scope screens (RMA, customers, reports, policies, settings, public check) keep their code
+// but are not routed.
 
 const LoginPage = lazy(() => import("@/features/auth/pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("@/features/auth/pages/ForgotPasswordPage"));
-const CheckWarrantyPage = lazy(() => import("@/features/warranty-lookup/pages/CheckWarrantyPage"));
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
-const RegistrationsListPage = lazy(() => import("@/features/registrations/pages/RegistrationsListPage"));
-const NewRegistrationPage = lazy(() => import("@/features/registrations/pages/NewRegistrationPage"));
-const BulkRegistrationPage = lazy(() => import("@/features/registrations/pages/BulkRegistrationPage"));
-const ClaimsListPage = lazy(() => import("@/features/claims/pages/ClaimsListPage"));
-const NewClaimPage = lazy(() => import("@/features/claims/pages/NewClaimPage"));
-const ClaimDetailPage = lazy(() => import("@/features/claims/pages/ClaimDetailPage"));
-const RmaListPage = lazy(() => import("@/features/rma/pages/RmaListPage"));
-const RmaDetailPage = lazy(() => import("@/features/rma/pages/RmaDetailPage"));
-const CustomersListPage = lazy(() => import("@/features/customers/pages/CustomersListPage"));
-const CustomerDetailPage = lazy(() => import("@/features/customers/pages/CustomerDetailPage"));
-const ProductsPage = lazy(() => import("@/features/products/pages/ProductsPage"));
-const ProductDetailPage = lazy(() => import("@/features/products/pages/ProductDetailPage"));
-const ReportsPage = lazy(() => import("@/features/reports/pages/ReportsPage"));
-const AdminUsersPage = lazy(() => import("@/features/admin/pages/AdminUsersPage"));
-const AdminPoliciesPage = lazy(() => import("@/features/admin/pages/AdminPoliciesPage"));
-const AdminSettingsPage = lazy(() => import("@/features/admin/pages/AdminSettingsPage"));
+const ScreenPlaceholderPage = lazy(() => import("./pages/ScreenPlaceholderPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 const guarded = (roles: readonly Role[] | undefined, children: RouteObject[]): RouteObject => ({
   element: <RequireRole roles={roles} />,
   children,
 });
+
+type Screens = Partial<Record<Role, ScreenCode>>;
+const screen = (path: string, screens: Screens): RouteObject => ({
+  path,
+  element: <ScreenPlaceholderPage screens={screens} />,
+});
+
+const PARTNERS: Role[] = ["dealer", "distributor"];
 
 export const routes: RouteObject[] = [
   {
@@ -44,7 +39,6 @@ export const routes: RouteObject[] = [
       // Public
       { path: "/login", element: <LoginPage /> },
       { path: "/forgot-password", element: <ForgotPasswordPage /> },
-      { path: "/check", element: <CheckWarrantyPage /> },
 
       // Authenticated
       guarded(undefined, [
@@ -52,47 +46,44 @@ export const routes: RouteObject[] = [
           element: <AppLayout />,
           errorElement: <RouteError />,
           children: [
+            // A01 / DL01 / CU02 (role home)
             { index: true, element: <DashboardPage /> },
-            { path: "claims", element: <ClaimsListPage /> },
-            { path: "claims/new", element: <NewClaimPage /> },
-            { path: "claims/:id", element: <ClaimDetailPage /> },
-            { path: "products", element: <ProductsPage /> },
-            { path: "products/:sku", element: <ProductDetailPage /> },
 
-            guarded(
-              ["technician", "distributor", "admin"],
-              [
-                { path: "registrations", element: <RegistrationsListPage /> },
-                { path: "registrations/new", element: <NewRegistrationPage /> },
-              ],
-            ),
-            guarded(
-              ["distributor", "admin"],
-              [{ path: "registrations/bulk", element: <BulkRegistrationPage /> }],
-            ),
-            guarded(
-              ["claims_agent", "service_center", "admin"],
-              [
-                { path: "rma", element: <RmaListPage /> },
-                { path: "rma/:id", element: <RmaDetailPage /> },
-              ],
-            ),
-            guarded(
-              ["distributor", "claims_agent", "admin"],
-              [
-                { path: "customers", element: <CustomersListPage /> },
-                { path: "customers/:id", element: <CustomerDetailPage /> },
-              ],
-            ),
-            guarded(["claims_agent", "admin"], [{ path: "reports", element: <ReportsPage /> }]),
             guarded(
               ["admin"],
               [
-                { path: "admin/users", element: <AdminUsersPage /> },
-                { path: "admin/policies", element: <AdminPoliciesPage /> },
-                { path: "admin/settings", element: <AdminSettingsPage /> },
+                screen("registrations", { admin: "A02" }),
+                screen("registrations/:id", { admin: "A03" }),
+                screen("models", { admin: "A06" }),
+                screen("models/:id", { admin: "A06" }),
+                screen("claims", { admin: "A09" }),
+                screen("claims/:id", { admin: "A10" }),
+                screen("admin/dealers", { admin: "A11" }),
+                screen("admin/integrations", { admin: "A12" }),
+                screen("admin/simulate", { admin: "A13" }),
               ],
             ),
+            guarded(
+              ["admin", ...PARTNERS],
+              [
+                screen("registrations/new", { admin: "DL03", dealer: "DL03", distributor: "DL03" }),
+                screen("registrations/bulk", { admin: "DL02", dealer: "DL02", distributor: "DL02" }),
+                screen("units", { admin: "A04", dealer: "DL04", distributor: "DL04" }),
+              ],
+            ),
+            guarded(["customer"], [screen("register", { customer: "CU01" })]),
+
+            // Shared screens: the demo server decides which rows each role gets.
+            screen("units/:serial", { admin: "A05", dealer: "DL05", distributor: "DL05", customer: "CU03" }),
+            screen("complaints", { admin: "A07", dealer: "DL07", distributor: "DL07", customer: "CU05" }),
+            screen("complaints/new", {
+              admin: "DL06",
+              dealer: "DL06",
+              distributor: "DL06",
+              customer: "CU04",
+            }),
+            screen("complaints/:id", { admin: "A08", dealer: "DL07", distributor: "DL07", customer: "CU05" }),
+
             { path: "*", element: <NotFoundPage /> },
           ],
         },

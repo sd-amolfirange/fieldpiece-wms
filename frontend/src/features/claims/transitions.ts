@@ -34,9 +34,10 @@ export interface ClaimTransition {
   tone?: "primary" | "secondary" | "danger";
 }
 
-const CUSTOMER: readonly Role[] = ["technician", "distributor", "admin"];
-const AGENT: readonly Role[] = ["claims_agent", "admin"];
-const SERVICE: readonly Role[] = ["service_center", "admin"];
+// LEGACY state machine for the old claim pages (rebuilt in Phase 3 on domain/claim-transitions.ts).
+const CUSTOMER: readonly Role[] = ["dealer", "distributor", "admin"];
+const AGENT: readonly Role[] = ["admin"];
+const SERVICE: readonly Role[] = ["admin"];
 
 export const CLAIM_TRANSITIONS: readonly ClaimTransition[] = [
   { action: "submit", from: "DRAFT", to: "SUBMITTED", roles: CUSTOMER, tone: "primary" },
@@ -71,7 +72,7 @@ export const CLAIM_TRANSITIONS: readonly ClaimTransition[] = [
     action: "mark_in_transit",
     from: "RMA_ISSUED",
     to: "IN_TRANSIT",
-    roles: ["technician", "distributor", "service_center", "admin"],
+    roles: ["dealer", "distributor", "admin"],
     requiresInput: true, // tracking number
     tone: "primary",
   },

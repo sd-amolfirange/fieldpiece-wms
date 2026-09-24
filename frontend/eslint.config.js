@@ -73,8 +73,8 @@ export default tseslint.config(
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
-    // Fixtures index into arrays they just built; non-null assertions are fine here.
-    files: ["src/mocks/**"],
+    // Fixtures, the demo seed and tests index into arrays they just built; non-null assertions are fine here.
+    files: ["src/mocks/**", "src/demo-core/seed.ts", "src/**/*.test.{ts,tsx}"],
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },
   },
   {

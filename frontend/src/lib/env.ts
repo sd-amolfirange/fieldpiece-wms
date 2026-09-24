@@ -6,6 +6,8 @@ export const env = {
   oidcClientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? "",
   sentryDsn: import.meta.env.VITE_SENTRY_DSN ?? "",
   enableMocks: import.meta.env.VITE_ENABLE_MOCKS === "true",
+  /** Offers the seed accounts on the sign-in page (dev server and demo builds). */
+  demoMode: import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === "true",
   expiringSoonDays: Number(import.meta.env.VITE_EXPIRING_SOON_DAYS ?? 60) || 60,
   mode: import.meta.env.MODE,
 } as const;

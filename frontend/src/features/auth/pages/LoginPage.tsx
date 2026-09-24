@@ -9,11 +9,11 @@ import { Button, Card, FormField, Input, NativeSelect } from "@/components/ui";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { env } from "@/lib/env";
 import { useSession } from "@/lib/session";
-import type { Role } from "@/types";
 import { useLogin } from "../hooks";
 import { loginSchema, type LoginForm } from "../schemas";
+import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "../types";
 
-const ROLES: Role[] = ["technician", "distributor", "claims_agent", "service_center", "admin"];
+const showDemoAccounts = env.enableMocks || env.demoMode;
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -27,11 +27,17 @@ export default function LoginPage() {
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "", role: env.enableMocks ? "technician" : undefined },
+    defaultValues: { email: "", password: "" },
   });
+
+  const pickAccount = (email: string) => {
+    setValue("email", email, { shouldValidate: !!email });
+    setValue("password", email ? DEMO_PASSWORD : "", { shouldValidate: !!email });
+  };
 
   if (status === "authenticated") return <Navigate to={from} replace />;
 
@@ -48,8 +54,8 @@ export default function LoginPage() {
     <AuthLayout>
       <Card as="div">
         <h1 className="mb-6 text-h1">{t("auth.signInTitle")}</h1>
-        {env.enableMocks ? (
-          <p className="mb-4 rounded bg-info-bg p-3 text-sm text-info">{t("auth.mockNotice")}</p>
+        {showDemoAccounts ? (
+          <p className="mb-4 rounded bg-info-bg p-3 text-sm text-info">{t("auth.demoNotice")}</p>
         ) : null}
         <form onSubmit={onSubmit} noValidate className="space-y-4">
           <FormField label={t("fields.email")} error={errors.email?.message} required>
@@ -67,12 +73,13 @@ export default function LoginPage() {
           >
             <Input type="password" autoComplete="current-password" {...register("password")} />
           </FormField>
-          {env.enableMocks ? (
+          {showDemoAccounts ? (
             <FormField label={t("auth.mockRole")}>
-              <NativeSelect {...register("role")}>
-                {ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {t(`roles.${role}`)}
+              <NativeSelect defaultValue="" onChange={(e) => pickAccount(e.target.value)}>
+                <option value="">{t("auth.pickAccount")}</option>
+                {DEMO_ACCOUNTS.map((account) => (
+                  <option key={account.email} value={account.email}>
+                    {t(account.labelKey)}
                   </option>
                 ))}
               </NativeSelect>
@@ -83,11 +90,6 @@ export default function LoginPage() {
           </Button>
         </form>
       </Card>
-      <p className="mt-6 text-center text-body">
-        <Link to="/check" className="text-info underline underline-offset-2">
-          {t("auth.checkWarrantyLink")}
-        </Link>
-      </p>
     </AuthLayout>
   );
 }

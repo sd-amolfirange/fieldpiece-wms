@@ -62,9 +62,9 @@ export default function NewRegistrationPage() {
       sku: "",
       purchaseDate: "",
       proofCount: 0,
-      // Pre-filled for a logged-in technician (Section 8.3).
-      ownerName: user?.role === "technician" ? user.name : "",
-      ownerEmail: user?.role === "technician" ? user.email : "",
+      // Pre-filled for a signed-in customer.
+      ownerName: user?.role === "customer" ? user.name : "",
+      ownerEmail: user?.role === "customer" ? user.email : "",
     },
   });
 

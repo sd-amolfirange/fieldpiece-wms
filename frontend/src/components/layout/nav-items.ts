@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   Boxes,
   ClipboardList,
   LayoutDashboard,
@@ -7,12 +6,11 @@ import {
   Settings,
   ShieldCheck,
   Truck,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/types";
 
-// Mirrors the route table in Section 6.2. Keep in sync with app/router.tsx.
+// Menus per role (docs/implementation-plan.md, section 5). Keep in sync with app/router.tsx.
 
 export interface NavItem {
   to: string;
@@ -23,26 +21,37 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, roles: "all", end: true },
+  // Admin
+  { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, roles: ["admin"], end: true },
+  { to: "/registrations", labelKey: "nav.registrations", icon: ShieldCheck, roles: ["admin"] },
+  { to: "/units", labelKey: "nav.units", icon: Boxes, roles: ["admin"] },
+  { to: "/models", labelKey: "nav.models", icon: Package, roles: ["admin"] },
+  { to: "/complaints", labelKey: "nav.complaints", icon: Truck, roles: ["admin"] },
+  { to: "/claims", labelKey: "nav.claims", icon: ClipboardList, roles: ["admin"] },
+  { to: "/admin/dealers", labelKey: "nav.admin", icon: Settings, roles: ["admin"] },
+  // Dealer and distributor
+  { to: "/", labelKey: "nav.home", icon: LayoutDashboard, roles: ["dealer", "distributor"], end: true },
   {
-    to: "/registrations",
-    labelKey: "nav.registrations",
+    to: "/registrations/new",
+    labelKey: "nav.registerUnit",
     icon: ShieldCheck,
-    roles: ["technician", "distributor", "admin"],
+    roles: ["dealer", "distributor"],
   },
-  { to: "/claims", labelKey: "nav.claims", icon: ClipboardList, roles: "all" },
-  { to: "/rma", labelKey: "nav.rma", icon: Truck, roles: ["claims_agent", "service_center", "admin"] },
   {
-    to: "/customers",
-    labelKey: "nav.customers",
-    icon: Users,
-    roles: ["distributor", "claims_agent", "admin"],
+    to: "/registrations/bulk",
+    labelKey: "nav.bulkImport",
+    icon: ClipboardList,
+    roles: ["dealer", "distributor"],
   },
-  { to: "/products", labelKey: "nav.products", icon: Package, roles: "all" },
-  { to: "/reports", labelKey: "nav.reports", icon: BarChart3, roles: ["claims_agent", "admin"] },
-  { to: "/admin/users", labelKey: "nav.admin", icon: Settings, roles: ["admin"] },
+  { to: "/units", labelKey: "nav.mySoldUnits", icon: Boxes, roles: ["dealer", "distributor"] },
+  { to: "/complaints", labelKey: "nav.complaintsAndClaims", icon: Truck, roles: ["dealer", "distributor"] },
+  // Customer
+  { to: "/", labelKey: "nav.myUnits", icon: Boxes, roles: ["customer"], end: true },
+  { to: "/register", labelKey: "nav.registerProduct", icon: ShieldCheck, roles: ["customer"] },
+  { to: "/complaints", labelKey: "nav.myComplaints", icon: Truck, roles: ["customer"] },
 ];
 
+/** The public warranty check is out of scope for the demo: kept here but not routed. */
 export const publicNavItems: NavItem[] = [
   { to: "/check", labelKey: "nav.checkWarranty", icon: Boxes, roles: "all" },
 ];

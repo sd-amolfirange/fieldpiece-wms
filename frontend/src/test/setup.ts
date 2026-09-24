@@ -3,6 +3,7 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import "@/lib/i18n";
 import { i18n } from "@/lib/i18n";
+import { resetMockDb } from "@/mocks/db";
 import { server } from "@/mocks/server";
 
 beforeAll(async () => {
@@ -12,6 +13,7 @@ beforeAll(async () => {
 afterEach(() => {
   cleanup();
   server.resetHandlers();
+  resetMockDb();
   sessionStorage.clear();
 });
 afterAll(() => server.close());

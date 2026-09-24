@@ -7,12 +7,11 @@ import type {
   Product,
   Registration,
   Rma,
-  Role,
-  SessionUser,
   WarrantyPolicy,
 } from "@/types";
 
-// In-memory fixtures for MSW. SKUs, names and warranty terms are SAMPLE DATA ONLY. [CONFIRM real SKU list]
+// LEGACY fixtures for the out-of-scope screens (public check, RMA, customers). The demo seed lives in
+// src/demo-core/seed.ts.
 
 const TODAY = new Date();
 const iso = (d: Date) => d.toISOString();
@@ -60,39 +59,6 @@ export const policies: WarrantyPolicy[] = products.map((p, i) => ({
   exclusions: ["physical_damage", "misuse", "consumables"],
   effectiveFrom: "2020-01-01",
 }));
-
-export const mockUsers: Record<Role, SessionUser> = {
-  technician: {
-    id: "u-tech",
-    name: "Sam Tech",
-    email: "tech@example.com",
-    role: "technician",
-    currency: "USD",
-  },
-  distributor: {
-    id: "u-dist",
-    name: "Acme HVAC Supply",
-    email: "dist@example.com",
-    role: "distributor",
-    distributorId: "d-1",
-    currency: "USD",
-  },
-  claims_agent: {
-    id: "u-agent",
-    name: "Casey Agent",
-    email: "agent@example.com",
-    role: "claims_agent",
-    currency: "USD",
-  },
-  service_center: {
-    id: "u-svc",
-    name: "Service Bench",
-    email: "svc@example.com",
-    role: "service_center",
-    currency: "USD",
-  },
-  admin: { id: "u-admin", name: "Alex Admin", email: "admin@example.com", role: "admin", currency: "USD" },
-};
 
 export const customers: Customer[] = [
   { id: "c-1", name: "Sam Tech", email: "tech@example.com", distributorId: "d-1" },
@@ -173,13 +139,13 @@ export const claims: Claim[] = Array.from({ length: 42 }, (_, index) => {
     history: [
       {
         at: iso(created),
-        actor: { id: "u-tech", name: "Sam Tech", role: "technician" },
+        actor: { id: "u-tech", name: "Sam Tech", role: "dealer" },
         type: "created",
         to: "SUBMITTED",
       },
       {
         at: iso(addDays(created, 1)),
-        actor: { id: "u-agent", name: "Casey Agent", role: "claims_agent" },
+        actor: { id: "u-agent", name: "Casey Agent", role: "admin" },
         type: "comment",
         comment: "Asked the customer for a photo of the display.",
         internal: true,
