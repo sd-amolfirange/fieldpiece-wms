@@ -21,7 +21,7 @@ import {
 } from "@/components/ui";
 import { toApiError } from "@/lib/api-error";
 import { formatDateTime } from "@/lib/format";
-import { useDealers, useModels } from "@/lib/master-data";
+import { useDealers, useModels } from "@/features/catalog";
 import { useCurrentRole } from "@/lib/session";
 import { bulkImportsApi } from "../api";
 import { useBulkImport, useBulkImports, useResubmitBulk, useUploadBulk } from "../hooks";

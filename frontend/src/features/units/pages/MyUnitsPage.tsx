@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import type { Paginated, RegistrationView } from "@wms/domain";
 import { Boxes, Package, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -7,10 +5,8 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
 import { buttonVariants, Card, MonoId, RegistrationStatusBadge, WarrantyStatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { http } from "@/lib/http";
-import { LIVE_REFRESH_MS } from "@/lib/query-client";
 import { useCurrentUser } from "@/lib/session";
-import { useUnits } from "../hooks";
+import { useMyPendingRegistrations, useUnits } from "../hooks";
 import { stillCoveredLine, unitStatusLine } from "../status-line";
 
 // CU02 My units (customer home, phone layout): one card per unit with its overall status and a countdown,
@@ -20,14 +16,7 @@ export default function MyUnitsPage() {
   const { t, i18n } = useTranslation();
   const user = useCurrentUser();
   const units = useUnits({ pageSize: 100, sort: "serial" });
-  const pending = useQuery({
-    queryKey: ["registrations", { mine: true, status: "PENDING" }],
-    queryFn: () =>
-      http
-        .get<Paginated<RegistrationView>>("/registrations", { params: { status: "PENDING", pageSize: 50 } })
-        .then((r) => r.data),
-    refetchInterval: LIVE_REFRESH_MS,
-  });
+  const pending = useMyPendingRegistrations();
 
   return (
     <div className="mx-auto max-w-xl">

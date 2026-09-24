@@ -1,8 +1,8 @@
 import type { UploadItem } from "@/components/ui";
 import { signInAs } from "@/test/sign-in";
-import { http } from "./http";
-import { useSession } from "./session";
-import { uploadAll, uploadFile } from "./uploads";
+import { http } from "@/lib/http";
+import { useSession } from "@/lib/session";
+import { uploadAll, uploadFile } from "./upload";
 
 describe("uploads", () => {
   afterEach(() => useSession.getState().signOut());

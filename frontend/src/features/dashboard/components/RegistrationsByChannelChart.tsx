@@ -1,11 +1,19 @@
 import type { ChannelCount } from "@wms/domain";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, Card } from "@/components/ui";
 
 // A01 "Registrations by channel": approved registrations per source (bulk uploads count under Dealer).
-// Same axes, grid and "View data" table as ClaimsByStatusChart.
+// Identical to ClaimsByStatusChart: same axes, grid, tooltip, bar shape, "View data" table, and bar colours
+// from the same CSS variables, following each channel's badge variant (see status-styles.ts).
+
+const channelColor: Record<ChannelCount["channel"], string> = {
+  DEALER: "var(--brand-500)",
+  PORTAL: "var(--info)",
+  EMAIL: "var(--ink-400)",
+  ERP: "var(--ink-400)",
+};
 
 export function RegistrationsByChannelChart({ data }: { data: ChannelCount[] }) {
   const { t } = useTranslation();
@@ -52,6 +60,10 @@ export function RegistrationsByChannelChart({ data }: { data: ChannelCount[] }) 
                 dataKey="label"
                 tick={{ fontSize: 12, fill: "var(--ink-500)" }}
                 stroke="var(--ink-200)"
+                interval={0}
+                angle={-30}
+                textAnchor="end"
+                height={60}
               />
               <YAxis
                 allowDecimals={false}
@@ -59,12 +71,11 @@ export function RegistrationsByChannelChart({ data }: { data: ChannelCount[] }) 
                 stroke="var(--ink-200)"
               />
               <Tooltip cursor={{ fill: "var(--brand-50)" }} />
-              <Bar
-                dataKey="count"
-                name={t("dashboard.registrations")}
-                fill="var(--info)"
-                radius={[2, 2, 0, 0]}
-              />
+              <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+                {rows.map((r) => (
+                  <Cell key={r.channel} fill={channelColor[r.channel]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>

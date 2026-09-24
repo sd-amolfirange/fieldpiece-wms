@@ -11,11 +11,13 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { toast } from "@/components/feedback";
 import { Button, Card, MonoId, Timeline, type TimelineItem } from "@/components/ui";
 import { printQrLabel, QrCode, registerUrl } from "@/features/qr";
 import { toApiError } from "@/lib/api-error";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { useCurrentRole } from "@/lib/session";
 import { unitsApi } from "../api";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -128,16 +130,36 @@ const eventIcon = {
 /** Service, claim and registration history of a unit, newest first. */
 export function UnitHistory({ unit }: { unit: UnitView }) {
   const { t, i18n } = useTranslation();
+  const role = useCurrentRole();
+  // Claim and complaint events link to their record for the roles that can open it.
+  const linkFor = (type: string, ref?: string) =>
+    !ref
+      ? undefined
+      : type === "claim_created" && role === "admin"
+        ? `/claims/${ref}`
+        : type === "complaint_raised" && (role === "admin" || role === "customer")
+          ? `/complaints/${ref}`
+          : undefined;
   const items: TimelineItem[] = [...unit.history]
     .sort((a, b) => b.at.localeCompare(a.at))
-    .map((e, index) => ({
-      id: `${e.at}-${index}`,
-      icon: eventIcon[e.type],
-      actor: e.byName,
-      action: t(`units.history.${e.type}`, { ref: e.refId ?? "" }),
-      timestamp: formatDateTime(e.at, i18n.language),
-      comment: e.text,
-    }));
+    .map((e, index) => {
+      const text = t(`units.history.${e.type}`, { ref: e.refId ?? "" });
+      const to = linkFor(e.type, e.refId);
+      return {
+        id: `${e.at}-${index}`,
+        icon: eventIcon[e.type],
+        actor: e.byName,
+        action: to ? (
+          <Link to={to} className="underline-offset-2 hover:underline">
+            {text}
+          </Link>
+        ) : (
+          text
+        ),
+        timestamp: formatDateTime(e.at, i18n.language),
+        comment: e.text,
+      };
+    });
   return items.length ? (
     <Timeline items={items} />
   ) : (

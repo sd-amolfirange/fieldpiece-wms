@@ -79,7 +79,8 @@
     "previousPage": "Previous page",
     "nextPage": "Next page",
     "results": "{{count}} results",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "actions": "Actions"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
@@ -129,7 +130,32 @@
       "REPAIRED": "Repaired",
       "REPLACED": "Replaced",
       "CREDITED": "Credited",
-      "CLOSED": "Closed"
+      "CLOSED": "Closed",
+      "PAID": "Paid"
+    },
+    "complaint": {
+      "NEW": "New",
+      "WITH_SERVICE": "With service",
+      "RESOLVED": "Resolved"
+    },
+    "source": {
+      "CUSTOMER": "Customer",
+      "DEALER": "Dealer",
+      "ADMIN": "Admin"
+    },
+    "finance": {
+      "NOT_POSTED": "Not posted",
+      "POSTED": "Posted to Finance",
+      "FAILED": "Posting failed"
+    },
+    "integration": {
+      "PENDING": "Pending",
+      "SUCCESS": "Sent",
+      "FAILED": "Failed"
+    },
+    "direction": {
+      "IN": "Inbound",
+      "OUT": "Outbound"
     },
     "warranty": {
       "ACTIVE": "Active",
@@ -276,6 +302,41 @@
     "addComment": "Add comment",
     "commentPlaceholder": "Write a comment",
     "outOfWarranty": "Out of warranty, paid repair quote",
+    "allBrands": "All brands",
+    "filterBrand": "Brand",
+    "countLink": "{{status}}: {{count}} claims. Show them",
+    "details": "Claim details",
+    "evidence": "Evidence from the job result",
+    "noEvidence": "No job result is linked to this claim.",
+    "finance": "Finance posting",
+    "financeHelp": {
+      "NOT_POSTED": "The settlement is posted to Finance when the claim is marked paid.",
+      "POSTED": "Settlement posted to Finance. See the Integration log for the message.",
+      "FAILED": "The posting to Finance failed. Retry it from the Integration log."
+    },
+    "history": "History",
+    "rejectedBecause": "Rejected by the manufacturer: {{reason}}",
+    "submitTitle": "Submit to the manufacturer",
+    "submitHelp": "The evidence from the job result goes with the claim. Add the RMA number if this brand uses one, and the amount claimed.",
+    "rmaHelp": "Leave blank if the brand doesn't issue RMA numbers.",
+    "rejectTitle": "Reject this claim",
+    "done": {
+      "submit": "Claim submitted to the manufacturer",
+      "approve": "Claim approved",
+      "reject": "Claim rejected",
+      "mark_paid": "Claim paid and posted to Finance"
+    },
+    "fields": {
+      "brand": "Brand",
+      "unit": "Unit",
+      "customer": "Customer",
+      "dealer": "Dealer",
+      "complaint": "Complaint",
+      "created": "Created",
+      "rma": "RMA number",
+      "amount": "Amount claimed",
+      "reason": "Reason"
+    },
     "columns": {
       "id": "Claim",
       "serial": "Serial",
@@ -283,10 +344,17 @@
       "category": "Failure",
       "status": "Status",
       "updated": "Updated",
-      "sla": "SLA due"
+      "sla": "SLA due",
+      "created": "Created",
+      "brand": "Brand",
+      "unit": "Unit",
+      "dealer": "Dealer",
+      "rma": "RMA number",
+      "amount": "Amount",
+      "finance": "Finance"
     },
     "actions": {
-      "submit": "Submit claim",
+      "submit": "Submit to manufacturer",
       "start_review": "Start review",
       "request_info": "Request info",
       "respond": "Send response",
@@ -298,7 +366,8 @@
       "mark_repaired": "Mark repaired",
       "mark_replaced": "Mark replaced",
       "mark_credited": "Mark credited",
-      "close": "Close claim"
+      "close": "Close claim",
+      "mark_paid": "Mark paid"
     },
     "failure": {
       "no_power": "No power",
@@ -314,7 +383,182 @@
   "customers": { "title": "Customers", "detailTitle": "Customer" },
   "products": { "title": "Products", "detailTitle": "Product {{sku}}" },
   "reports": { "title": "Reports" },
-  "admin": { "users": "Users", "policies": "Warranty policies", "settings": "Settings" },
+  "admin": {
+    "users": "Users",
+    "policies": "Warranty policies",
+    "settings": "Settings",
+    "dealers": "Dealers & users",
+    "integrations": "Integration log",
+    "simulate": "Simulate"
+  },
+  "complaints": {
+    "title": "Complaints",
+    "raise": "Raise complaint",
+    "empty": "No complaints yet.",
+    "searchPlaceholder": "Search by complaint ID or serial",
+    "filterStatus": "Status",
+    "allStatuses": "All statuses",
+    "filterSource": "Source",
+    "allSources": "All sources",
+    "columns": {
+      "id": "Complaint",
+      "received": "Received",
+      "unit": "Unit",
+      "customer": "Customer",
+      "dealer": "Dealer",
+      "source": "Source",
+      "status": "Status",
+      "entitlement": "Covered",
+      "claim": "Claim"
+    },
+    "unit": "Unit",
+    "pickUnitFirst": "Pick a unit to see what the warranty covers.",
+    "fault": "What's wrong?",
+    "faultHelp": "For example: no cooling, water leaking, strange noise.",
+    "photos": "Photos or video",
+    "photoHint": "Add a photo or short video of the fault (optional).",
+    "submit": "Raise complaint",
+    "raised": "Complaint raised",
+    "notRegistered": "This unit isn't registered yet, so a complaint can't be raised for it.",
+    "details": "Complaint details",
+    "fields": {
+      "received": "Received",
+      "raisedBy": "Raised by",
+      "customer": "Customer",
+      "dealer": "Dealer",
+      "serviceRequest": "Service request",
+      "fault": "Fault"
+    },
+    "noPhotos": "No photos added.",
+    "openFile": "Open {{name}}",
+    "progress": "Progress",
+    "step": {
+      "NEW": "Raised",
+      "WITH_SERVICE": "With service",
+      "RESOLVED": "Resolved"
+    },
+    "stepBy": "by {{name}}",
+    "stepWaiting": "Waiting",
+    "sendToService": "Send to service system",
+    "sent": "Sent to the service system",
+    "claim": "Manufacturer claim",
+    "newPartWarranty": "New {{part}} {{serial}} is under warranty until {{date}}."
+  },
+  "entitlement": {
+    "title": "What's covered",
+    "titleFor": "What's covered for {{serial}}",
+    "parts": "Parts",
+    "labour": "Labour",
+    "partsCovered": "Covered: {{parts}}.",
+    "partsChargeable": "Parts are chargeable.",
+    "labourCovered": "Labour is free.",
+    "labourChargeable": "Labour is chargeable.",
+    "claimable": "Covered parts are claimed back from the manufacturer after the repair.",
+    "notClaimable": "Nothing to claim from the manufacturer for this job.",
+    "void": "The warranty on this unit is void. The visit is chargeable.",
+    "short": {
+      "VOID": "Chargeable (void)",
+      "NOT_REGISTERED": "Not registered",
+      "NOTHING_ACTIVE": "Chargeable",
+      "PARTIAL": "Parts covered",
+      "FULL": "Parts and labour"
+    }
+  },
+  "jobResult": {
+    "title": "Job result",
+    "technician": "Technician",
+    "completed": "Completed",
+    "notes": "Notes",
+    "partsCaption": "Parts replaced",
+    "columns": {
+      "part": "Part",
+      "oldSerial": "Old serial",
+      "newSerial": "New serial",
+      "newWarranty": "New part warranty"
+    },
+    "until": "until {{date}}",
+    "noParts": "No parts replaced.",
+    "photos": "Photos",
+    "signOff": "Customer sign-off",
+    "signedBy": "Signed by {{name}}"
+  },
+  "integration": {
+    "title": "Integration log",
+    "empty": "No messages match these filters.",
+    "columns": {
+      "time": "Time",
+      "system": "System",
+      "direction": "Direction",
+      "type": "Message",
+      "ref": "Reference",
+      "status": "Status"
+    },
+    "filterSystem": "System",
+    "allSystems": "All systems",
+    "filterDirection": "Direction",
+    "allDirections": "In and out",
+    "filterStatus": "Status",
+    "allStatuses": "All statuses",
+    "system": {
+      "CRM": "CRM",
+      "ERP": "ERP",
+      "FINANCE": "Finance",
+      "SERVICE": "Service system",
+      "OEM": "Manufacturer (OEM)",
+      "EMAIL": "Email"
+    },
+    "type": {
+      "service_request": "Service request",
+      "job_result": "Job result",
+      "claim_submission": "Claim submission",
+      "oem_decision": "Manufacturer decision",
+      "finance_posting": "Finance posting",
+      "erp_invoice": "ERP sales invoice",
+      "crm_update": "CRM update",
+      "registration_email": "Registration email"
+    },
+    "viewPayload": "View payload",
+    "payloadTitle": "{{type}} payload",
+    "lastError": "Last error after {{attempts}} attempts: {{error}}",
+    "retry": "Retry",
+    "retried": "Message sent again"
+  },
+  "simulate": {
+    "title": "Simulate",
+    "intro": "Demo only. These buttons stand in for the systems around the warranty platform. In production the messages arrive on their own.",
+    "jobResult": {
+      "title": "Service system: job result",
+      "help": "The technician finishes the visit and the service system returns the job result: parts replaced, serials, photos and sign-off.",
+      "complaint": "Complaint with service",
+      "none": "No complaints are with the service system.",
+      "part": "Part replaced",
+      "send": "Send job result",
+      "done": "Job result received",
+      "claim": "Draft claim {{id}} created"
+    },
+    "oem": {
+      "title": "Manufacturer: claim decision",
+      "help": "The manufacturer approves or rejects a submitted claim.",
+      "claim": "Submitted claim",
+      "none": "No claims are waiting for the manufacturer.",
+      "reason": "Reason",
+      "reasonHelp": "Needed when rejecting.",
+      "approve": "Approve claim",
+      "reject": "Reject claim",
+      "done": {
+        "APPROVED": "The manufacturer approved the claim",
+        "REJECTED": "The manufacturer rejected the claim"
+      }
+    },
+    "reset": {
+      "title": "Reset demo data",
+      "help": "Put every screen back to the starting data, so the walkthrough can run again.",
+      "button": "Reset demo data",
+      "confirmTitle": "Reset the demo data?",
+      "confirmHelp": "Everything done since the last reset is removed. Everyone stays signed in.",
+      "done": "Demo data reset"
+    }
+  },
   "screens": {
     "phase": "{{code}} (Phase {{phase}})",
     "comingLater": "Coming in a later phase: {{section}}",
@@ -456,7 +700,10 @@
     "pickModel": "Pick the model.",
     "pickDealer": "Pick the dealer.",
     "invoiceRequired": "Add a photo or PDF of the invoice.",
-    "reasonRequired": "Give a reason (at least 5 characters)."
+    "reasonRequired": "Give a reason (at least 5 characters).",
+    "pickUnit": "Pick the unit.",
+    "describeFault": "Describe the fault (at least 5 characters).",
+    "amount": "Enter the amount claimed."
   },
   "rowErrors": {
     "required": "Required",
@@ -750,6 +997,12 @@
     "registration_submitted": "New registration to review: {{serial}}",
     "registration_approved": "{{serial}} is registered and under warranty.",
     "registration_rejected": "Registration for {{serial}} was rejected: {{reason}}",
-    "bulk_processed": "{{file}}: {{registered}} registered, {{errors}} to fix, {{review}} sent to admin."
+    "bulk_processed": "{{file}}: {{registered}} registered, {{errors}} to fix, {{review}} sent to admin.",
+    "complaint_raised": "New complaint {{id}} for {{serial}}",
+    "complaint_with_service": "Complaint {{id}} is with the service team.",
+    "complaint_resolved": "Complaint {{id}} is resolved. The new {{part}} has its own warranty from today.",
+    "claim_draft_created": "Draft claim {{id}} created for {{serial}}",
+    "claim_approved_by_oem": "The manufacturer approved claim {{id}}.",
+    "claim_rejected_by_oem": "The manufacturer rejected claim {{id}}."
   }
 }

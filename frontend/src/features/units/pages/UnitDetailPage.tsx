@@ -1,9 +1,9 @@
-import { Wrench } from "lucide-react";
+import { MessageSquarePlus, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
-import { Card, MonoId, Tabs, WarrantyStatusBadge } from "@/components/ui";
+import { buttonVariants, Card, MonoId, Tabs, WarrantyStatusBadge } from "@/components/ui";
 import { toApiError } from "@/lib/api-error";
 import { can } from "@/lib/permissions";
 import { useCurrentRole } from "@/lib/session";
@@ -62,7 +62,21 @@ export default function UnitDetailPage() {
           {stillCovered ? <span className="text-sm font-semibold text-success">{stillCovered}</span> : null}
         </>
       }
-      actions={<CertificateButton unit={unit} variant={isCustomer ? "primary" : "secondary"} />}
+      actions={
+        <>
+          {/* Dealers raise complaints from Phase 4 (DL06). */}
+          {(role === "admin" || isCustomer) && can(role, "complaints:create") ? (
+            <Link
+              to={`/complaints/new?serial=${encodeURIComponent(unit.serial)}`}
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              <MessageSquarePlus size={20} strokeWidth={1.75} aria-hidden />
+              {t("complaints.raise")}
+            </Link>
+          ) : null}
+          <CertificateButton unit={unit} variant={isCustomer ? "primary" : "secondary"} />
+        </>
+      }
     />
   );
 

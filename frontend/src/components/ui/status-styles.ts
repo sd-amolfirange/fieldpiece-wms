@@ -1,12 +1,22 @@
 import type {
   BulkRowStatus,
+  ClaimStatus as DomainClaimStatus,
+  ComplaintSource,
+  ComplaintStatus,
   Coverage,
+  FinancePostingStatus,
+  IntegrationDirection,
+  IntegrationStatus,
   RegistrationChannel,
   RegistrationFlag,
   RegistrationStatus,
   WarrantyStatus as DomainWarrantyStatus,
 } from "@wms/domain";
-import type { ClaimStatus, RmaStatus, WarrantyStatus as LegacyWarrantyStatus } from "@/types";
+import type {
+  ClaimStatus as LegacyClaimStatus,
+  RmaStatus,
+  WarrantyStatus as LegacyWarrantyStatus,
+} from "@/types";
 
 // The existing colour variants, reused by every status (no new colours).
 const NEUTRAL = "bg-ink-100 text-ink-600";
@@ -17,10 +27,11 @@ const DANGER = "bg-danger-bg text-danger";
 const BRAND = "bg-brand-100 text-brand-800";
 
 export type AnyWarrantyStatus = LegacyWarrantyStatus | DomainWarrantyStatus;
+export type AnyClaimStatus = LegacyClaimStatus | DomainClaimStatus;
 
 // Status is never shown by colour alone: pair these with a label (Section 3.2).
 
-export const claimStatusStyle: Record<ClaimStatus, string> = {
+export const claimStatusStyle: Record<AnyClaimStatus, string> = {
   DRAFT: "bg-ink-100 text-ink-600",
   SUBMITTED: "bg-info-bg text-info",
   IN_REVIEW: "bg-info-bg text-info",
@@ -33,6 +44,7 @@ export const claimStatusStyle: Record<ClaimStatus, string> = {
   REPAIRED: "bg-success-bg text-success",
   REPLACED: "bg-success-bg text-success",
   CREDITED: "bg-success-bg text-success",
+  PAID: SUCCESS,
   CLOSED: "bg-ink-100 text-ink-600",
 };
 
@@ -84,4 +96,33 @@ export const bulkRowStatusStyle: Record<BulkRowStatus, string> = {
 export const coverageStyle: Record<Coverage, string> = {
   COVERED: SUCCESS,
   CHARGEABLE: WARNING,
+};
+
+export const complaintStatusStyle: Record<ComplaintStatus, string> = {
+  NEW: INFO,
+  WITH_SERVICE: BRAND,
+  RESOLVED: SUCCESS,
+};
+
+export const complaintSourceStyle: Record<ComplaintSource, string> = {
+  CUSTOMER: INFO,
+  DEALER: BRAND,
+  ADMIN: NEUTRAL,
+};
+
+export const financePostingStyle: Record<FinancePostingStatus, string> = {
+  NOT_POSTED: NEUTRAL,
+  POSTED: SUCCESS,
+  FAILED: DANGER,
+};
+
+export const integrationStatusStyle: Record<IntegrationStatus, string> = {
+  PENDING: NEUTRAL,
+  SUCCESS: SUCCESS,
+  FAILED: DANGER,
+};
+
+export const integrationDirectionStyle: Record<IntegrationDirection, string> = {
+  IN: INFO,
+  OUT: BRAND,
 };

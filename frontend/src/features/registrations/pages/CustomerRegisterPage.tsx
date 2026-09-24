@@ -24,8 +24,8 @@ import {
 import { QrScannerModal, type QrPayload } from "@/features/qr";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { toIsoDate } from "@/lib/format";
-import { useModels } from "@/lib/master-data";
-import { uploadAll } from "@/lib/uploads";
+import { useModels } from "@/features/catalog";
+import { uploadAll } from "@/features/files";
 import { useFieldError } from "@/lib/use-field-error";
 import { useCreateRegistration } from "../hooks";
 import { selfRegisterSchema, type SelfRegisterForm } from "../schemas";

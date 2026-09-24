@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ScaffoldPage } from "@/components/layout";
 import { useCurrentRole } from "@/lib/session";
@@ -55,7 +56,13 @@ const PHASE: Record<ScreenCode, number> = {
   CU05: 3,
 };
 
-export default function ScreenPlaceholderPage({ screens }: { screens: Partial<Record<Role, ScreenCode>> }) {
+export default function ScreenPlaceholderPage({
+  screens,
+  children,
+}: {
+  screens: Partial<Record<Role, ScreenCode>>;
+  children?: ReactNode;
+}) {
   const { t } = useTranslation();
   const role = useCurrentRole();
   const code = (role && screens[role]) ?? Object.values(screens)[0] ?? "A02";
@@ -66,6 +73,8 @@ export default function ScreenPlaceholderPage({ screens }: { screens: Partial<Re
       title={`${code} · ${t(`screens.${code}.title`)}`}
       section={t("screens.phase", { code, phase: PHASE[code] })}
       todo={Array.isArray(mustContain) ? mustContain.map(String) : []}
-    />
+    >
+      {children}
+    </ScaffoldPage>
   );
 }

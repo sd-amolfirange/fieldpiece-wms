@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
 import { Card, MonoId } from "@/components/ui";
-import { useModels } from "@/lib/master-data";
+import { useModels } from "@/features/catalog";
 
 // A06 Models & parts: models grouped by brand. Each model is a template whose parts and warranty periods are
 // attached to every unit registered with it.

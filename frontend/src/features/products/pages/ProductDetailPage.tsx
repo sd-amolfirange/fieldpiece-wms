@@ -5,7 +5,7 @@ import { ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
 import { Card, MonoId } from "@/components/ui";
 import { ModelTemplateTable } from "@/features/units";
-import { useModels } from "@/lib/master-data";
+import { useModels } from "@/features/catalog";
 
 // A06 model template: parts, warranty months and parts / labour coverage, set once and applied to every unit.
 

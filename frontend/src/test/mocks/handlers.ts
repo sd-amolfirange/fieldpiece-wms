@@ -5,9 +5,12 @@ import {
   createBulkImport,
   dispatch,
   getAttachment,
+  jobPhotoSvg,
+  jobSerials,
   parseCsv,
   rowsFromMatrix,
   ServiceError,
+  simulateJobResult,
   userFromToken,
   type DemoResponse,
 } from "@demo-core";
@@ -128,6 +131,39 @@ export const handlers = [
       const blob = mockFiles.get(attachment.id);
       if (!blob) return new HttpResponse(null, { status: 404 });
       return new HttpResponse(blob, { headers: { "Content-Type": attachment.mime } });
+    } catch (e) {
+      if (e instanceof ServiceError) return errorJson(e);
+      throw e;
+    }
+  }),
+
+  // Simulator: the service system returns a job result with two job photos (same as the Express route).
+  http.post(api("/simulate/job-result"), async ({ request }) => {
+    const user = userFromToken(mockDb, mockSessions, bearer(request));
+    if (!user)
+      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
+    try {
+      const ctx = contextFor(mockDb, user);
+      const body = ((await readBody(request)) ?? {}) as Parameters<typeof simulateJobResult>[1];
+      const serials = jobSerials(ctx, body.complaintId ?? "", body.partType);
+      const photos = [
+        [`Removed ${serials.partType.toLowerCase()}`, serials.oldSerial ?? "-"],
+        [`New ${serials.partType.toLowerCase()} fitted`, serials.newSerial],
+      ].map(([caption = "photo", serial = ""]) => {
+        const svg = jobPhotoSvg(caption, serial);
+        const attachment = addAttachment(
+          ctx,
+          {
+            name: `${caption.replace(/\s+/g, "-").toLowerCase()}.svg`,
+            mime: "image/svg+xml",
+            size: svg.length,
+          },
+          (id) => `${basePath}/files/${id}`,
+        );
+        mockFiles.set(attachment.id, new Blob([svg], { type: "image/svg+xml" }));
+        return attachment.id;
+      });
+      return HttpResponse.json(simulateJobResult(ctx, body, photos));
     } catch (e) {
       if (e instanceof ServiceError) return errorJson(e);
       throw e;

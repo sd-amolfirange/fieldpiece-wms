@@ -1,25 +1,10 @@
 import type { UploadItem } from "@/components/ui";
 import type { Attachment } from "@wms/domain";
-import { http } from "./http";
+import { filesApi } from "./api";
 
-// Real file uploads: each file goes to POST /uploads (multipart) and comes back as an Attachment whose
-// id is stored on the registration, complaint or job result. Files are served from Attachment.url.
+// Uploads a form's files with per-file progress and returns their attachment ids.
 
-export function uploadFile(file: File, onProgress?: (percent: number) => void): Promise<Attachment> {
-  const form = new FormData();
-  form.append("file", file, file.name);
-  // Sent separately too: some FormData serialisers (jsdom) drop the file name.
-  form.append("name", file.name);
-  return http
-    .post<Attachment>("/uploads", form, {
-      // Overrides the instance's JSON default so axios sends real multipart with a boundary.
-      headers: { "Content-Type": "multipart/form-data" },
-      onUploadProgress: (event) => {
-        if (onProgress && event.total) onProgress(Math.round((event.loaded / event.total) * 100));
-      },
-    })
-    .then((r) => r.data);
-}
+export const uploadFile = filesApi.upload;
 
 /**
  * Uploads every item that hasn't been uploaded yet, reporting progress per file through `onChange`.

@@ -1,5 +1,7 @@
-import { lazy } from "react";
+import { lazy, type ReactNode } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { AdminTabs } from "@/features/admin/components/AdminTabs";
+import { useCurrentRole } from "@/lib/session";
 import type { Role } from "@/types";
 import { AppLayout } from "./AppLayout";
 import type { ScreenCode } from "./pages/ScreenPlaceholderPage";
@@ -24,6 +26,13 @@ const UnitsListPage = lazy(() => import("@/features/units/pages/UnitsListPage"))
 const UnitDetailPage = lazy(() => import("@/features/units/pages/UnitDetailPage"));
 const ModelsPage = lazy(() => import("@/features/products/pages/ProductsPage"));
 const ModelDetailPage = lazy(() => import("@/features/products/pages/ProductDetailPage"));
+const ComplaintsListPage = lazy(() => import("@/features/complaints/pages/ComplaintsListPage"));
+const NewComplaintPage = lazy(() => import("@/features/complaints/pages/NewComplaintPage"));
+const ComplaintDetailPage = lazy(() => import("@/features/complaints/pages/ComplaintDetailPage"));
+const ClaimsListPage = lazy(() => import("@/features/claims/pages/ClaimsListPage"));
+const ClaimDetailPage = lazy(() => import("@/features/claims/pages/ClaimDetailPage"));
+const IntegrationLogPage = lazy(() => import("@/features/admin/pages/IntegrationLogPage"));
+const SimulatePage = lazy(() => import("@/features/admin/pages/SimulatePage"));
 const ScreenPlaceholderPage = lazy(() => import("./pages/ScreenPlaceholderPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -33,12 +42,13 @@ const guarded = (roles: readonly Role[] | undefined, children: RouteObject[]): R
 });
 
 type Screens = Partial<Record<Role, ScreenCode>>;
-const screen = (path: string, screens: Screens): RouteObject => ({
-  path,
-  element: <ScreenPlaceholderPage screens={screens} />,
-});
-
 const PARTNERS: Role[] = ["dealer", "distributor"];
+
+/** One path, built page for some roles and the placeholder for roles a later phase covers. */
+function ForRoles({ roles, page, screens }: { roles: Role[]; page: ReactNode; screens: Screens }) {
+  const role = useCurrentRole();
+  return role && roles.includes(role) ? page : <ScreenPlaceholderPage screens={screens} />;
+}
 
 export const routes: RouteObject[] = [
   {
@@ -65,11 +75,18 @@ export const routes: RouteObject[] = [
                 { path: "registrations/:id", element: <RegistrationReviewPage /> }, // A03
                 { path: "models", element: <ModelsPage /> }, // A06
                 { path: "models/:id", element: <ModelDetailPage /> }, // A06
-                screen("claims", { admin: "A09" }),
-                screen("claims/:id", { admin: "A10" }),
-                screen("admin/dealers", { admin: "A11" }),
-                screen("admin/integrations", { admin: "A12" }),
-                screen("admin/simulate", { admin: "A13" }),
+                { path: "claims", element: <ClaimsListPage /> }, // A09
+                { path: "claims/:id", element: <ClaimDetailPage /> }, // A10
+                {
+                  path: "admin/dealers",
+                  element: (
+                    <ScreenPlaceholderPage screens={{ admin: "A11" }}>
+                      <AdminTabs />
+                    </ScreenPlaceholderPage>
+                  ),
+                },
+                { path: "admin/integrations", element: <IntegrationLogPage /> }, // A12
+                { path: "admin/simulate", element: <SimulatePage /> }, // A13
               ],
             ),
             guarded(
@@ -84,14 +101,37 @@ export const routes: RouteObject[] = [
 
             // Shared screens: the demo server decides which rows each role gets.
             { path: "units/:serial", element: <UnitDetailPage /> }, // A05 / DL05 / CU03
-            screen("complaints", { admin: "A07", dealer: "DL07", distributor: "DL07", customer: "CU05" }),
-            screen("complaints/new", {
-              admin: "DL06",
-              dealer: "DL06",
-              distributor: "DL06",
-              customer: "CU04",
-            }),
-            screen("complaints/:id", { admin: "A08", dealer: "DL07", distributor: "DL07", customer: "CU05" }),
+            // Dealer and distributor complaints (DL06, DL07) come in Phase 4.
+            {
+              path: "complaints", // A07 / My complaints
+              element: (
+                <ForRoles
+                  roles={["admin", "customer"]}
+                  page={<ComplaintsListPage />}
+                  screens={{ dealer: "DL07", distributor: "DL07" }}
+                />
+              ),
+            },
+            {
+              path: "complaints/new", // CU04 (admin: on a customer's behalf)
+              element: (
+                <ForRoles
+                  roles={["admin", "customer"]}
+                  page={<NewComplaintPage />}
+                  screens={{ dealer: "DL06", distributor: "DL06" }}
+                />
+              ),
+            },
+            {
+              path: "complaints/:id", // A08 / CU05
+              element: (
+                <ForRoles
+                  roles={["admin", "customer"]}
+                  page={<ComplaintDetailPage />}
+                  screens={{ dealer: "DL07", distributor: "DL07" }}
+                />
+              ),
+            },
 
             { path: "*", element: <NotFoundPage /> },
           ],

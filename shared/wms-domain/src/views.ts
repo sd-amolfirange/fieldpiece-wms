@@ -1,13 +1,16 @@
 import type {
+  Attachment,
   Brand,
   Claim,
   Complaint,
   Dealer,
   Distributor,
+  IsoDate,
   JobResult,
   Model,
   Registration,
   RegistrationChannel,
+  ReplacedPart,
   Role,
   Unit,
   UnitPart,
@@ -63,12 +66,20 @@ export interface RegistrationView extends Registration {
   duplicateOf?: UnitView;
 }
 
+/** Job result with its photos and each new part's warranty end (the new warranty starts on the repair day). */
+export interface JobResultView extends Omit<JobResult, "partsReplaced"> {
+  partsReplaced: (ReplacedPart & { newWarrantyEnd?: IsoDate })[];
+  photos: Attachment[];
+}
+
 export interface ComplaintView extends Complaint {
   modelCode: string;
+  modelName: string;
   brandName: string;
   dealerName?: string;
   customerName?: string;
-  jobResult?: JobResult;
+  attachments: Attachment[];
+  jobResult?: JobResultView;
   claimStatus?: Claim["status"];
 }
 
@@ -76,6 +87,10 @@ export interface ClaimView extends Claim {
   brandName: string;
   dealerName?: string;
   modelCode: string;
+  customerName?: string;
+  complaintDescription?: string;
+  /** Evidence pulled from the job result. */
+  jobResult?: JobResultView;
 }
 
 export interface BulkImportView extends BulkImport {

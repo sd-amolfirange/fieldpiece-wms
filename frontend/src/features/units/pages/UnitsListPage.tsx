@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/layout";
 import { buttonVariants, DataTable, Input, MonoId, NativeSelect, WarrantyStatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { useDealers } from "@/lib/master-data";
+import { useDealers } from "@/features/catalog";
 import { useCurrentRole } from "@/lib/session";
 import { useTableParams } from "@/lib/use-table-params";
 import { useUnits } from "../hooks";

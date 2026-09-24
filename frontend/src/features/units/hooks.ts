@@ -25,3 +25,11 @@ export function useUnit(serial: string | undefined) {
     refetchInterval: LIVE_REFRESH_MS,
   });
 }
+
+export function useMyPendingRegistrations() {
+  return useQuery({
+    queryKey: ["registrations", { mine: true, status: "PENDING" }],
+    queryFn: unitsApi.myPendingRegistrations,
+    refetchInterval: LIVE_REFRESH_MS,
+  });
+}

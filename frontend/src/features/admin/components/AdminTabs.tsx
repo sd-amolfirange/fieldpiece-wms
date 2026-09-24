@@ -2,10 +2,11 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 
+// A11 / A12 / A13. The legacy users, policies and settings screens are out of scope and not routed.
 const tabs = [
-  { to: "/admin/users", key: "admin.users" },
-  { to: "/admin/policies", key: "admin.policies" },
-  { to: "/admin/settings", key: "admin.settings" },
+  { to: "/admin/dealers", key: "admin.dealers" },
+  { to: "/admin/integrations", key: "admin.integrations" },
+  { to: "/admin/simulate", key: "admin.simulate" },
 ];
 
 export function AdminTabs() {
