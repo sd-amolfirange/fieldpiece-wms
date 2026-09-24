@@ -10,6 +10,9 @@ import {
   dispatch,
   getAttachment,
   getUnit,
+  jobPhotoSvg,
+  jobSerials,
+  simulateJobResult,
   rowsFromMatrix,
   templateCsv,
   MAX_UPLOAD_BYTES,
@@ -211,6 +214,35 @@ export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
       }
     },
   );
+
+  // ---- simulator: service system returns a job result (with two job photos stored as attachments) ----
+  app.post(`${API_BASE}/simulate/job-result`, (req, res) => {
+    try {
+      const user = userFromToken(db, sessions, bearer(req));
+      if (!user) throw new ServiceError(401, "unauthenticated", "Session expired. Sign in again.");
+      const ctx = contextFor(db, user);
+      const body = (req.body ?? {}) as Parameters<typeof simulateJobResult>[1];
+      const serials = jobSerials(ctx, body.complaintId ?? "", body.partType);
+      const photos = [
+        [`Removed ${serials.partType.toLowerCase()}`, serials.oldSerial ?? "-"],
+        [`New ${serials.partType.toLowerCase()} fitted`, serials.newSerial],
+      ].map(([caption, serial]) => {
+        const svg = jobPhotoSvg(caption ?? "", serial ?? "");
+        const attachment = addAttachment(
+          ctx,
+          { name: `${(caption ?? "photo").replace(/\s+/g, "-").toLowerCase()}.svg`, mime: "image/svg+xml", size: svg.length },
+          (id) => `${API_BASE}/files/${id}`,
+        );
+        writeFileSync(join(uploadsDir, attachment.id), svg);
+        return attachment.id;
+      });
+      const complaint = simulateJobResult(ctx, body, photos);
+      db.onChange?.(db.state);
+      res.json(complaint);
+    } catch (e) {
+      sendError(res, e);
+    }
+  });
 
   // ---- warranty certificate PDF (bearer token, or the refresh cookie for plain links) ----
   app.get(`${API_BASE}/units/:serial/certificate.pdf`, (req, res) => {

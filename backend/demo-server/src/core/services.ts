@@ -17,6 +17,8 @@ import {
   type DealerView,
   type IntegrationMessage,
   type IsoDate,
+  type JobResult,
+  type JobResultView,
   type ModelView,
   type Notification,
   type OrgStructure,
@@ -274,6 +276,23 @@ export function getRegistration(ctx: Ctx, id: string): RegistrationView {
 
 // ---- complaints ----------------------------------------------------------------------------------
 
+export const attachmentsById = (state: DemoState, ids: string[] = []): Attachment[] =>
+  ids.map((id) => state.attachments.find((a) => a.id === id)).filter((a): a is Attachment => !!a);
+
+/** Job result with photos and each new part's warranty end (read from the unit's replacement part). */
+export function toJobResultView(state: DemoState, job: JobResult | undefined, unitSerial: string): JobResultView | undefined {
+  if (!job) return undefined;
+  const unit = state.units.find((u) => u.serial === unitSerial);
+  return {
+    ...job,
+    partsReplaced: job.partsReplaced.map((p) => ({
+      ...p,
+      newWarrantyEnd: unit?.parts.find((x) => x.serial === p.newSerial)?.warrantyEnd,
+    })),
+    photos: attachmentsById(state, job.photoIds),
+  };
+}
+
 function toComplaintView(ctx: Ctx, c: Complaint): ComplaintView {
   const unit = ctx.state.units.find((u) => u.serial === c.unitSerial);
   const model = ctx.state.models.find((m) => m.id === unit?.modelId);
@@ -281,10 +300,16 @@ function toComplaintView(ctx: Ctx, c: Complaint): ComplaintView {
   return {
     ...c,
     modelCode: model?.code ?? "",
+    modelName: model?.name ?? "",
     brandName: unit ? brandName(ctx.state, unit.brandId) : "",
     dealerName: dealerName(ctx.state, c.dealerId),
     customerName: customerName(ctx.state, c.customerId),
-    jobResult: ctx.state.jobResults.find((j) => j.id === c.jobResultId),
+    attachments: attachmentsById(ctx.state, c.attachmentIds),
+    jobResult: toJobResultView(
+      ctx.state,
+      ctx.state.jobResults.find((j) => j.id === c.jobResultId),
+      c.unitSerial,
+    ),
     claimStatus:
       claim && canSeeClaim(ctx.user, claim, ctx.state.dealers)
         ? claim.status
@@ -324,11 +349,19 @@ export function getComplaint(ctx: Ctx, id: string): ComplaintView {
 
 function toClaimView(ctx: Ctx, c: Claim): ClaimView {
   const unit = ctx.state.units.find((u) => u.serial === c.unitSerial);
+  const complaint = ctx.state.complaints.find((x) => x.id === c.complaintId);
   return {
     ...c,
     brandName: brandName(ctx.state, c.brandId),
     dealerName: dealerName(ctx.state, c.dealerId),
     modelCode: ctx.state.models.find((m) => m.id === unit?.modelId)?.code ?? "",
+    customerName: customerName(ctx.state, unit?.customerId),
+    complaintDescription: complaint?.description,
+    jobResult: toJobResultView(
+      ctx.state,
+      ctx.state.jobResults.find((j) => j.id === c.jobResultId),
+      c.unitSerial,
+    ),
   };
 }
 

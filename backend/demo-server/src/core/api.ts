@@ -15,6 +15,14 @@ import {
   resubmitBulkRows,
   type CreateRegistrationBody,
 } from "./registrations";
+import {
+  claimTransition,
+  createComplaint,
+  previewEntitlement,
+  retryIntegration,
+  sendToService,
+  simulateOemDecision,
+} from "./complaints";
 import { createSeed, DEMO_ACCOUNTS, DEMO_PASSWORD } from "./seed";
 import {
   authenticate,
@@ -283,6 +291,43 @@ export const routes: Route[] = [
     method: "GET",
     path: "/notifications",
     handler: (ctx) => listNotifications(ctx),
+  },
+  // ---- Phase 3: complaints, claims, integration log, simulator ----
+  {
+    method: "POST",
+    path: "/complaints",
+    handler: (ctx, _p, req) => createComplaint(ctx, (req.body ?? {}) as Parameters<typeof createComplaint>[1]),
+  },
+  {
+    method: "GET",
+    path: "/units/:serial/entitlement",
+    handler: (ctx, p) => previewEntitlement(ctx, p.serial ?? ""),
+  },
+  {
+    method: "POST",
+    path: "/complaints/:id/send-to-service",
+    roles: ["admin"],
+    handler: (ctx, p) => sendToService(ctx, p.id ?? ""),
+  },
+  {
+    method: "POST",
+    path: "/claims/:id/transitions",
+    roles: ["admin"],
+    handler: (ctx, p, req) =>
+      claimTransition(ctx, p.id ?? "", (req.body ?? {}) as Parameters<typeof claimTransition>[2]),
+  },
+  {
+    method: "POST",
+    path: "/simulate/oem-decision",
+    roles: ["admin"],
+    handler: (ctx, _p, req) =>
+      simulateOemDecision(ctx, (req.body ?? {}) as Parameters<typeof simulateOemDecision>[1]),
+  },
+  {
+    method: "POST",
+    path: "/integrations/:id/retry",
+    roles: ["admin"],
+    handler: (ctx, p) => retryIntegration(ctx, p.id ?? ""),
   },
   {
     method: "POST",
