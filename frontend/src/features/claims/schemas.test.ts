@@ -1,7 +1,7 @@
 import { claimSchema, rejectSchema } from "./schemas";
 
 const valid = {
-  serialNumber: " sc680-100037 ",
+  serialNumber: " aer-spl15-210311 ",
   failureCategory: "no_power" as const,
   failureDate: "2026-01-10",
   description: "The meter will not power on with fresh batteries installed.",
@@ -13,7 +13,7 @@ describe("claimSchema", () => {
   it("accepts a valid claim and normalises the serial", () => {
     const result = claimSchema.safeParse(valid);
     expect(result.success).toBe(true);
-    expect(result.data?.serialNumber).toBe("SC680-100037");
+    expect(result.data?.serialNumber).toBe("AER-SPL15-210311");
   });
 
   it("needs at least 30 characters of description", () => {

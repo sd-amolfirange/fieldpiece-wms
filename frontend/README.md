@@ -1,9 +1,10 @@
-# Fieldpiece WMS: Frontend
+# HVAC Warranty Management: Frontend
 
-Web app for the Fieldpiece Warranty Management System. Built to
-[FIELDPIECE_WARRANTY_FRONTEND_INSTRUCTIONS.md](FIELDPIECE_WARRANTY_FRONTEND_INSTRUCTIONS.md) (the "build guide"). Read it before changing anything.
+Web app for the HVAC Warranty Management demo. Scope, roles, screens and workflows come from
+[docs/Demo workflows.md](docs/Demo%20workflows.md), which is the single source of truth. The work plan is in
+[docs/implementation-plan.md](docs/implementation-plan.md).
 
-**Stack:** React 18, TypeScript (strict), Vite 5, Tailwind CSS 3.4, Radix UI, TanStack Query/Table, React Router 6,
+**Stack:** React 18, TypeScript (strict), Vite 8, Tailwind CSS 3.4, Radix UI, TanStack Query/Table, React Router 7,
 Zustand, react-hook-form + zod, Recharts, i18next, MSW, Vitest, Playwright.
 
 ## Getting started
@@ -15,7 +16,6 @@ npm run dev:mock     # runs against MSW mocks, no backend needed -> http://local
 ```
 
 In mock mode the sign-in screen has a **Sign in as** picker, so you can try every role. Any email and password work.
-Useful mock serials: `SC680-100037` (registered), `ZZZ-999999` (not found), `RATELIMIT` (429 response).
 
 To run against a real API, copy `.env.example` to `.env.local`, set `VITE_API_BASE_URL`, and run `npm run dev`.
 
@@ -38,7 +38,7 @@ Husky runs lint-staged on commit and checks commit messages against Conventional
 
 ```
 src/
-├── app/            providers, router (route table = Section 6.2), RequireRole, layouts
+├── app/            providers, router, RequireRole, layouts
 ├── components/
 │   ├── ui/         design-system primitives (Button, FormField, SerialNumberInput, DataTable, Modal, ...)
 │   ├── layout/     AppShell, TopBar, AppHeader, Sidebar, PageHeader, AuthLayout, ScaffoldPage
@@ -48,7 +48,7 @@ src/
 ├── mocks/          MSW handlers + fixtures for every endpoint
 ├── locales/        en / es / fr strings
 ├── styles/         tokens.css (the ONLY place hex values live), globals.css
-└── types/          shared domain + API types (Section 7)
+└── types/          shared domain + API types
 ```
 
 ## Rules the tooling enforces
@@ -61,35 +61,9 @@ src/
 - **Tokens stay in memory.** Never put an access token in `localStorage`.
 - **UI hiding isn't security.** `lib/permissions.ts` and `RequireRole` only decide what to show; the API enforces access.
 
-## Build status
+## Notes
 
-| Area                                                                                                   | State                                                               |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Shell, nav, theming, i18n, auth session + refresh, error mapping, toasts                               | Done                                                                |
-| Design-system primitives (Section 5)                                                                   | Done                                                                |
-| Public warranty check (8.1)                                                                            | Done                                                                |
-| Claims list, claim detail with state-machine actions, approve/reject modals, timeline + internal notes | Done                                                                |
-| Register product (8.3), file claim (8.4)                                                               | Working flows; uploads, SKU picker images and address step are TODO |
-| Dashboard (8.2)                                                                                        | KPIs + status chart; role-specific lists TODO                       |
-| RMA detail, reports, customers, products detail, admin, bulk registration                              | Routed placeholders with the checklist from the build guide         |
-
-Search the code for `TODO` and `[CONFIRM]` to find open work.
-
-## Deviations from the build guide
-
-1. **Status colours (Section 3.2).** Two pairs failed the mandatory WCAG AA check (Section 10) and were adjusted in
-   `tokens.css`: `success-bg` #E6F4EA → #EDF7F0 (was 4.45:1), and `warning` #B87F12 → #8A5E0E (was 3.02:1 on its
-   background). #B87F12 (`brand-700`) is also only 3.45:1 on white, so it **can't be used for body-size accent text**,
-   despite what Section 3.2 says. Use `brand-800` or black instead. This needs client sign-off.
+1. **Status colours.** `success-bg` and `warning` in `tokens.css` were darkened so badges pass WCAG AA (4.5:1).
 2. **`globals.css`** imports `tokens.css` before the `@tailwind` directives (PostCSS requires `@import` first).
 3. **Opacity modifiers** such as `bg-ink-900/60` don't work on CSS-variable colours in Tailwind 3, so `scrim` and
    `tint` tokens were added for overlays.
-4. **Logo.** `src/assets/brand/fieldpiece-logo-dev.png` is the PNG from fieldpiece.com, for development only. Dark
-   mode inverts it until the official white SVG arrives.
-
-## Open items for Fieldpiece
-
-See Section 15 of the build guide. Items that block frontend work: identity provider (auth is mocked behind
-`features/auth/api.ts`), serial formats per SKU (`lib/serial.ts`), warranty terms, out-of-warranty claims, replacement
-warranty rule, Myriad Pro licence (Source Sans 3 is the fallback), and the languages to support (es/fr are stubs and
-fall back to English).

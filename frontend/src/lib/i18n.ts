@@ -16,7 +16,7 @@ export type LanguageCode = (typeof supportedLanguages)[number]["code"];
 
 function initialLanguage(): LanguageCode {
   try {
-    const saved = window.localStorage.getItem("fp-wms-lang");
+    const saved = window.localStorage.getItem("wms-lang");
     if (saved && supportedLanguages.some((l) => l.code === saved)) return saved as LanguageCode;
   } catch {
     // storage blocked: fall through to the browser language
@@ -36,7 +36,7 @@ void i18n.use(initReactI18next).init({
 i18n.on("languageChanged", (lng) => {
   document.documentElement.lang = lng;
   try {
-    window.localStorage.setItem("fp-wms-lang", lng);
+    window.localStorage.setItem("wms-lang", lng);
   } catch {
     // ignore: preference just won't persist
   }

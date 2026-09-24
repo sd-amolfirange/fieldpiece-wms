@@ -3,6 +3,15 @@ import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const vendorChunks: [string, string[]][] = [
+  ["react", ["react", "react-dom", "react-router", "react-router-dom", "scheduler"]],
+  ["query", ["@tanstack/react-query", "@tanstack/react-table", "axios", "zustand"]],
+  ["radix", ["@radix-ui/*"]],
+  ["forms", ["react-hook-form", "@hookform/resolvers", "zod", "react-dropzone"]],
+  ["i18n", ["i18next", "react-i18next", "date-fns"]],
+  ["charts", ["recharts", "d3-*", "victory-vendor"]],
+];
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -10,24 +19,15 @@ export default defineConfig({
   },
   server: { port: 5173 },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         // Long-lived vendor chunks so app deploys don't bust the whole cache.
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          query: ["@tanstack/react-query", "@tanstack/react-table", "axios", "zustand"],
-          radix: [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-tooltip",
-          ],
-          forms: ["react-hook-form", "@hookform/resolvers", "zod", "react-dropzone"],
-          i18n: ["i18next", "react-i18next", "date-fns"],
-          charts: ["recharts"],
+        manualChunks: (id: string) => {
+          const pkg = /[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/.exec(id)?.[1]?.replace("\\", "/");
+          if (!pkg) return undefined;
+          return vendorChunks.find(([, pkgs]) =>
+            pkgs.some((p) => (p.endsWith("*") ? pkg.startsWith(p.slice(0, -1)) : pkg === p)),
+          )?.[0];
         },
       },
     },

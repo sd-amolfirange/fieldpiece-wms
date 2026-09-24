@@ -21,7 +21,9 @@ import {
   type UploadItem,
 } from "@/components/ui";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
+import { readDraft, removeDraft, writeDraft } from "@/lib/drafts";
 import { toIsoDate } from "@/lib/format";
+import { useCurrentUser } from "@/lib/session";
 import { claimsApi } from "../api";
 import { claimSchema, FAILURE_CATEGORIES, PHOTO_REQUIRED_CATEGORIES, type ClaimDraft } from "../schemas";
 
@@ -29,7 +31,7 @@ import { claimSchema, FAILURE_CATEGORIES, PHOTO_REQUIRED_CATEGORIES, type ClaimD
 // TODO: expired-warranty warning ("Out of warranty, paid repair quote") once lookup is wired to step 1. [CONFIRM]
 // TODO: upload attachments via presigned URLs (POST /uploads/presign) before submitting.
 
-const DRAFT_KEY = "fp-wms-claim-draft";
+const DRAFT_FORM = "claim";
 const AUTOSAVE_MS = 10_000;
 
 const STEP_FIELDS: FieldPath<ClaimDraft>[][] = [
@@ -39,18 +41,10 @@ const STEP_FIELDS: FieldPath<ClaimDraft>[][] = [
   [],
 ];
 
-function readLocalDraft(): Partial<ClaimDraft> | null {
-  try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
-    return raw ? (JSON.parse(raw) as Partial<ClaimDraft>) : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function NewClaimPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const userId = useCurrentUser()?.id;
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState(0);
   const [files, setFiles] = useState<UploadItem[]>([]);
@@ -66,7 +60,7 @@ export default function NewClaimPage() {
       description: "",
       failureDate: "",
       photoCount: 0,
-      ...readLocalDraft(),
+      ...readDraft<ClaimDraft>(userId, DRAFT_FORM),
     },
   });
   const {
@@ -92,11 +86,7 @@ export default function NewClaimPage() {
       const snapshot = JSON.stringify(values);
       if (snapshot === lastSaved.current || !values.serialNumber) return;
       lastSaved.current = snapshot;
-      try {
-        window.localStorage.setItem(DRAFT_KEY, snapshot);
-      } catch {
-        // storage blocked; the API save below still runs
-      }
+      writeDraft(userId, DRAFT_FORM, values);
       claimsApi
         .saveDraft({ ...values, id: draftId })
         .then((claim) => setDraftId(claim.id))
@@ -105,7 +95,7 @@ export default function NewClaimPage() {
         });
     }, AUTOSAVE_MS);
     return () => window.clearInterval(timer);
-  }, [getValues, draftId]);
+  }, [getValues, draftId, userId]);
 
   const next = async () => {
     const fields = STEP_FIELDS[step] ?? [];
@@ -118,11 +108,7 @@ export default function NewClaimPage() {
       const draft = await claimsApi.saveDraft({ ...values, id: draftId });
       setDraftId(draft.id);
       const submitted = await claimsApi.transition(draft.id, { action: "submit" });
-      try {
-        window.localStorage.removeItem(DRAFT_KEY);
-      } catch {
-        // ignore
-      }
+      removeDraft(userId, DRAFT_FORM);
       toast.success(t("claims.actions.submit"), submitted.id);
       navigate(`/claims/${submitted.id}`, { replace: true });
     } catch (error) {

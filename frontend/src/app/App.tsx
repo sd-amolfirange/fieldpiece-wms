@@ -7,7 +7,7 @@ export function App() {
   const [router] = useState(createAppRouter);
   return (
     <AppProviders>
-      <RouterProvider router={router} future={{ v7_startTransition: true }} />
+      <RouterProvider router={router} />
     </AppProviders>
   );
 }

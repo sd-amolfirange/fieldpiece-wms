@@ -25,7 +25,7 @@ const memoryStorage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = {
 function browserStorage() {
   try {
     const storage = window.localStorage;
-    storage.getItem("fp-wms-ui");
+    storage.getItem("wms-ui");
     return storage;
   } catch {
     return memoryStorage;
@@ -43,7 +43,7 @@ export const useUiPrefs = create<UiPrefsState>()(
       setTheme: (theme) => set({ theme }),
     }),
     {
-      name: "fp-wms-ui",
+      name: "wms-ui",
       storage: createJSONStorage(browserStorage),
       partialize: ({ sidebarCollapsed, theme }) => ({ sidebarCollapsed, theme }),
     },

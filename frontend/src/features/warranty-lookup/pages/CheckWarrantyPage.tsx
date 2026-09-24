@@ -44,7 +44,7 @@ export default function CheckWarrantyPage() {
             required
             labelAction={<SerialHelpLink />}
           >
-            <SerialNumberInput placeholder="SC680-100037" {...register("serial")} />
+            <SerialNumberInput placeholder="AER-SPL15-240917" {...register("serial")} />
           </FormField>
           <Button type="submit" size="lg" icon={Search} loading={check.isFetching} className="sm:mt-6">
             {t("check.submit")}

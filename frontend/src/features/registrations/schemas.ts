@@ -20,7 +20,7 @@ export const registrationSchema = z
           .min(1, "Enter the serial number.")
           .regex(
             new RegExp(DEFAULT_SERIAL_PATTERN),
-            "That doesn't look like a Fieldpiece serial number. Check the label.",
+            "That doesn't look like a valid serial number. Check the label on the unit.",
           ),
       ),
     sku: z.string().min(1, "Pick the product."),

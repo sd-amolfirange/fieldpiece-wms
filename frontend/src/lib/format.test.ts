@@ -77,6 +77,6 @@ describe("IDs and serials", () => {
   });
 
   it("normalises serials", () => {
-    expect(normalizeSerial("  sc 680-abc1 ")).toBe("SC680-ABC1");
+    expect(normalizeSerial("  aer-spl15 240917 ")).toBe("AER-SPL15240917");
   });
 });

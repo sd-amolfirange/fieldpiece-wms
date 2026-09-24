@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SessionUser } from "@/types";
+import { clearAllDrafts } from "./drafts";
 import { setAuthFailureHandler, tokenStore } from "./http";
 import { queryClient } from "./query-client";
 
@@ -26,6 +27,7 @@ export const useSession = create<SessionState>((set) => ({
   signOut: () => {
     tokenStore.clear();
     queryClient.clear();
+    clearAllDrafts();
     set({ status: "anonymous", user: null });
   },
   markAnonymous: () => set({ status: "anonymous", user: null }),

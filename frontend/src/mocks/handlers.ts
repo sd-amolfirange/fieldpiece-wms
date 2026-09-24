@@ -13,7 +13,7 @@ const api = (path: string) => `*${basePath}${path}`;
 const error = (status: number, body: ApiErrorBody) => HttpResponse.json(body, { status });
 
 // Simulates the httpOnly refresh cookie across reloads. Mock-only; real tokens never touch storage.
-const SESSION_KEY = "fp-wms-mock-session";
+const SESSION_KEY = "wms-mock-session";
 function currentMockUser(): SessionUser | null {
   try {
     const role = globalThis.sessionStorage?.getItem(SESSION_KEY) as Role | null;

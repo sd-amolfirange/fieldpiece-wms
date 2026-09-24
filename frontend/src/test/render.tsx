@@ -17,10 +17,7 @@ interface Options extends Omit<RenderOptions, "wrapper"> {
 export function renderWithProviders(ui: ReactElement, { route = "/", path = "*", ...options }: Options = {}) {
   const queryClient = createQueryClient();
   queryClient.setDefaultOptions({ queries: { retry: false } });
-  const router = createMemoryRouter([{ path, element: ui }], {
-    initialEntries: [route],
-    future: { v7_relativeSplatPath: true },
-  });
+  const router = createMemoryRouter([{ path, element: ui }], { initialEntries: [route] });
 
   return {
     user: userEvent.setup(),
@@ -29,7 +26,7 @@ export function renderWithProviders(ui: ReactElement, { route = "/", path = "*",
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <TooltipProvider>
-            <RouterProvider router={router} future={{ v7_startTransition: true }} />
+            <RouterProvider router={router} />
           </TooltipProvider>
         </I18nextProvider>
       </QueryClientProvider>,

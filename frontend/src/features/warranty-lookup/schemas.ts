@@ -12,7 +12,7 @@ export const warrantyCheckSchema = z.object({
         .min(1, "Enter the serial number.")
         .regex(
           new RegExp(DEFAULT_SERIAL_PATTERN),
-          "That doesn't look like a Fieldpiece serial number. Check the label and try again.",
+          "That doesn't look like a valid serial number. Check the label on the unit.",
         ),
     ),
 });

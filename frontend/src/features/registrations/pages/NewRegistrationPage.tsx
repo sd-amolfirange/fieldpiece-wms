@@ -220,7 +220,7 @@ export default function NewRegistrationPage() {
                     aria-invalid={errors.acceptTerms ? true : undefined}
                     {...register("acceptTerms")}
                   />
-                  I accept the Fieldpiece warranty terms
+                  {t("registrations.acceptTerms")}
                 </label>
                 {errors.acceptTerms ? (
                   <p className="text-sm text-danger">{errors.acceptTerms.message}</p>

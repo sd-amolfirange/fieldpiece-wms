@@ -109,8 +109,8 @@
   "fields": {
     "serialNumber": "Serial number",
     "serialHelp": "Where do I find this?",
-    "serialHelpBody": "The serial number is printed on the label on the back of the unit, usually under the battery cover.",
-    "serialInvalid": "That doesn't look like a Fieldpiece serial number. Check the label and try again.",
+    "serialHelpBody": "The serial number is printed on the rating label on the side of the unit, next to the QR code.",
+    "serialInvalid": "That doesn't look like a valid serial number. Check the label on the unit and try again.",
     "purchaseDate": "Purchase date",
     "purchaseDateFuture": "Purchase date can't be in the future.",
     "purchaseDateBeforeLaunch": "Purchase date is before this product was released. Check the receipt.",
@@ -124,7 +124,7 @@
     "removeFile": "Remove {{name}}"
   },
   "auth": {
-    "signInTitle": "Sign in to Fieldpiece Warranty",
+    "signInTitle": "Sign in to HVAC Warranty",
     "signIn": "Sign in",
     "forgotPassword": "Forgot password?",
     "forgotTitle": "Reset your password",
@@ -139,7 +139,7 @@
   },
   "check": {
     "title": "Check warranty",
-    "intro": "Enter the serial number to see if a Fieldpiece unit is covered.",
+    "intro": "Enter the serial number to see if a unit is covered.",
     "submit": "Check warranty",
     "notFound": "Serial number not found. Check the label on the back of the unit, or register it first.",
     "coverageUntil": "Covered until {{date}}",
@@ -186,6 +186,7 @@
     "duplicate": "This unit is already registered.",
     "contactSupport": "Contact support",
     "empty": "No registrations yet. Register a product to start its warranty.",
+    "acceptTerms": "I accept the warranty terms",
     "columns": {
       "serial": "Serial",
       "sku": "SKU",
