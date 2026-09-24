@@ -1,6 +1,6 @@
 import { appUrl, expect, present, resetDemoData, rolePage, test } from "./fixtures";
 
-// W3 – Customer complaint, service hand-off and manufacturer claim (docs/Demo workflows.md).
+// W3 – Customer complaint, service hand-off and manufacturer claim (docs/demo-workflows.md).
 // Logins: customer R. Kulkarni (phone), admin; the simulator steps use A13 as the admin.
 
 const SERIAL = "AER-SPL15-210311";

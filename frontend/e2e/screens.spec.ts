@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { appUrl, expect, resetDemoData, rolePage, test } from "./fixtures";
 
-// Every screen's "must contain" list (docs/Demo workflows.md, 25 screens), checked on fresh seed data with the login
+// Every screen's "must contain" list (docs/demo-workflows.md, 25 screens), checked on fresh seed data with the login
 // that uses the screen. One step per screen; each assertion is one item of its list.
 
 test("screens: every must-contain item is present", async ({ browser, baseURL }) => {

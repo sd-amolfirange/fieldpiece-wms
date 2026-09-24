@@ -1,6 +1,6 @@
 # Implementation plan: HVAC Warranty demo
 
-Source of truth: [Demo workflows.md](Demo%20workflows.md). Rules: [../CLAUDE.md](../CLAUDE.md), which in short says the
+Source of truth: [demo-workflows.md](demo-workflows.md). Rules: [../CLAUDE.md](../CLAUDE.md), which in short says the
 visual design is frozen and new screens are built only from existing components and classes.
 
 Items marked **🔍 REVIEW** need your sign-off before they're built.

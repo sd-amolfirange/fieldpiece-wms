@@ -75,9 +75,11 @@ export default function LoginPage() {
             error={errors.password?.message}
             required
             labelAction={
-              <Link to="/forgot-password" className="text-sm text-info underline underline-offset-2">
-                {t("auth.forgotPassword")}
-              </Link>
+              env.showForgotPassword ? (
+                <Link to="/forgot-password" className="text-sm text-info underline underline-offset-2">
+                  {t("auth.forgotPassword")}
+                </Link>
+              ) : undefined
             }
           >
             <Input type="password" autoComplete="current-password" {...register("password")} />

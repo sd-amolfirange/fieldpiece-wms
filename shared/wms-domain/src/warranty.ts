@@ -9,7 +9,7 @@ import type {
   WarrantyStatus,
 } from "./types";
 
-// Warranty rules (docs/Demo workflows.md):
+// Warranty rules (docs/demo-workflows.md):
 // - every part has its own warranty: end = start + the model template's months, compared with today;
 // - the end day itself is still covered;
 // - "Expiring soon" means 30 days or fewer remain;

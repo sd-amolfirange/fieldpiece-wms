@@ -1,6 +1,6 @@
 import { appUrl, expect, present, resetDemoData, rolePage, test } from "./fixtures";
 
-// W5 – Void warranty and chargeable repair (docs/Demo workflows.md). Logins: admin, customer R. Kulkarni (phone).
+// W5 – Void warranty and chargeable repair (docs/demo-workflows.md). Logins: admin, customer R. Kulkarni (phone).
 
 const UNIT = "AER-SPL18-230502";
 

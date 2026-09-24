@@ -145,7 +145,7 @@ Each of the three folders has `typecheck`, `lint`, `test` and `build` scripts.
 
 ## 7. Demo day
 
-Follow this order on the morning of the demo. It is the pre-demo checklist in `docs/Demo workflows.md`, spelled out.
+Follow this order on the morning of the demo. It is the pre-demo checklist in `docs/demo-workflows.md`, spelled out.
 
 1. **Start the server** (laptop): `cd backend/demo-server` → `npm run demo`. Wait for "Demo app on
    http://localhost:4000".
@@ -168,7 +168,7 @@ Follow this order on the morning of the demo. It is the pre-demo checklist in `d
 6. **QR label for W2:** in the Admin window open **Units** → `AER-SPL15-240917` → **Print label** (or keep that page
    on screen for the phone to scan).
 7. **Bulk file for W1:** keep `demo-assets/coolair_sales_week38.xlsx` ready on the Dealer laptop.
-8. **Run order:** W1, W2, W3, W4, W6, W5, W7 (`docs/Demo workflows.md`). Nothing else needs resetting between
+8. **Run order:** W1, W2, W3, W4, W6, W5, W7 (`docs/demo-workflows.md`). Nothing else needs resetting between
    workflows.
 
 **The failed row in the Integration log is on purpose.** The seed includes one outbound **CRM update that failed**

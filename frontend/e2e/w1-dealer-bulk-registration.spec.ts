@@ -1,6 +1,6 @@
 import { appUrl, expect, isoDay, resetDemoData, rolePage, test } from "./fixtures";
 
-// W1 – Dealer bulk registration (docs/Demo workflows.md). Logins: dealer CoolAir Traders, admin, customer R. Kulkarni.
+// W1 – Dealer bulk registration (docs/demo-workflows.md). Logins: dealer CoolAir Traders, admin, customer R. Kulkarni.
 
 const XLSX = "../demo-assets/coolair_sales_week38.xlsx";
 

@@ -1,7 +1,7 @@
 # HVAC Warranty Management: Frontend
 
 Web app for the HVAC Warranty Management demo. Scope, roles, screens and workflows come from
-[docs/Demo workflows.md](docs/Demo%20workflows.md), which is the single source of truth. The work plan is in
+[docs/demo-workflows.md](docs/demo-workflows.md), which is the single source of truth. The work plan is in
 [docs/implementation-plan.md](docs/implementation-plan.md).
 
 **Stack:** React 18, TypeScript (strict), Vite 8, Tailwind CSS 3.4, Radix UI, TanStack Query/Table, React Router 7,

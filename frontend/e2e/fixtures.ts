@@ -8,7 +8,7 @@ import {
   type Page,
 } from "@playwright/test";
 
-// Shared helpers for the workflow specs (docs/Demo workflows.md). Chromium only.
+// Shared helpers for the workflow specs (docs/demo-workflows.md). Chromium only.
 
 export const ACCOUNTS = {
   admin: "Admin: WMS office admin",

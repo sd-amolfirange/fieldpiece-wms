@@ -1,0 +1,10 @@
+# Safety net for the whole repo (each package also has its own .gitignore).
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+backend/demo-server/data/
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/demo-data/

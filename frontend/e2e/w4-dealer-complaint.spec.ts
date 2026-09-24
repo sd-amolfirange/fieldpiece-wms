@@ -1,6 +1,6 @@
 import { appUrl, expect, present, resetDemoData, rolePage, test } from "./fixtures";
 
-// W4 – Dealer complaint on behalf of a customer (docs/Demo workflows.md). Logins: dealer CoolAir Traders (tablet),
+// W4 – Dealer complaint on behalf of a customer (docs/demo-workflows.md). Logins: dealer CoolAir Traders (tablet),
 // admin. Runs exactly as written: no extra simulation; the claims tab shows the seeded CoolAir claim.
 
 const UNIT = "AER-SPL18-251120";

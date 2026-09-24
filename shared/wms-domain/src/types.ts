@@ -1,4 +1,4 @@
-// Domain model for the HVAC warranty demo (docs/Demo workflows.md).
+// Domain model for the HVAC warranty demo (docs/demo-workflows.md).
 // Package @wms/domain: shared by frontend/ and backend/demo-server/. Pure data and rules only.
 
 /** ISO calendar date, yyyy-MM-dd. */

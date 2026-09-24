@@ -5,7 +5,7 @@ import { appUrl, expect, isoDay, present, resetDemoData, rolePage, shownDate, te
 // CommonJS package: take the classes from the default export.
 const { BinaryBitmap, HybridBinarizer, QRCodeReader, RGBLuminanceSource } = zxing;
 
-// W2 – Customer self-registration by QR (docs/Demo workflows.md). Logins: customer R. Kulkarni (phone), admin.
+// W2 – Customer self-registration by QR (docs/demo-workflows.md). Logins: customer R. Kulkarni (phone), admin.
 // The QR label is decoded exactly as a phone camera would read it; the real camera is a manual check.
 
 const SERIAL = "AER-SPL15-240917";

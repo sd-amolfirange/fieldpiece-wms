@@ -735,10 +735,10 @@ Everything below is done by the mock today and the frontend depends on it. None 
 The frontend still contains code from screens that are out of scope and not routed. These calls are never made in the
 demo and the mock doesn't serve them. Listed so nobody builds them by mistake:
 
-| Call                                                                     | From                                                                                     |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `GET /admin/users`, `GET /admin/policies`, `GET/PUT /admin/settings`     | Legacy admin screens                                                                     |
-| `GET /customers`, `GET /customers/:id`                                   | Legacy customers screen                                                                  |
-| `GET /reports/claims-over-time`                                          | Legacy reports screen                                                                    |
-| `GET /rma`, `GET /rma/:id`, `PATCH /rma/:id`, `POST /rma/:id/inspection` | Legacy RMA screens                                                                       |
-| `POST /auth/forgot-password`                                             | Forgot-password page (routed, but the mock has no endpoint; see the verification report) |
+| Call                                                                     | From                                                                                                                                    |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/users`, `GET /admin/policies`, `GET/PUT /admin/settings`     | Legacy admin screens                                                                                                                    |
+| `GET /customers`, `GET /customers/:id`                                   | Legacy customers screen                                                                                                                 |
+| `GET /reports/claims-over-time`                                          | Legacy reports screen                                                                                                                   |
+| `GET /rma`, `GET /rma/:id`, `PATCH /rma/:id`, `POST /rma/:id/inspection` | Legacy RMA screens                                                                                                                      |
+| `POST /auth/forgot-password`                                             | Forgot-password page. Hidden in the demo build (`VITE_SHOW_FORGOT_PASSWORD=false`); the real backend needs it if password reset is kept |

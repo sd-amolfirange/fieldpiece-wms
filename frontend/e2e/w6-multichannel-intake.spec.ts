@@ -1,6 +1,6 @@
 import { appUrl, expect, resetDemoData, rolePage, test } from "./fixtures";
 
-// W6 – Multi-channel intake and integrations (docs/Demo workflows.md). Login: admin (the simulator is A13).
+// W6 – Multi-channel intake and integrations (docs/demo-workflows.md). Login: admin (the simulator is A13).
 
 test("W6: multi-channel intake and integrations", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E: one spec per demo workflow (docs/Demo workflows.md, W1-W7), on Chromium only (the demo runs on Chrome).
+// E2E: one spec per demo workflow (docs/demo-workflows.md, W1-W7), on Chromium only (the demo runs on Chrome).
 // Runs its own demo server (port 4100, throwaway data folder) and Vite dev server (port 5174), so it never touches
 // the data of a demo server you have running on 4000. (No dot in the data folder name: the server won't serve
 // files from dot-folders.) Specs share that server, so they run one at a time; each

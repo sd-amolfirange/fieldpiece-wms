@@ -1,7 +1,7 @@
 # Demo verification report
 
 What was checked before hand-over, how, and what is left for a person to check on the day. Scope and wording follow
-`docs/Demo workflows.md`. The demo is supported on **Google Chrome only**; every check below ran in Chrome/Chromium.
+`docs/demo-workflows.md`. The demo is supported on **Google Chrome only**; every check below ran in Chrome/Chromium.
 
 ## 1. Summary
 
@@ -212,7 +212,7 @@ horizontally scrolling table area wasn't reachable by keyboard.
 
 ## 5. Pre-demo checklist
 
-| #   | Step (from `docs/Demo workflows.md`)              | Can be followed as written?                                                                                                                              |
+| #   | Step (from `docs/demo-workflows.md`)              | Can be followed as written?                                                                                                                              |
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Run Reset demo data (Admin → Simulate)            | Yes. Administration → Simulate tab → Reset demo data → confirm. Verified.                                                                                |
 | 2   | Open four windows, each signed in                 | Yes, with four **Chrome profiles** (one sign-in cookie per profile). Verified with four separate browser contexts; with real profiles: manual check 6.6. |
@@ -302,7 +302,7 @@ http://localhost:4000`. Note the `https://…trycloudflare.com` address.
 | Integration retry     | In the mock, Retry always succeeds.                                                                                                                                                                                                                    |
 | Seed dates            | Units are dated from the day of the reset (for example "expiring within 30 days"). Reset on the morning of the demo.                                                                                                                                   |
 | Sample bulk file      | `coolair_sales_week38.xlsx` has fixed serials (`…-2609xx`) and dates. Uploading it twice without a reset flags its serials as duplicates.                                                                                                              |
-| Forgot password       | The page is reachable from sign-in, but the mock has no reset endpoint, so submitting shows "Not found." It isn't part of any workflow.                                                                                                                |
+| Forgot password       | The demo server has no password reset. The demo build hides the "Forgot password" link (`VITE_SHOW_FORGOT_PASSWORD=false` in `.env.showcase`); opening `/forgot-password` directly shows "Please contact your administrator."                          |
 | Tablet (DL07)         | Below 1280 px wide, the dealer's complaints list hides Received, Source, Status and Cover so it fits a 1024 px tablet without sideways scrolling; the progress tracker still shows the status.                                                         |
 | Out-of-scope code     | Screens from the earlier product (RMA, customers, reports, policies, settings, public warranty check) are kept in the code but not routed.                                                                                                             |
 | Currency and language | English only; amounts in INR.                                                                                                                                                                                                                          |

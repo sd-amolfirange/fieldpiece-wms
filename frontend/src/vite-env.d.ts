@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_MOCKS?: string;
   readonly VITE_DEMO_MODE?: string;
   readonly VITE_SHOW_ENV_TAG?: string;
+  readonly VITE_SHOW_FORGOT_PASSWORD?: string;
   readonly VITE_EXPIRING_SOON_DAYS?: string;
 }
 

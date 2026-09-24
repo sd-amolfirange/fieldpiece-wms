@@ -7,6 +7,7 @@ import { toast } from "@/components/feedback";
 import { AuthLayout } from "@/components/layout";
 import { Button, Card, FormField, Input } from "@/components/ui";
 import { toApiError } from "@/lib/api-error";
+import { env } from "@/lib/env";
 import { useForgotPassword } from "../hooks";
 import { forgotPasswordSchema, type ForgotPasswordForm } from "../schemas";
 
@@ -27,7 +28,12 @@ export default function ForgotPasswordPage() {
     <AuthLayout>
       <Card as="div">
         <h1 className="mb-2 text-h1">{t("auth.forgotTitle")}</h1>
-        {forgot.isSuccess ? (
+        {!env.showForgotPassword ? (
+          // Demo build: no password reset behind this page (VITE_SHOW_FORGOT_PASSWORD=false).
+          <p role="status" className="text-body">
+            {t("auth.contactAdmin")}
+          </p>
+        ) : forgot.isSuccess ? (
           <p role="status" className="text-body">
             {t("auth.resetSent")}
           </p>

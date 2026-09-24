@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-- `docs/Demo workflows.md` is the only source of truth for scope, roles, screens (A01–A13, DL01–DL07, CU01–CU05),
+- `docs/demo-workflows.md` is the only source of truth for scope, roles, screens (A01–A13, DL01–DL07, CU01–CU05),
   statuses, seed data and workflows (W1–W7).
 - `docs/implementation-plan.md` is the agreed plan. Follow it phase by phase.
 - `docs/FE_Requirements_Gap_Report.md` describes the code as it was before the rebuild. Use it to see what is reusable.
@@ -41,6 +41,9 @@ The existing look must stay exactly as it is. Only features and behaviour change
 - Approved exceptions (Phase 5): `DataTable` takes an optional per-column `meta.className`, applied to that column's
   header and cells in the desktop table only (default behaviour unchanged). Use it with `hidden xl:table-cell` to hide
   lower-priority columns below 1280px (DL07 on a 1024px tablet); that breakpoint class is approved.
+- Approved exception (Phase 6, accessibility, no visual change): `DataTable`'s horizontal scroll area is keyboard-
+  focusable and named (`tabIndex={0}`, `role="region"`, `aria-label={caption}`), with a one-line
+  `jsx-a11y/no-noninteractive-tabindex` exception that states the reason.
 - The demo is supported on Google Chrome only (desktop, and Chrome on the phone). Don't add cross-browser testing or
   fixes; Playwright runs on Chromium only.
 
@@ -62,5 +65,7 @@ The existing look must stay exactly as it is. Only features and behaviour change
   `git diff --name-only e51b09e -- src/styles tailwind.config.ts src/components/layout src/assets public/favicon.svg`
   may only list the approved exceptions: `nav-items.ts` (menu data), `Logo.tsx` (390px header fit),
   `TopBar.tsx` (environment tag via `VITE_SHOW_ENV_TAG`) and `ScaffoldPage.tsx` (placeholder text).
+- Keep frontend changes (`frontend/`, `shared/wms-domain/`, `demo-assets/`, root config) and mock-server changes
+  (`backend/demo-server/`) in separate commits.
 - Commit messages must pass `.husky/commit-msg`: use `WMS-<n>: <summary>`, for example
   `WMS-004: Phase 1: demo server and seed data`.

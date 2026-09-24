@@ -1,6 +1,6 @@
 import { appUrl, expect, resetDemoData, rolePage, test } from "./fixtures";
 
-// W7 – Distributor oversight (docs/Demo workflows.md). Logins: admin, distributor NorthStar Distribution.
+// W7 – Distributor oversight (docs/demo-workflows.md). Logins: admin, distributor NorthStar Distribution.
 
 test("W7: distributor oversight", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));

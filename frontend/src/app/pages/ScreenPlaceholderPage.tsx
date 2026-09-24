@@ -5,7 +5,7 @@ import { useCurrentRole } from "@/lib/session";
 import type { Role } from "@/types";
 
 // Stand-in for a demo screen that a later phase builds. Shows the screen code and its "must contain" list
-// from docs/Demo workflows.md, so every route is reachable and checkable from Phase 1 on.
+// from docs/demo-workflows.md, so every route is reachable and checkable from Phase 1 on.
 
 export type ScreenCode =
   | "A02"
