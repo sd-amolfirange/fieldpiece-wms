@@ -1,17 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
 import { Button, FormField, Input, Modal, Textarea } from "@/components/ui";
 import { useFieldError } from "@/lib/use-field-error";
+import { rejectClaimSchema, submitClaimSchema, type RejectClaimForm, type SubmitClaimForm } from "../schemas";
 
 // Same pattern as the registration reject modal: collect what the claim action needs before sending it.
-
-const submitSchema = z.object({
-  rmaNumber: z.string().trim().optional(),
-  amount: z.string().refine((v) => Number(v) > 0, "validation.amount"),
-});
-type SubmitForm = z.infer<typeof submitSchema>;
 
 interface ModalProps<T> {
   open: boolean;
@@ -34,8 +28,8 @@ export function SubmitClaimModal({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<SubmitForm>({
-    resolver: zodResolver(submitSchema),
+  } = useForm<SubmitClaimForm>({
+    resolver: zodResolver(submitClaimSchema),
     values: { rmaNumber: defaultRma ?? "", amount: "" },
   });
 
@@ -73,9 +67,6 @@ export function SubmitClaimModal({
   );
 }
 
-const rejectSchema = z.object({ reason: z.string().trim().min(5, "validation.reasonRequired") });
-type RejectForm = z.infer<typeof rejectSchema>;
-
 export function RejectClaimModal({ open, onOpenChange, onConfirm, pending }: ModalProps<string>) {
   const { t } = useTranslation();
   const fieldError = useFieldError();
@@ -83,7 +74,7 @@ export function RejectClaimModal({ open, onOpenChange, onConfirm, pending }: Mod
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<RejectForm>({ resolver: zodResolver(rejectSchema), values: { reason: "" } });
+  } = useForm<RejectClaimForm>({ resolver: zodResolver(rejectClaimSchema), values: { reason: "" } });
 
   return (
     <Modal

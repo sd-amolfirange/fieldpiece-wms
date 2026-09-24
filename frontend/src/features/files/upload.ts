@@ -6,6 +6,17 @@ import { filesApi } from "./api";
 
 export const uploadFile = filesApi.upload;
 
+/** HEIC/HEIF (iPhone "High efficiency") photos: most browsers can't show them, so they're refused up front. */
+export const isHeic = (file: File) => /^image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+
+/** Splits HEIC photos out of a dropzone selection; `heic` holds their file names for the message. */
+export function dropHeic(items: UploadItem[]): { kept: UploadItem[]; heic: string[] } {
+  return {
+    kept: items.filter((item) => !isHeic(item.file)),
+    heic: items.filter((item) => isHeic(item.file)).map((item) => item.file.name),
+  };
+}
+
 /**
  * Uploads every item that hasn't been uploaded yet, reporting progress per file through `onChange`.
  * Resolves with all attachment ids, or rejects on the first failure (the item gets its error message).

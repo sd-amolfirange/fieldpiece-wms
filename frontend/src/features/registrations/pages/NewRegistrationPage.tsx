@@ -27,7 +27,7 @@ import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { toIsoDate } from "@/lib/format";
 import { useDealers, useModels } from "@/features/catalog";
 import { useCurrentRole } from "@/lib/session";
-import { uploadAll } from "@/features/files";
+import { dropHeic, uploadAll } from "@/features/files";
 import { useFieldError } from "@/lib/use-field-error";
 import { useCreateRegistration } from "../hooks";
 import { unitRegisterSchema, type UnitRegisterForm } from "../schemas";
@@ -235,7 +235,11 @@ export default function NewRegistrationPage() {
               <FormField label={t("registerUnit.invoice")} helper={t("common.optional")}>
                 <FileDropzone
                   value={files}
-                  onChange={setFiles}
+                  onChange={(next) => {
+                    const { kept, heic } = dropHeic(next);
+                    heic.forEach((name) => toast.error(t("fields.heicNotSupported", { name })));
+                    setFiles(kept);
+                  }}
                   maxFiles={3}
                   onReject={(m) => m.forEach((msg) => toast.error(msg))}
                 />

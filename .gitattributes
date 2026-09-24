@@ -1,0 +1,15 @@
+# Line endings: LF in the repository and in every working copy, whatever core.autocrlf says.
+# Matches Prettier "endOfLine": "lf", so formatting never produces line-ending-only changes.
+* text=auto eol=lf
+
+# Binary files: never convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.xlsx binary
+*.woff binary
+*.woff2 binary

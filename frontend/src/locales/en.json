@@ -188,6 +188,7 @@
     "fileDropHint": "Photos or PDF, up to {{maxSizeMb}} MB each, {{maxFiles}} files max",
     "fileTooLarge": "{{name}} is larger than {{maxSizeMb}} MB. Choose a smaller file.",
     "fileWrongType": "{{name}} isn't a photo or PDF. Upload an image or PDF.",
+    "heicNotSupported": "{{name}} is a HEIC photo, which can't be shown here. Send it as a JPEG instead (on iPhone: Settings > Camera > Formats > Most Compatible).",
     "tooManyFiles": "You can attach up to {{maxFiles}} files.",
     "removeFile": "Remove {{name}}"
   },

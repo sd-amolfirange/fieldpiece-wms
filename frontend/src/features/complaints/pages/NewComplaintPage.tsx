@@ -16,7 +16,7 @@ import {
   Textarea,
   type UploadItem,
 } from "@/components/ui";
-import { uploadAll } from "@/features/files";
+import { dropHeic, uploadAll } from "@/features/files";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { useCurrentRole } from "@/lib/session";
 import { useFieldError } from "@/lib/use-field-error";
@@ -106,7 +106,11 @@ export default function NewComplaintPage() {
             <FormField label={t("complaints.photos")} helper={t("common.optional")}>
               <FileDropzone
                 value={files}
-                onChange={setFiles}
+                onChange={(next) => {
+                  const { kept, heic } = dropHeic(next);
+                  heic.forEach((name) => toast.error(t("fields.heicNotSupported", { name })));
+                  setFiles(kept);
+                }}
                 maxFiles={3}
                 accept={MEDIA}
                 hint={t("complaints.photoHint")}

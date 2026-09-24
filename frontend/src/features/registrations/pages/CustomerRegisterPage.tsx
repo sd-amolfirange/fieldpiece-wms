@@ -25,7 +25,7 @@ import { QrScannerModal, type QrPayload } from "@/features/qr";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { toIsoDate } from "@/lib/format";
 import { useModels } from "@/features/catalog";
-import { uploadAll } from "@/features/files";
+import { dropHeic, uploadAll } from "@/features/files";
 import { useFieldError } from "@/lib/use-field-error";
 import { useCreateRegistration } from "../hooks";
 import { selfRegisterSchema, type SelfRegisterForm } from "../schemas";
@@ -216,7 +216,11 @@ export default function CustomerRegisterPage() {
           >
             <FileDropzone
               value={files}
-              onChange={setFiles}
+              onChange={(next) => {
+                const { kept, heic } = dropHeic(next);
+                heic.forEach((name) => toast.error(t("fields.heicNotSupported", { name })));
+                setFiles(kept);
+              }}
               maxFiles={3}
               onReject={(m) => m.forEach((msg) => toast.error(msg))}
             />

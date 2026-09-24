@@ -2,7 +2,7 @@ import type { UploadItem } from "@/components/ui";
 import { signInAs } from "@/test/sign-in";
 import { http } from "@/lib/http";
 import { useSession } from "@/lib/session";
-import { uploadAll, uploadFile } from "./upload";
+import { dropHeic, uploadAll, uploadFile } from "./upload";
 
 describe("uploads", () => {
   afterEach(() => useSession.getState().signOut());
@@ -48,5 +48,18 @@ describe("uploads", () => {
     // A retry doesn't upload the same files again.
     const again = await uploadAll(items, () => {}, cache);
     expect(again).toEqual(ids);
+  });
+});
+
+describe("dropHeic", () => {
+  it("refuses iPhone HEIC photos by type or extension and keeps JPEGs", () => {
+    const items: UploadItem[] = [
+      { file: new File(["x"], "IMG_0001.HEIC", { type: "" }) },
+      { file: new File(["x"], "fault.heif", { type: "image/heif" }) },
+      { file: new File(["x"], "fault.jpg", { type: "image/jpeg" }) },
+    ];
+    const { kept, heic } = dropHeic(items);
+    expect(heic).toEqual(["IMG_0001.HEIC", "fault.heif"]);
+    expect(kept.map((i) => i.file.name)).toEqual(["fault.jpg"]);
   });
 });
