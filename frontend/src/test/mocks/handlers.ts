@@ -2,8 +2,11 @@ import { http, HttpResponse } from "msw";
 import {
   addAttachment,
   contextFor,
+  createBulkImport,
   dispatch,
   getAttachment,
+  parseCsv,
+  rowsFromMatrix,
   ServiceError,
   userFromToken,
   type DemoResponse,
@@ -82,6 +85,31 @@ export const handlers = [
       );
       mockFiles.set(attachment.id, file);
       return HttpResponse.json(attachment, { status: 201 });
+    } catch (e) {
+      if (e instanceof ServiceError) return errorJson(e);
+      throw e;
+    }
+  }),
+
+  // Bulk upload (CSV only in tests; the server also reads .xlsx).
+  http.post(api("/bulk-imports"), async ({ request }) => {
+    const user = userFromToken(mockDb, mockSessions, bearer(request));
+    if (!user)
+      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
+    const form = await request.formData();
+    const entry = form.get("file");
+    const file = typeof entry === "object" && entry && "text" in entry ? (entry as File) : null;
+    if (!file)
+      return HttpResponse.json({ code: "validation_error", message: "Choose a file." }, { status: 422 });
+    const name = form.get("name");
+    const dealerId = form.get("dealerId");
+    try {
+      const batch = createBulkImport(contextFor(mockDb, user), {
+        fileName: typeof name === "string" && name ? name : "upload.csv",
+        dealerId: typeof dealerId === "string" ? dealerId : undefined,
+        rows: rowsFromMatrix(parseCsv(await file.text())),
+      });
+      return HttpResponse.json(batch, { status: 201 });
     } catch (e) {
       if (e instanceof ServiceError) return errorJson(e);
       throw e;

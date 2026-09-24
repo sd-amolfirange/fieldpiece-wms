@@ -1,6 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Bell, LogOut, Menu, Moon, Sun, UserCircle2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { NotificationsBell } from "@/features/notifications";
 import { useSession } from "@/lib/session";
 import { useUiPrefs } from "@/lib/ui-prefs";
 import { GlobalSearch } from "./GlobalSearch";
@@ -50,10 +51,19 @@ export function AppHeader({ onSignOut }: AppHeaderProps) {
             <Moon size={20} strokeWidth={1.75} aria-hidden />
           )}
         </button>
-        {/* TODO: notifications popover backed by GET /notifications */}
-        <button type="button" className={iconButton} aria-label={t("header.notifications")}>
-          <Bell size={20} strokeWidth={1.75} aria-hidden />
-        </button>
+        <NotificationsBell
+          trigger={(unread) => (
+            <button
+              type="button"
+              className={iconButton}
+              aria-label={
+                unread ? t("header.notificationsUnread", { count: unread }) : t("header.notifications")
+              }
+            >
+              <Bell size={20} strokeWidth={1.75} aria-hidden />
+            </button>
+          )}
+        />
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger className={iconButton} aria-label={t("header.account")}>

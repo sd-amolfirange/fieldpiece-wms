@@ -1,5 +1,5 @@
 import { isIsoDate } from "./dates";
-import type { IsoDate } from "./types";
+import type { IsoDateTime, IsoDate } from "./types";
 
 // Row validation for dealer registrations (single form and bulk import), checked against the product master.
 
@@ -73,3 +73,44 @@ export const hasErrors = (errors: RowErrors) => Object.keys(errors).length > 0;
 /** A duplicate serial needs a human (admin review); every other error is fixed by the dealer. */
 export const needsAdminReview = (errors: RowErrors) =>
   errors.serial === "duplicate_serial" && Object.keys(errors).length === 1;
+
+// ---- Bulk import (DL02) -------------------------------------------------------------------------
+
+export const BULK_ROW_STATUSES = [
+  "REGISTERED",
+  "FIXED",
+  "ERROR",
+  "REVIEW",
+] as const;
+/** REGISTERED: imported as it was; FIXED: imported after an inline fix; ERROR: needs fixing; REVIEW: sent to admin. */
+export type BulkRowStatus = (typeof BULK_ROW_STATUSES)[number];
+
+export interface BulkRow {
+  /** Row number in the uploaded sheet (header = row 1). */
+  rowNumber: number;
+  values: RegistrationRowInput;
+  errors: RowErrors;
+  status: BulkRowStatus;
+  registrationId?: string;
+}
+
+export interface BulkImport {
+  id: string;
+  fileName: string;
+  dealerId: string;
+  uploadedBy: string;
+  uploadedByName: string;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+  rows: BulkRow[];
+}
+
+export function bulkCounts(rows: readonly BulkRow[]) {
+  const count = (s: BulkRowStatus) => rows.filter((r) => r.status === s).length;
+  return {
+    total: rows.length,
+    registered: count("REGISTERED") + count("FIXED"),
+    errors: count("ERROR"),
+    review: count("REVIEW"),
+  };
+}

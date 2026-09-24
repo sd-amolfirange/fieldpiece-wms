@@ -186,6 +186,8 @@ export interface Registration {
   installDate?: IsoDate;
   purchaseDate?: IsoDate;
   invoiceNumber?: string;
+  /** Site where the unit is installed. */
+  location?: string;
   attachmentIds: string[];
   submittedBy: string;
   submittedByName: string;

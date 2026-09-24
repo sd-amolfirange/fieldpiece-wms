@@ -1,6 +1,6 @@
 import { FileText, Upload, X } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { useDropzone, type FileRejection } from "react-dropzone";
+import { useDropzone, type Accept, type FileRejection } from "react-dropzone";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { formatFileSize } from "@/lib/format";
@@ -11,6 +11,7 @@ import { formatFileSize } from "@/lib/format";
 
 export const MAX_FILE_SIZE_MB = 10;
 export const MAX_FILES = 5;
+const DEFAULT_ACCEPT: Accept = { "image/*": [], "application/pdf": [".pdf"] };
 
 export interface UploadItem {
   file: File;
@@ -25,6 +26,12 @@ interface FileDropzoneProps {
   onReject?: (messages: string[]) => void;
   maxFiles?: number;
   maxSizeMb?: number;
+  /** File types to accept. Defaults to photos and PDF. */
+  accept?: Accept;
+  /** Replaces the default "Photos or PDF…" hint under the drop text. */
+  hint?: string;
+  /** Opens the rear camera on phones. Pass false for documents such as spreadsheets. */
+  capture?: "environment" | false;
   id?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
@@ -36,6 +43,9 @@ export function FileDropzone({
   onReject,
   maxFiles = MAX_FILES,
   maxSizeMb = MAX_FILE_SIZE_MB,
+  accept = DEFAULT_ACCEPT,
+  hint,
+  capture = "environment",
   id,
   ...aria
 }: FileDropzoneProps) {
@@ -57,7 +67,7 @@ export function FileDropzone({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "image/*": [], "application/pdf": [".pdf"] },
+    accept,
     maxSize: maxSizeMb * 1024 * 1024,
     maxFiles,
     disabled: remaining <= 0,
@@ -80,10 +90,10 @@ export function FileDropzone({
           ),
         })}
       >
-        <input {...getInputProps({ id, capture: "environment", ...aria })} />
+        <input {...getInputProps({ id, capture: capture || undefined, ...aria })} />
         <Upload size={24} strokeWidth={1.75} aria-hidden className="text-ink-500" />
         <p className="text-body font-semibold">{t("fields.fileDrop")}</p>
-        <p className="text-xs text-text-muted">{t("fields.fileDropHint", { maxSizeMb, maxFiles })}</p>
+        <p className="text-xs text-text-muted">{hint ?? t("fields.fileDropHint", { maxSizeMb, maxFiles })}</p>
       </div>
 
       {value.length ? (

@@ -14,7 +14,16 @@ import { RouteError } from "./RouteError";
 
 const LoginPage = lazy(() => import("@/features/auth/pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("@/features/auth/pages/ForgotPasswordPage"));
-const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
+const RegistrationsListPage = lazy(() => import("@/features/registrations/pages/RegistrationsListPage"));
+const RegistrationReviewPage = lazy(() => import("@/features/registrations/pages/RegistrationReviewPage"));
+const NewRegistrationPage = lazy(() => import("@/features/registrations/pages/NewRegistrationPage"));
+const BulkRegistrationPage = lazy(() => import("@/features/registrations/pages/BulkRegistrationPage"));
+const CustomerRegisterPage = lazy(() => import("@/features/registrations/pages/CustomerRegisterPage"));
+const UnitsListPage = lazy(() => import("@/features/units/pages/UnitsListPage"));
+const UnitDetailPage = lazy(() => import("@/features/units/pages/UnitDetailPage"));
+const ModelsPage = lazy(() => import("@/features/products/pages/ProductsPage"));
+const ModelDetailPage = lazy(() => import("@/features/products/pages/ProductDetailPage"));
 const ScreenPlaceholderPage = lazy(() => import("./pages/ScreenPlaceholderPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -47,15 +56,15 @@ export const routes: RouteObject[] = [
           errorElement: <RouteError />,
           children: [
             // A01 / DL01 / CU02 (role home)
-            { index: true, element: <DashboardPage /> },
+            { index: true, element: <HomePage /> },
 
             guarded(
               ["admin"],
               [
-                screen("registrations", { admin: "A02" }),
-                screen("registrations/:id", { admin: "A03" }),
-                screen("models", { admin: "A06" }),
-                screen("models/:id", { admin: "A06" }),
+                { path: "registrations", element: <RegistrationsListPage /> }, // A02
+                { path: "registrations/:id", element: <RegistrationReviewPage /> }, // A03
+                { path: "models", element: <ModelsPage /> }, // A06
+                { path: "models/:id", element: <ModelDetailPage /> }, // A06
                 screen("claims", { admin: "A09" }),
                 screen("claims/:id", { admin: "A10" }),
                 screen("admin/dealers", { admin: "A11" }),
@@ -66,15 +75,15 @@ export const routes: RouteObject[] = [
             guarded(
               ["admin", ...PARTNERS],
               [
-                screen("registrations/new", { admin: "DL03", dealer: "DL03", distributor: "DL03" }),
-                screen("registrations/bulk", { admin: "DL02", dealer: "DL02", distributor: "DL02" }),
-                screen("units", { admin: "A04", dealer: "DL04", distributor: "DL04" }),
+                { path: "registrations/new", element: <NewRegistrationPage /> }, // DL03 (admin: manual add)
+                { path: "registrations/bulk", element: <BulkRegistrationPage /> }, // DL02
+                { path: "units", element: <UnitsListPage /> }, // A04 / DL04
               ],
             ),
-            guarded(["customer"], [screen("register", { customer: "CU01" })]),
+            guarded(["customer"], [{ path: "register", element: <CustomerRegisterPage /> }]), // CU01
 
             // Shared screens: the demo server decides which rows each role gets.
-            screen("units/:serial", { admin: "A05", dealer: "DL05", distributor: "DL05", customer: "CU03" }),
+            { path: "units/:serial", element: <UnitDetailPage /> }, // A05 / DL05 / CU03
             screen("complaints", { admin: "A07", dealer: "DL07", distributor: "DL07", customer: "CU05" }),
             screen("complaints/new", {
               admin: "DL06",

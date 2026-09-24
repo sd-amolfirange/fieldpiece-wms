@@ -1,47 +1,81 @@
-import { detectSku, registrationSchema } from "./schemas";
+import { addDaysIso, todayIso } from "@wms/domain";
+import { selfRegisterSchema, unitRegisterSchema } from "./schemas";
 
-const valid = {
-  serialNumber: "aer-spl15-240917",
-  sku: "AER-SPL15",
-  launchDate: "2019-01-01",
-  purchaseDate: "2026-01-15",
-  proofCount: 1,
-  ownerName: "Sam Tech",
-  ownerEmail: "tech@example.com",
-  acceptTerms: true as const,
-};
+/** First message per field, as the form shows it. */
+const messages = (result: {
+  success: boolean;
+  error?: { issues: { path: PropertyKey[]; message: string }[] };
+}) =>
+  Object.fromEntries([...(result.error?.issues ?? [])].reverse().map((i) => [i.path.join("."), i.message]));
 
-describe("registrationSchema", () => {
-  it("accepts a valid registration", () => {
-    expect(registrationSchema.safeParse(valid).success).toBe(true);
+describe("selfRegisterSchema (CU01)", () => {
+  const valid = {
+    serial: " aer-spl15-240917 ",
+    modelCode: "AER-SPL15",
+    purchaseDate: addDaysIso(todayIso(), -3),
+    invoiceCount: 1,
+  };
+
+  it("accepts a QR-prefilled registration and normalises the serial", () => {
+    const result = selfRegisterSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    expect(result.data?.serial).toBe("AER-SPL15-240917");
   });
 
-  it("rejects purchase dates before the product launch", () => {
-    const result = registrationSchema.safeParse({ ...valid, purchaseDate: "2018-12-31" });
-    expect(result.error?.issues.find((i) => i.path[0] === "purchaseDate")?.message).toMatch(
-      /before this product/,
-    );
+  it("needs the invoice, a model and a past purchase date", () => {
+    const result = selfRegisterSchema.safeParse({
+      ...valid,
+      modelCode: "",
+      invoiceCount: 0,
+      purchaseDate: addDaysIso(todayIso(), 1),
+    });
+    expect(messages(result)).toEqual({
+      modelCode: "validation.pickModel",
+      invoiceCount: "validation.invoiceRequired",
+      purchaseDate: "rowErrors.future_date",
+    });
   });
 
-  it("requires proof of purchase and accepted terms", () => {
-    const result = registrationSchema.safeParse({ ...valid, proofCount: 0, acceptTerms: false });
-    const paths = result.error?.issues.map((i) => i.path[0]);
-    expect(paths).toEqual(expect.arrayContaining(["proofCount", "acceptTerms"]));
+  it("rejects malformed serials and dates", () => {
+    const result = selfRegisterSchema.safeParse({ ...valid, serial: "AB", purchaseDate: "15/09/2026" });
+    expect(messages(result)).toMatchObject({ serial: "validation.serial", purchaseDate: "validation.date" });
   });
 });
 
-describe("detectSku", () => {
-  const catalogue = [{ sku: "AER-SPL15" }, { sku: "AER-VRF10", serialPattern: "^VRF10[0-9]{6}$" }];
+describe("unitRegisterSchema (DL03)", () => {
+  const valid = {
+    serial: "AER-SPL15-260950",
+    modelCode: "AER-SPL15",
+    installDate: todayIso(),
+    customerName: "P. Kale",
+    customerPhone: "+91 90000 00300",
+    customerEmail: "",
+  };
 
-  it("uses the serial pattern when the product has one", () => {
-    expect(detectSku("vrf10123456", catalogue)).toBe("AER-VRF10");
+  it("accepts a dealer registration without a dealer field", () => {
+    expect(unitRegisterSchema(false).safeParse(valid).success).toBe(true);
   });
 
-  it("falls back to the SKU prefix", () => {
-    expect(detectSku("AER-SPL15-000001", catalogue)).toBe("AER-SPL15");
+  it("makes distributors and admins pick the dealer", () => {
+    expect(messages(unitRegisterSchema(true).safeParse(valid))).toEqual({
+      dealerId: "validation.pickDealer",
+    });
+    expect(unitRegisterSchema(true).safeParse({ ...valid, dealerId: "d-coolair" }).success).toBe(true);
   });
 
-  it("returns null when nothing matches", () => {
-    expect(detectSku("ZZZ-1", catalogue)).toBeNull();
+  it("needs install date and customer details, and checks the email", () => {
+    const result = unitRegisterSchema(false).safeParse({
+      ...valid,
+      installDate: "",
+      customerName: " ",
+      customerPhone: "",
+      customerEmail: "not-an-email",
+    });
+    expect(messages(result)).toEqual({
+      installDate: "rowErrors.required",
+      customerName: "rowErrors.required",
+      customerPhone: "rowErrors.required",
+      customerEmail: "validation.email",
+    });
   });
 });

@@ -41,11 +41,12 @@ describe("routing and role homes", () => {
     expect(screen.queryByRole("link", { name: "Models & parts" })).not.toBeInTheDocument();
   });
 
-  it("gives the customer their two units", async () => {
+  it("gives the customer their two units on CU02 My units", async () => {
     await signInAs("customer.rk@demo.wms");
     renderAt("/");
-    const tile = await screen.findByText("My units", { selector: "p" });
-    expect(tile.nextElementSibling).toHaveTextContent("2");
+    expect(await screen.findByText("AER-SPL15-210311")).toBeInTheDocument();
+    expect(screen.getByText("AER-SPL18-230502")).toBeInTheDocument();
+    expect(screen.getByText("Compressor covered until 11 Mar 2031")).toBeInTheDocument();
   });
 
   it("blocks, not just hides, other roles' screens", async () => {
@@ -62,9 +63,9 @@ describe("routing and role homes", () => {
 
   it("shows the planned screen and its must-contain list for routes a later phase builds", async () => {
     await signInAs("dealer.coolair@demo.wms");
-    renderAt("/units");
-    expect(await screen.findByRole("heading", { name: /DL04 · My sold units/ })).toBeInTheDocument();
-    expect(screen.getByText("Search, status pills")).toBeInTheDocument();
+    renderAt("/complaints");
+    expect(await screen.findByRole("heading", { name: /DL07 · Complaints & claims/ })).toBeInTheDocument();
+    expect(screen.getByText("Claim status (view only)")).toBeInTheDocument();
   });
 
   it("sends signed-out visitors to the sign-in page with the demo accounts", async () => {

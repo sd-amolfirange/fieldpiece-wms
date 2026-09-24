@@ -1,10 +1,13 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import "@/lib/i18n";
 import { i18n } from "@/lib/i18n";
 import { resetMockDb } from "./mocks/db";
 import { server } from "./mocks/server";
+
+// Full-page tests wait for several requests; the default 1 s is too tight when the whole suite runs.
+configure({ asyncUtilTimeout: 5000 });
 
 beforeAll(async () => {
   await i18n.changeLanguage("en");

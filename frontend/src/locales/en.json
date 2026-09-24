@@ -15,6 +15,8 @@
     "language": "Language"
   },
   "header": {
+    "notificationsUnread_one": "Notifications, {{count}} unread",
+    "notificationsUnread_other": "Notifications, {{count}} unread",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "search": "Search serials, claims, RMAs, customers",
@@ -59,6 +61,8 @@
     "customer": "Customer"
   },
   "common": {
+    "yes": "Yes",
+    "no": "No",
     "loading": "Loading",
     "retry": "Try again",
     "cancel": "Cancel",
@@ -85,6 +89,33 @@
     "goToDashboard": "Go to dashboard"
   },
   "status": {
+    "registration": {
+      "PENDING": "Pending",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected"
+    },
+    "channel": {
+      "DEALER": "Dealer",
+      "PORTAL": "Portal",
+      "EMAIL": "Email",
+      "ERP": "ERP",
+      "BULK": "Bulk"
+    },
+    "flag": {
+      "EXCEPTION": "Exception",
+      "DUPLICATE": "Duplicate",
+      "MODEL_MISMATCH": "Model mismatch"
+    },
+    "bulkRow": {
+      "REGISTERED": "Registered",
+      "FIXED": "Fixed and registered",
+      "ERROR": "Needs fixing",
+      "REVIEW": "Sent to admin"
+    },
+    "coverage": {
+      "COVERED": "Covered",
+      "CHARGEABLE": "Chargeable"
+    },
     "claim": {
       "DRAFT": "Draft",
       "SUBMITTED": "Submitted",
@@ -105,7 +136,8 @@
       "EXPIRING_SOON": "Expiring soon",
       "EXPIRED": "Expired",
       "NOT_REGISTERED": "Not registered",
-      "VOID": "Void"
+      "VOID": "Void",
+      "PENDING": "Pending registration"
     },
     "rma": {
       "ISSUED": "Issued",
@@ -162,6 +194,9 @@
     "signInToClaim": "You'll need to sign in to file a claim."
   },
   "dashboard": {
+    "registrationsByChannel": "Registrations by channel",
+    "channel": "Channel",
+    "registrations": "Registrations",
     "title": "Dashboard",
     "greeting": "Welcome back, {{name}}",
     "myProducts": "My products",
@@ -412,5 +447,309 @@
       "title": "Complaint tracking",
       "mustContain": ["Timeline: raised → with service → resolved", "New part warranty shown after repair"]
     }
+  },
+  "validation": {
+    "required": "This field is required.",
+    "serial": "That doesn't look like a valid serial number. Check the label on the unit.",
+    "date": "Enter a valid date.",
+    "email": "Enter a valid email, like name@company.com.",
+    "pickModel": "Pick the model.",
+    "pickDealer": "Pick the dealer.",
+    "invoiceRequired": "Add a photo or PDF of the invoice.",
+    "reasonRequired": "Give a reason (at least 5 characters)."
+  },
+  "rowErrors": {
+    "required": "Required",
+    "invalid_serial": "Not a valid serial",
+    "unknown_model": "Model code not in the product master",
+    "duplicate_serial": "Serial already registered",
+    "duplicate_in_file": "Serial appears twice in this file",
+    "invalid_date": "Use a date like 2026-09-15",
+    "future_date": "Date is in the future"
+  },
+  "parts": {
+    "type": {
+      "UNIT": "Unit",
+      "COMPRESSOR": "Compressor",
+      "PCB": "PCB"
+    },
+    "caption": "Part-wise warranty",
+    "templateCaption": "Model template parts",
+    "columns": {
+      "part": "Part",
+      "serial": "Serial",
+      "starts": "Starts",
+      "ends": "Ends",
+      "status": "Status",
+      "daysLeft": "Days left",
+      "covers": "Covers",
+      "warranty": "Warranty",
+      "ownSerial": "Own serial"
+    },
+    "unitSerial": "Unit serial",
+    "partsAndLabour": "Parts and labour",
+    "partsOnly": "Parts only",
+    "labourOnly": "Labour only",
+    "replaced": "Replaced",
+    "replacedOn": "Replaced on {{date}} by {{serial}}",
+    "replaces": "Replacement for {{serial}}",
+    "noneYet": "No parts yet.",
+    "years_one": "{{count}} year",
+    "years_other": "{{count}} years",
+    "months_one": "{{count}} month",
+    "months_other": "{{count}} months"
+  },
+  "units": {
+    "title": "Units",
+    "mySoldUnits": "My sold units",
+    "addUnit": "Add unit",
+    "bulkUpload": "Bulk upload",
+    "searchPlaceholder": "Search serial, customer or dealer",
+    "filterStatus": "Filter by warranty status",
+    "filterDealer": "Filter by dealer",
+    "allStatuses": "All statuses",
+    "allDealers": "All dealers",
+    "empty": "No units match. Clear the filters or register a unit.",
+    "columns": {
+      "serial": "Serial",
+      "model": "Model",
+      "customer": "Customer",
+      "dealer": "Dealer",
+      "installed": "Installed",
+      "status": "Status",
+      "daysLeft": "Days left"
+    },
+    "facts": "Unit",
+    "fields": {
+      "model": "Model",
+      "brand": "Brand",
+      "capacity": "Capacity",
+      "installed": "Installed",
+      "location": "Location",
+      "customer": "Customer",
+      "dealer": "Dealer"
+    },
+    "tabsLabel": "Unit details",
+    "tabs": {
+      "parts": "Part-wise warranty",
+      "history": "Service & claim history"
+    },
+    "countdown_one": "Covered for {{count}} more day",
+    "countdown_other": "Covered for {{count}} more days",
+    "expiredOn": "Unit warranty ended on {{date}}",
+    "partStillCovered": "{{part}} covered until {{date}}",
+    "voidLine": "Warranty void",
+    "notRegistered": "Not registered yet",
+    "notRegisteredLong": "This unit isn't registered yet. Its parts get their warranties when the registration is approved.",
+    "voidNotice": "Warranty void: {{reason}}.",
+    "voidReason": {
+      "UNAUTHORISED_REPAIR": "unauthorised repair",
+      "MISSED_SERVICING": "missed servicing",
+      "PHYSICAL_DAMAGE": "physical damage",
+      "OTHER": "other reason"
+    },
+    "certificate": "Warranty certificate (PDF)",
+    "qrLabel": "QR label",
+    "printLabel": "Print label",
+    "qrAlt": "QR code for {{serial}}",
+    "noHistory": "No history yet.",
+    "history": {
+      "registered": "registered the unit ({{ref}})",
+      "part_replaced": "replaced a part",
+      "voided": "voided the warranty",
+      "complaint_raised": "raised complaint {{ref}}",
+      "claim_created": "created claim {{ref}}",
+      "note": "added a note"
+    }
+  },
+  "myUnits": {
+    "empty": "No units yet. Scan the QR code on your unit to register it.",
+    "pendingLine": "Sent on {{date}}. It becomes a warranty record once approved."
+  },
+  "models": {
+    "title": "Models & parts",
+    "empty": "No models in the product master yet.",
+    "notFound": "Model not found.",
+    "partCount_one": "{{count}} part",
+    "partCount_other": "{{count}} parts",
+    "template": "Model template",
+    "templateHelp": "Set once: every unit registered with this model gets these parts and warranty periods automatically.",
+    "details": "Model",
+    "type": "Type",
+    "code": "Model code"
+  },
+  "inbox": {
+    "title": "Registration inbox",
+    "searchPlaceholder": "Search serial, customer or dealer",
+    "filterStatus": "Filter by status",
+    "filterFlag": "Filter by exception",
+    "filterSource": "Filter by source",
+    "allStatuses": "All statuses",
+    "allFlags": "All registrations",
+    "allSources": "All sources",
+    "flagFilter": {
+      "EXCEPTION": "Exceptions",
+      "DUPLICATE": "Duplicates",
+      "MODEL_MISMATCH": "Model mismatches"
+    },
+    "columns": {
+      "received": "Received",
+      "serial": "Serial",
+      "model": "Model",
+      "customer": "Customer",
+      "dealer": "Dealer",
+      "source": "Source",
+      "flags": "Flags",
+      "status": "Status"
+    },
+    "empty": "No registrations match. Clear the filters.",
+    "approveSelected_one": "Approve {{count}} selected",
+    "approveSelected_other": "Approve {{count}} selected",
+    "bulkApproved_one": "{{count}} registration approved",
+    "bulkApproved_other": "{{count}} registrations approved",
+    "bulkSkipped_one": "{{count}} skipped: duplicates or already decided",
+    "bulkSkipped_other": "{{count}} skipped: duplicates or already decided"
+  },
+  "review": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "merge": "Merge into existing record",
+    "approved": "Registration approved. Warranty started.",
+    "rejected": "Registration rejected.",
+    "merged": "Merged into the existing record.",
+    "rejectTitle": "Reject registration",
+    "reason": "Reason (shown to whoever submitted it)",
+    "duplicateReason": "Duplicate: serial {{serial}} is already registered.",
+    "openUnit": "Open unit",
+    "submitted": "Submitted data",
+    "invoice": "Invoice",
+    "openInvoice": "Open full size",
+    "noInvoice": "No invoice attached.",
+    "existingRecord": "Existing record",
+    "openExisting": "Open existing unit",
+    "duplicateWarning": "Serial {{serial}} is already registered. Compare with the existing record below, then reject or merge.",
+    "modelMismatchWarning": "The model on this registration doesn't match the model in our records for this serial.",
+    "unknownSerialWarning": "This serial isn't in our stock records. Check it against the invoice.",
+    "rejectedBecause": "Rejected: {{reason}}",
+    "fields": {
+      "serial": "Serial",
+      "model": "Model",
+      "customer": "Customer",
+      "phone": "Phone",
+      "email": "Email",
+      "city": "City",
+      "installDate": "Installed",
+      "purchaseDate": "Purchased",
+      "invoiceNumber": "Invoice number",
+      "dealer": "Dealer",
+      "submittedBy": "Submitted by",
+      "reviewedBy": "Decided by",
+      "warranty": "Warranty"
+    }
+  },
+  "registerUnit": {
+    "stepUnit": "Unit",
+    "stepInstall": "Installation and invoice",
+    "stepCustomer": "Customer and review",
+    "scan": "Scan QR label",
+    "model": "Model",
+    "dealer": "Dealer",
+    "installDate": "Install date",
+    "location": "Site / location",
+    "invoiceNumber": "Invoice number",
+    "invoice": "Invoice (photo or PDF)",
+    "customerName": "Customer name",
+    "customerPhone": "Customer phone",
+    "customerEmail": "Customer email",
+    "city": "City",
+    "partsPreview": "Warranty attached from the model: {{parts}}.",
+    "partPeriod": "{{part}} {{period}}",
+    "submit": "Register unit",
+    "doneTitle": "Unit registered",
+    "doneMessage": "The warranty is active. Parts and their warranty periods were attached from the model.",
+    "reviewTitle": "Sent to admin review",
+    "reviewMessage": "This serial is already registered, so an admin checks it before anything changes.",
+    "openUnit": "Open unit",
+    "registerAnother": "Register another"
+  },
+  "selfRegister": {
+    "fromQr": "Details read from the QR label on your unit.",
+    "scan": "Scan the QR label",
+    "scanAgain": "Scan again",
+    "model": "Model",
+    "purchaseDate": "Purchase date",
+    "location": "Where is it installed?",
+    "invoice": "Invoice photo",
+    "submit": "Register product",
+    "sentTitle": "Registration sent",
+    "pendingMessage": "Pending approval: we check your invoice, then your warranty starts. You'll get a notification.",
+    "backToUnits": "Back to my units",
+    "registerAnother": "Register another"
+  },
+  "bulk": {
+    "title": "Bulk import",
+    "templateCsv": "CSV template",
+    "templateXlsx": "Excel template",
+    "uploadTitle": "Upload a sales file",
+    "dropHint": "Excel (.xlsx) or CSV, up to 5 MB. Use the template columns.",
+    "uploaded": "{{file}} checked",
+    "summary": "{{total}} rows checked: {{registered}} registered, {{errors}} need fixing, {{review}} sent to admin review.",
+    "resubmit_one": "Resubmit {{count}} fixed row",
+    "resubmit_other": "Resubmit {{count}} fixed rows",
+    "resubmitted": "{{registered}} registered, {{errors}} still need fixing",
+    "rowsCaption": "Rows in this upload",
+    "show": "Show rows",
+    "showAll": "All rows",
+    "showAttention": "Rows that need attention",
+    "noAttention": "Nothing needs attention.",
+    "editCell": "{{field}}, row {{row}}",
+    "field": {
+      "serial": "Serial",
+      "modelCode": "Model code",
+      "installDate": "Install date",
+      "customerName": "Customer",
+      "customerPhone": "Phone"
+    },
+    "columns": {
+      "row": "Row",
+      "serial": "Serial",
+      "model": "Model code",
+      "customer": "Customer",
+      "installDate": "Install date",
+      "status": "Result",
+      "problem": "Problem"
+    },
+    "history": {
+      "title": "Upload history",
+      "uploaded": "Uploaded",
+      "file": "File",
+      "dealer": "Dealer",
+      "by": "By",
+      "rows": "Rows",
+      "registered": "Registered",
+      "errors": "To fix",
+      "review": "To admin",
+      "empty": "No uploads yet."
+    }
+  },
+  "qr": {
+    "scanTitle": "Scan QR label",
+    "pointCamera": "Point the camera at the QR code on the unit's label.",
+    "starting": "Starting camera",
+    "cameraBlocked": "Camera access is blocked. Allow it in the browser, or type the serial below.",
+    "cameraInsecure": "The camera only works on a secure (https) page. Type the serial below instead.",
+    "cameraUnavailable": "No camera available. Type the serial below.",
+    "unreadable": "That QR code isn't a unit label. Try again or type the serial.",
+    "typeSerial": "Or type the serial number",
+    "useSerial": "Use this serial"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "No notifications yet.",
+    "registration_submitted": "New registration to review: {{serial}}",
+    "registration_approved": "{{serial}} is registered and under warranty.",
+    "registration_rejected": "Registration for {{serial}} was rejected: {{reason}}",
+    "bulk_processed": "{{file}}: {{registered}} registered, {{errors}} to fix, {{review}} sent to admin."
   }
 }

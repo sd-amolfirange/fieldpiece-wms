@@ -3,18 +3,22 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
-import { Card } from "@/components/ui";
-import { useProducts } from "../hooks";
+import { Card, MonoId } from "@/components/ui";
+import { useModels } from "@/lib/master-data";
+
+// A06 Models & parts: models grouped by brand. Each model is a template whose parts and warranty periods are
+// attached to every unit registered with it.
 
 export default function ProductsPage() {
   const { t } = useTranslation();
-  const query = useProducts();
+  const query = useModels();
+  const brands = [...new Set(query.data?.map((m) => m.brandName))].sort();
 
   return (
     <>
       <PageHeader
-        title={t("products.title")}
-        breadcrumbs={[{ label: t("nav.dashboard"), to: "/" }, { label: t("products.title") }]}
+        title={t("models.title")}
+        breadcrumbs={[{ label: t("nav.dashboard"), to: "/" }, { label: t("models.title") }]}
       />
       {query.isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -25,31 +29,44 @@ export default function ProductsPage() {
       ) : query.error ? (
         <ErrorState error={query.error} onRetry={() => void query.refetch()} />
       ) : !query.data?.length ? (
-        <EmptyState icon={Package} message={t("common.comingSoon")} />
+        <EmptyState icon={Package} message={t("models.empty")} />
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {query.data.map((p) => (
-            <li key={p.sku}>
-              <Link to={`/products/${p.sku}`} className="block rounded-lg hover:ring-2 hover:ring-ink-1000">
-                <Card as="article" className="flex gap-4">
-                  {/* Square frame with ink-50 background (Section 3.5) */}
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-ink-50">
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt="" className="h-full w-full object-contain" />
-                    ) : (
-                      <Package size={24} strokeWidth={1.75} className="text-ink-400" aria-hidden />
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="text-h3">{p.name}</h2>
-                    <p className="font-mono text-sm">{p.sku}</p>
-                    <p className="mt-1 text-sm text-text-muted">{p.warrantyMonths} months</p>
-                  </div>
-                </Card>
-              </Link>
-            </li>
+        <div className="space-y-6">
+          {brands.map((brand) => (
+            <section key={brand} aria-labelledby={`brand-${brand}`}>
+              <h2 id={`brand-${brand}`} className="mb-4 text-h3">
+                {brand}
+              </h2>
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {query.data
+                  .filter((m) => m.brandName === brand)
+                  .map((m) => (
+                    <li key={m.id}>
+                      <Link
+                        to={`/models/${m.id}`}
+                        aria-label={`${m.name} (${m.code})`}
+                        className="block rounded-lg hover:ring-2 hover:ring-ink-1000"
+                      >
+                        <Card as="article" className="flex gap-4">
+                          {/* Square frame with ink-50 background (Section 3.5) */}
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-ink-50">
+                            <Package size={24} strokeWidth={1.75} className="text-ink-400" aria-hidden />
+                          </div>
+                          <div>
+                            <h3 className="text-h3">{m.name}</h3>
+                            <MonoId>{m.code}</MonoId>
+                            <p className="mt-1 text-sm text-text-muted">
+                              {m.capacity} · {m.type} · {t("models.partCount", { count: m.parts.length })}
+                            </p>
+                          </div>
+                        </Card>
+                      </Link>
+                    </li>
+                  ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </>
   );

@@ -14,6 +14,7 @@ import type {
   User,
   WarrantyStatus,
 } from "./types";
+import type { BulkImport, bulkCounts } from "./registration-rules";
 
 // Shapes the API returns: domain records plus computed warranty status and display names,
 // so screens don't repeat the rules or the lookups.
@@ -75,6 +76,11 @@ export interface ClaimView extends Claim {
   brandName: string;
   dealerName?: string;
   modelCode: string;
+}
+
+export interface BulkImportView extends BulkImport {
+  dealerName?: string;
+  counts: ReturnType<typeof bulkCounts>;
 }
 
 export interface ModelView extends Model {

@@ -1,55 +1,48 @@
+import { isIsoDate, normalizeSerialValue, SERIAL_PATTERN, todayIso } from "@wms/domain";
 import { z } from "zod";
-import { DEFAULT_SERIAL_PATTERN } from "@/lib/serial";
-import { normalizeSerial } from "@/lib/format";
-import { validatePurchaseDate } from "@/lib/warranty";
 
-const purchaseDateMessages = {
-  required: "Enter the purchase date.",
-  future: "Purchase date can't be in the future.",
-  beforeLaunch: "Purchase date is before this product was released. Check the receipt.",
-} as const;
+// Form rules for DL03 and CU01. Messages are i18n keys, translated where they're shown.
 
-export const registrationSchema = z
-  .object({
-    serialNumber: z
-      .string()
-      .transform(normalizeSerial)
-      .pipe(
-        z
-          .string()
-          .min(1, "Enter the serial number.")
-          .regex(
-            new RegExp(DEFAULT_SERIAL_PATTERN),
-            "That doesn't look like a valid serial number. Check the label on the unit.",
-          ),
-      ),
-    sku: z.string().min(1, "Pick the product."),
-    launchDate: z.string().optional(), // from the selected product, used for validation only
-    purchaseDate: z.string(),
-    sellerName: z.string().trim().optional(),
-    proofCount: z.number().int().min(1, "Upload the receipt or invoice."),
-    ownerName: z.string().trim().min(1, "Enter the owner's name."),
-    ownerEmail: z.string().trim().email("Enter a valid email, like name@company.com."),
-    ownerPhone: z.string().trim().optional(),
-    acceptTerms: z.literal(true, { errorMap: () => ({ message: "Accept the warranty terms to continue." }) }),
-  })
-  .superRefine((value, ctx) => {
-    const problem = validatePurchaseDate(value.purchaseDate || null, { launchDate: value.launchDate });
-    if (problem)
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["purchaseDate"],
-        message: purchaseDateMessages[problem],
-      });
-  });
+const serial = z
+  .string()
+  .transform(normalizeSerialValue)
+  .pipe(z.string().min(1, "validation.required").regex(SERIAL_PATTERN, "validation.serial"));
 
-export type RegistrationForm = z.input<typeof registrationSchema>;
+const pastDate = (requiredKey: string) =>
+  z
+    .string()
+    .min(1, requiredKey)
+    .refine((v) => isIsoDate(v), "validation.date")
+    .refine((v) => v <= todayIso(), "rowErrors.future_date");
 
-/** Detect the SKU from a serial prefix where the pattern allows it (Section 8.3). [CONFIRM formats] */
-export function detectSku(serial: string, skus: { sku: string; serialPattern?: string }[]): string | null {
-  const normalized = normalizeSerial(serial);
-  const match = skus.find((p) =>
-    p.serialPattern ? new RegExp(p.serialPattern).test(normalized) : normalized.startsWith(`${p.sku}-`),
-  );
-  return match?.sku ?? null;
-}
+/** CU01: the customer registers a unit they bought (serial and model come from the QR label). */
+export const selfRegisterSchema = z.object({
+  serial,
+  modelCode: z.string().min(1, "validation.pickModel"),
+  purchaseDate: pastDate("validation.required"),
+  location: z.string().trim().optional(),
+  invoiceCount: z.number().int().min(1, "validation.invoiceRequired"),
+});
+export type SelfRegisterForm = z.input<typeof selfRegisterSchema>;
+
+/** DL03: a dealer (or a distributor / admin, who must pick the dealer) registers a unit at installation. */
+export const unitRegisterSchema = (needsDealer: boolean) =>
+  z
+    .object({
+      serial,
+      modelCode: z.string().min(1, "validation.pickModel"),
+      dealerId: z.string().optional(),
+      installDate: pastDate("rowErrors.required"),
+      location: z.string().trim().optional(),
+      invoiceNumber: z.string().trim().optional(),
+      customerName: z.string().trim().min(1, "rowErrors.required"),
+      customerPhone: z.string().trim().min(1, "rowErrors.required"),
+      customerEmail: z.union([z.literal(""), z.string().trim().email("validation.email")]).optional(),
+      city: z.string().trim().optional(),
+    })
+    .superRefine((value, ctx) => {
+      if (needsDealer && !value.dealerId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dealerId"], message: "validation.pickDealer" });
+      }
+    });
+export type UnitRegisterForm = z.input<ReturnType<typeof unitRegisterSchema>>;

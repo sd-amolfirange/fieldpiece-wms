@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { ErrorState, Skeleton } from "@/components/feedback";
@@ -6,10 +6,11 @@ import { PageHeader } from "@/components/layout";
 import { buttonVariants, KpiTile } from "@/components/ui";
 import { can } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/session";
+import { RegistrationsByChannelChart } from "../components/RegistrationsByChannelChart";
 import type { DashboardSummary } from "../types";
 import { useDashboardSummary } from "../hooks";
 
-// Role home: A01 (admin), DL01 (dealer / distributor), CU02 (customer; its unit cards arrive in Phase 2).
+// Role home: A01 (admin) and DL01 (dealer / distributor). Customers get CU02 My units (app/pages/HomePage).
 // The demo server scopes the numbers to the signed-in account.
 
 function tiles(summary: DashboardSummary): { key: string; value: number }[] {
@@ -52,10 +53,16 @@ export default function DashboardPage() {
 
   const primaryAction =
     can(role, "registrations:create") && role !== "admin" ? (
-      <Link to="/registrations/new" className={buttonVariants()}>
-        <ShieldCheck size={20} strokeWidth={1.75} aria-hidden />
-        {t("nav.registerUnit")}
-      </Link>
+      <>
+        <Link to="/registrations/bulk" className={buttonVariants({ variant: "secondary" })}>
+          <Upload size={20} strokeWidth={1.75} aria-hidden />
+          {t("nav.bulkImport")}
+        </Link>
+        <Link to="/registrations/new" className={buttonVariants()}>
+          <ShieldCheck size={20} strokeWidth={1.75} aria-hidden />
+          {t("nav.registerUnit")}
+        </Link>
+      </>
     ) : can(role, "registrations:self") ? (
       <Link to="/register" className={buttonVariants()}>
         <ShieldCheck size={20} strokeWidth={1.75} aria-hidden />
@@ -79,10 +86,15 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : summary.data ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {tiles(summary.data).map((tile) => (
-            <KpiTile key={tile.key} label={t(`dashboard.tiles.${tile.key}`)} value={tile.value} />
-          ))}
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {tiles(summary.data).map((tile) => (
+              <KpiTile key={tile.key} label={t(`dashboard.tiles.${tile.key}`)} value={tile.value} />
+            ))}
+          </div>
+          {summary.data.role === "admin" ? (
+            <RegistrationsByChannelChart data={summary.data.registrationsByChannel} />
+          ) : null}
         </div>
       ) : null}
     </>
