@@ -271,6 +271,7 @@ export function createSeed(today: IsoDate = todayIso()): DemoState {
     integrations: [],
     notifications: [],
     attachments: [],
+    bulkImports: [],
     counters: {},
   };
 

@@ -8,7 +8,7 @@ import ExcelJS from "exceljs";
 //   row 7  - unknown model code (AER-SPL20 isn't in the product master)
 //   row 15 - duplicate serial (AER-SPL15-250301 is already registered to S. Deshpande)
 //   row 22 - missing install date
-// Customer names and phone numbers are fictional.
+// Customer names and phone numbers are fictional. The first data row belongs to the demo customer R. Kulkarni.
 
 export const SAMPLE_HEADERS = [
   "Serial number",
@@ -79,6 +79,13 @@ export function sampleRows(): SampleRow[] {
       installDate: `2026-09-${String(day).padStart(2, "0")}`,
       invoiceNumber: `CA-INV-38${String(n).padStart(3, "0")}`,
     };
+    // Row 2 in the sheet is R. Kulkarni (matched by phone), so W1 step 9 shows the new unit in her app.
+    if (n === 1)
+      Object.assign(row, {
+        customerName: "R. Kulkarni",
+        customerPhone: "+91 90000 00101",
+        city: "Pune",
+      });
     if (n === 7) row.modelCode = "AER-SPL20";
     if (n === 15) row.serial = "AER-SPL15-250301";
     if (n === 22) row.installDate = null;

@@ -6,14 +6,19 @@ import multer from "multer";
 import {
   addAttachment,
   contextFor,
+  createBulkImport,
   dispatch,
   getAttachment,
+  getUnit,
+  rowsFromMatrix,
+  templateCsv,
   MAX_UPLOAD_BYTES,
   ServiceError,
   userFromToken,
   type DemoDb,
   type SessionStore,
 } from "./core/index";
+import { certificatePdf, readSheet, templateXlsx } from "./documents";
 
 // Express adapter over the demo API in ./core. Every window and the phone talk to this
 // one process, so they all see the same state. Endpoint logic lives in demo-core; this file only handles
@@ -41,12 +46,10 @@ function sendError(res: Response, e: unknown) {
     return;
   }
   console.error(e);
-  res
-    .status(500)
-    .json({
-      code: "server_error",
-      message: "Something went wrong on the demo server.",
-    });
+  res.status(500).json({
+    code: "server_error",
+    message: "Something went wrong on the demo server.",
+  });
 }
 
 export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
@@ -141,6 +144,104 @@ export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
       );
       res.setHeader("Cache-Control", "private, max-age=300");
       res.sendFile(resolve(path));
+    } catch (e) {
+      sendError(res, e);
+    }
+  });
+
+  // ---- bulk upload (DL02): read the sheet here, validate and import in the core ----
+  app.get(`${API_BASE}/bulk-imports/template.csv`, (_req, res) => {
+    res
+      .type("text/csv")
+      .attachment("registration-template.csv")
+      .send(templateCsv());
+  });
+  app.get(`${API_BASE}/bulk-imports/template.xlsx`, async (_req, res) => {
+    res
+      .type("xlsx")
+      .attachment("registration-template.xlsx")
+      .send(await templateXlsx());
+  });
+  const sheetUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  });
+  app.post(
+    `${API_BASE}/bulk-imports`,
+    sheetUpload.single("file"),
+    async (req, res) => {
+      try {
+        const user = userFromToken(db, sessions, bearer(req));
+        if (!user)
+          throw new ServiceError(
+            401,
+            "unauthenticated",
+            "Session expired. Sign in again.",
+          );
+        if (!req.file)
+          throw new ServiceError(
+            422,
+            "validation_error",
+            "Choose a file to upload.",
+          );
+        const fileName =
+          (typeof req.body?.name === "string" && req.body.name) ||
+          req.file.originalname;
+        if (!/\.(xlsx|csv)$/i.test(fileName)) {
+          throw new ServiceError(
+            415,
+            "unsupported_type",
+            "Upload an Excel (.xlsx) or CSV file.",
+          );
+        }
+        const rows = rowsFromMatrix(await readSheet(fileName, req.file.buffer));
+        const dealerId =
+          typeof req.body?.dealerId === "string"
+            ? req.body.dealerId
+            : undefined;
+        const batch = createBulkImport(contextFor(db, user), {
+          fileName,
+          dealerId,
+          rows,
+        });
+        db.onChange?.(db.state);
+        res.status(201).json(batch);
+      } catch (e) {
+        sendError(res, e);
+      }
+    },
+  );
+
+  // ---- warranty certificate PDF (bearer token, or the refresh cookie for plain links) ----
+  app.get(`${API_BASE}/units/:serial/certificate.pdf`, (req, res) => {
+    try {
+      const user =
+        userFromToken(db, sessions, bearer(req)) ??
+        userFromToken(
+          db,
+          sessions,
+          req.cookies?.[REFRESH_COOKIE] as string | undefined,
+        );
+      if (!user)
+        throw new ServiceError(
+          401,
+          "unauthenticated",
+          "Session expired. Sign in again.",
+        );
+      const unit = getUnit(contextFor(db, user), req.params.serial);
+      if (!unit.parts.length)
+        throw new ServiceError(
+          409,
+          "not_registered",
+          "This unit isn't registered yet.",
+        );
+      res
+        .type("pdf")
+        .setHeader(
+          "Content-Disposition",
+          `attachment; filename="warranty-${unit.serial}.pdf"`,
+        );
+      certificatePdf(unit).pipe(res);
     } catch (e) {
       sendError(res, e);
     }

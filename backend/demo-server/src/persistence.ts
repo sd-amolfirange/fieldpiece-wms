@@ -11,18 +11,42 @@ import { createSeed, type DemoState, type SessionStore } from "./core/index";
 // Keeps demo state and sign-in sessions on disk, so restarting the server doesn't lose data or sign
 // everyone out of the four demo windows. Plain JSON, rewritten after every change.
 
+/**
+ * Saves via a temp file. On Windows the rename can fail for a moment (EPERM / EBUSY) while another process,
+ * such as a virus scanner, has the file open: retry, then write in place. The data is also in memory, so a
+ * failed save is logged and never fails the request.
+ */
 function writeJson(path: string, value: unknown) {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(value));
-  renameSync(tmp, path);
+  const json = JSON.stringify(value);
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    const tmp = `${path}.tmp`;
+    writeFileSync(tmp, json);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        renameSync(tmp, path);
+        return;
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code;
+        if (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES") throw e;
+      }
+    }
+    writeFileSync(path, json);
+  } catch (e) {
+    console.error(`Couldn't save ${path}:`, (e as Error).message);
+  }
 }
+
+const emptyCollections = (): Pick<DemoState, "bulkImports"> => ({
+  bulkImports: [],
+});
 
 export function loadState(path: string): DemoState {
   if (existsSync(path)) {
     try {
       const state = JSON.parse(readFileSync(path, "utf8")) as DemoState;
-      if (state.version === 1) return state;
+      // Collections added after the file was saved start empty.
+      if (state.version === 1) return { ...emptyCollections(), ...state };
     } catch {
       // unreadable file: start from the seed again
     }

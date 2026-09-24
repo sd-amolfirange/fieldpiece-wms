@@ -4,6 +4,17 @@ import {
   type User,
   type WarrantyStatus,
 } from "@wms/domain";
+import {
+  approveRegistration,
+  bulkApproveRegistrations,
+  createRegistration,
+  getBulkImport,
+  listBulkImports,
+  mergeRegistration,
+  rejectRegistration,
+  resubmitBulkRows,
+  type CreateRegistrationBody,
+} from "./registrations";
 import { createSeed, DEMO_ACCOUNTS, DEMO_PASSWORD } from "./seed";
 import {
   authenticate,
@@ -136,6 +147,68 @@ export const routes: Route[] = [
     method: "GET",
     path: "/registrations/:id",
     handler: (ctx, p) => getRegistration(ctx, p.id ?? ""),
+  },
+  {
+    method: "POST",
+    path: "/registrations",
+    handler: (ctx, _p, req) =>
+      createRegistration(ctx, (req.body ?? {}) as CreateRegistrationBody),
+  },
+  {
+    method: "POST",
+    path: "/registrations/bulk-approve",
+    roles: ["admin"],
+    handler: (ctx, _p, req) =>
+      bulkApproveRegistrations(
+        ctx,
+        (req.body as { ids?: string[] } | undefined)?.ids,
+      ),
+  },
+  {
+    method: "POST",
+    path: "/registrations/:id/approve",
+    roles: ["admin"],
+    handler: (ctx, p) => approveRegistration(ctx, p.id ?? ""),
+  },
+  {
+    method: "POST",
+    path: "/registrations/:id/reject",
+    roles: ["admin"],
+    handler: (ctx, p, req) =>
+      rejectRegistration(
+        ctx,
+        p.id ?? "",
+        (req.body as { reason?: string } | undefined)?.reason,
+      ),
+  },
+  {
+    method: "POST",
+    path: "/registrations/:id/merge",
+    roles: ["admin"],
+    handler: (ctx, p) => mergeRegistration(ctx, p.id ?? ""),
+  },
+  {
+    method: "GET",
+    path: "/bulk-imports",
+    handler: (ctx) => listBulkImports(ctx),
+  },
+  {
+    method: "GET",
+    path: "/bulk-imports/:id",
+    handler: (ctx, p) => getBulkImport(ctx, p.id ?? ""),
+  },
+  {
+    method: "PUT",
+    path: "/bulk-imports/:id/rows",
+    handler: (ctx, p, req) =>
+      resubmitBulkRows(
+        ctx,
+        p.id ?? "",
+        (
+          req.body as
+            { rows?: Parameters<typeof resubmitBulkRows>[2] } | undefined
+        )?.rows,
+      ),
   },
   {
     method: "GET",

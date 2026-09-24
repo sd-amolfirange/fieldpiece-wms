@@ -74,10 +74,10 @@ export function requireRole(ctx: Ctx, ...roles: Role[]) {
   }
 }
 
-const notFound = (what: string) =>
+export const notFound = (what: string) =>
   new ServiceError(404, "not_found", `${what} not found.`);
 
-function paginate<T>(
+export function paginate<T>(
   items: T[],
   { page = 1, pageSize = 25 }: ListQuery,
 ): Paginated<T> {
@@ -91,7 +91,7 @@ function paginate<T>(
   };
 }
 
-function sortRows<T>(
+export function sortRows<T>(
   items: T[],
   sort: string | undefined,
   fallback: string,
@@ -110,13 +110,16 @@ function sortRows<T>(
   });
 }
 
-const matches = (q: string | undefined, ...values: (string | undefined)[]) => {
+export const matches = (
+  q: string | undefined,
+  ...values: (string | undefined)[]
+) => {
   if (!q) return true;
   const needle = q.trim().toLowerCase();
   return values.some((v) => v?.toLowerCase().includes(needle));
 };
 
-const dealerName = (state: DemoState, id?: string) =>
+export const dealerName = (state: DemoState, id?: string) =>
   state.dealers.find((d) => d.id === id)?.name;
 const customerName = (state: DemoState, id?: string) =>
   state.customers.find((c) => c.id === id)?.name;
@@ -188,7 +191,7 @@ export function toUnitView(
   };
 }
 
-function findUnit(ctx: Ctx, serial: string): Unit {
+export function findUnit(ctx: Ctx, serial: string): Unit {
   const unit = ctx.state.units.find((u) => u.serial === serial.toUpperCase());
   if (!unit || !canSee(ctx.user, unit, ctx.state.dealers))
     throw notFound("Unit");

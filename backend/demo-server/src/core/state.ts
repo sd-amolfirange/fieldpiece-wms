@@ -1,5 +1,6 @@
 import type {
   Attachment,
+  BulkImport,
   Brand,
   Claim,
   Complaint,
@@ -33,6 +34,7 @@ export interface DemoState {
   integrations: IntegrationMessage[];
   notifications: Notification[];
   attachments: Attachment[];
+  bulkImports: BulkImport[];
   counters: Record<string, number>;
 }
 
