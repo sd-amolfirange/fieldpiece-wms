@@ -22,6 +22,7 @@ import {
   retryIntegration,
   sendToService,
   simulateOemDecision,
+  voidWarranty,
 } from "./complaints";
 import { createSeed, DEMO_ACCOUNTS, DEMO_PASSWORD } from "./seed";
 import {
@@ -293,6 +294,12 @@ export const routes: Route[] = [
     handler: (ctx) => listNotifications(ctx),
   },
   // ---- Phase 3: complaints, claims, integration log, simulator ----
+  {
+    method: "POST",
+    path: "/units/:serial/void",
+    roles: ["admin"],
+    handler: (ctx, p, req) => voidWarranty(ctx, p.serial ?? "", (req.body ?? {}) as { reason?: string; note?: string }),
+  },
   {
     method: "POST",
     path: "/complaints",

@@ -14,12 +14,16 @@ import {
   type IntegrationMessage,
   type JobResult,
   type PartType,
+  type UnitView,
+  type VoidReason,
+  VOID_REASONS,
 } from "@wms/domain";
 import {
   assertOwnAttachments,
   findUnit,
   getClaim,
   getComplaint,
+  getUnit,
   notFound,
   notify,
   requireRole,
@@ -47,6 +51,28 @@ function followers(state: DemoState, c: Pick<Complaint, "customerId" | "dealerId
         (dealer?.distributorId && u.distributorId === dealer.distributorId),
     )
     .map((u) => u.id);
+}
+
+// ---- void warranty (W5) -----------------------------------------------------------------------------------
+
+/** Admin voids a unit's warranty with a reason and note; recorded with user and date in the unit history. */
+export function voidWarranty(ctx: Ctx, serial: string, body: { reason?: string; note?: string }): UnitView {
+  requireRole(ctx, "admin");
+  const unit = findUnit(ctx, serial);
+  const reason = body.reason as VoidReason;
+  if (!VOID_REASONS.includes(reason)) {
+    throw new ServiceError(422, "validation_error", "Choose a reason.", { reason: "validation.voidReason" });
+  }
+  if (unit.void) throw new ServiceError(409, "already_void", "This warranty is already void.");
+  if (!unit.parts.length) throw new ServiceError(409, "not_registered", "This unit isn't registered yet.");
+  const note = body.note?.trim() || undefined;
+  unit.void = { reason, note, by: ctx.user.id, byName: ctx.user.name, at: ctx.now };
+  unit.history.push({ at: ctx.now, type: "voided", byName: ctx.user.name, reason, text: note });
+  notify(ctx.state, followers(ctx.state, unit), "unit_voided", ctx.now, {
+    params: { serial: unit.serial },
+    link: `/units/${unit.serial}`,
+  });
+  return getUnit(ctx, unit.serial);
 }
 
 export function logMessage(
@@ -136,6 +162,8 @@ export function sendToService(ctx: Ctx, id: string): ComplaintView {
   const unit = state.units.find((u) => u.serial === complaint.unitSerial);
   const model = state.models.find((m) => m.id === unit?.modelId);
   const customer = state.customers.find((c) => c.id === complaint.customerId);
+  // Voided after the complaint was raised: the visit is now chargeable.
+  if (unit?.void) complaint.entitlement = entitlementFor(unit, ctx.today);
   complaint.serviceRequestId = nextId(state, "SR");
   complaint.status = "WITH_SERVICE";
   complaint.history.push({ at: ctx.now, status: "WITH_SERVICE", byName: ctx.user.name });
@@ -251,7 +279,8 @@ export function simulateJobResult(
     link: `/complaints/${complaint.id}`,
   });
 
-  // Draft claim with the evidence from the job result, only when something was covered.
+  // Draft claim with the evidence from the job result, only when something was covered. Never on a void unit.
+  if (unit?.void) complaint.entitlement = entitlementFor(unit, ctx.today);
   if (complaint.entitlement.claimable) {
     const claim: Claim = {
       id: nextId(state, "CLM"),
