@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { DemoDb } from "../../frontend/src/demo-core/index";
+import type { DemoDb } from "./core/index";
 import { API_BASE, createApp } from "./app";
 import { createFileSessionStore, loadState, saveState } from "./persistence";
 
@@ -10,7 +10,7 @@ const dataDir = process.env.DEMO_DATA_DIR ?? join(root, "data");
 const statePath = join(dataDir, "state.json");
 const port = Number(process.env.PORT ?? 4000);
 const serveFrontend = process.argv.includes("--serve-frontend");
-const staticDir = join(root, "..", "frontend", "dist");
+const staticDir = join(root, "..", "..", "frontend", "dist");
 
 const db: DemoDb = {
   state: loadState(statePath),
@@ -34,6 +34,8 @@ app.listen(port, () => {
         : "No frontend build found: run `npm run demo` instead.",
     );
   } else {
-    console.log("Frontend: run `npm run dev` in frontend/ and open http://localhost:5173");
+    console.log(
+      "Frontend: run `npm run dev` in frontend/ and open http://localhost:5173",
+    );
   }
 });

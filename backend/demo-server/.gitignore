@@ -1,3 +1,4 @@
 node_modules
+dist
 # Demo state, sessions and uploaded files (recreated from the seed on start)
 data

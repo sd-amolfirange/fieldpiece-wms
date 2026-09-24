@@ -1,0 +1,45 @@
+{
+  "name": "hvac-wms-demo-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared demo API for the HVAC Warranty demo. Every window and the phone talk to this one server.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/index.js --external:express --external:multer --external:cookie-parser --external:exceljs",
+    "start": "node dist/index.js",
+    "demo": "npm --prefix ../../frontend run build:showcase && tsx src/index.ts --serve-frontend",
+    "reset": "tsx scripts/reset.ts",
+    "sample-xlsx": "tsx scripts/make-sample-xlsx.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@wms/domain": "file:../../shared/wms-domain",
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^22.20.4",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "globals": "^15.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.6.3",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

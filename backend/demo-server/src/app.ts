@@ -13,9 +13,9 @@ import {
   userFromToken,
   type DemoDb,
   type SessionStore,
-} from "../../frontend/src/demo-core/index";
+} from "./core/index";
 
-// Express adapter over the shared demo API (frontend/src/demo-core). Every window and the phone talk to this
+// Express adapter over the demo API in ./core. Every window and the phone talk to this
 // one process, so they all see the same state. Endpoint logic lives in demo-core; this file only handles
 // HTTP details: cookies, multipart uploads, file downloads and serving the built frontend.
 
@@ -30,15 +30,23 @@ export interface AppOptions {
   staticDir?: string;
 }
 
-const bearer = (req: Request) => req.get("authorization")?.replace(/^Bearer /, "") || undefined;
+const bearer = (req: Request) =>
+  req.get("authorization")?.replace(/^Bearer /, "") || undefined;
 
 function sendError(res: Response, e: unknown) {
   if (e instanceof ServiceError) {
-    res.status(e.status).json({ code: e.code, message: e.message, fieldErrors: e.fieldErrors });
+    res
+      .status(e.status)
+      .json({ code: e.code, message: e.message, fieldErrors: e.fieldErrors });
     return;
   }
   console.error(e);
-  res.status(500).json({ code: "server_error", message: "Something went wrong on the demo server." });
+  res
+    .status(500)
+    .json({
+      code: "server_error",
+      message: "Something went wrong on the demo server.",
+    });
 }
 
 export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
@@ -58,22 +66,40 @@ export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
   });
 
   // ---- uploads (multipart) ----
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  });
   app.post(`${API_BASE}/uploads`, (req, res) => {
     upload.single("file")(req, res, (err: unknown) => {
       if (err) {
-        const tooLarge = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
+        const tooLarge =
+          err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
         res.status(tooLarge ? 413 : 400).json({
           code: tooLarge ? "too_large" : "upload_failed",
-          message: tooLarge ? "Files can be up to 15 MB." : "The upload didn't go through. Try again.",
+          message: tooLarge
+            ? "Files can be up to 15 MB."
+            : "The upload didn't go through. Try again.",
         });
         return;
       }
       try {
         const user = userFromToken(db, sessions, bearer(req));
-        if (!user) throw new ServiceError(401, "unauthenticated", "Session expired. Sign in again.");
-        if (!req.file) throw new ServiceError(422, "validation_error", "Choose a file to upload.");
-        const name = (typeof req.body?.name === "string" && req.body.name) || req.file.originalname;
+        if (!user)
+          throw new ServiceError(
+            401,
+            "unauthenticated",
+            "Session expired. Sign in again.",
+          );
+        if (!req.file)
+          throw new ServiceError(
+            422,
+            "validation_error",
+            "Choose a file to upload.",
+          );
+        const name =
+          (typeof req.body?.name === "string" && req.body.name) ||
+          req.file.originalname;
         const attachment = addAttachment(
           contextFor(db, user),
           { name, mime: req.file.mimetype, size: req.file.size },
@@ -93,13 +119,26 @@ export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
     try {
       const user =
         userFromToken(db, sessions, bearer(req)) ??
-        userFromToken(db, sessions, req.cookies?.[REFRESH_COOKIE] as string | undefined);
-      if (!user) throw new ServiceError(401, "unauthenticated", "Session expired. Sign in again.");
+        userFromToken(
+          db,
+          sessions,
+          req.cookies?.[REFRESH_COOKIE] as string | undefined,
+        );
+      if (!user)
+        throw new ServiceError(
+          401,
+          "unauthenticated",
+          "Session expired. Sign in again.",
+        );
       const attachment = getAttachment(contextFor(db, user), req.params.id);
       const path = join(uploadsDir, attachment.id);
-      if (!existsSync(path)) throw new ServiceError(404, "not_found", "File not found.");
+      if (!existsSync(path))
+        throw new ServiceError(404, "not_found", "File not found.");
       res.type(attachment.mime);
-      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(attachment.name)}"`);
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${encodeURIComponent(attachment.name)}"`,
+      );
       res.setHeader("Cache-Control", "private, max-age=300");
       res.sendFile(resolve(path));
     } catch (e) {
@@ -113,13 +152,20 @@ export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
       const result = dispatch(db, sessions, {
         method: req.method,
         path: req.path,
-        query: Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, typeof v === "string" ? v : undefined])),
+        query: Object.fromEntries(
+          Object.entries(req.query).map(([k, v]) => [
+            k,
+            typeof v === "string" ? v : undefined,
+          ]),
+        ),
         body: req.body as unknown,
         accessToken: bearer(req),
         refreshToken: req.cookies?.[REFRESH_COOKIE] as string | undefined,
       });
-      if (result.setRefreshToken) res.cookie(REFRESH_COOKIE, result.setRefreshToken, cookieOptions(req));
-      if (result.clearRefreshToken) res.clearCookie(REFRESH_COOKIE, { path: API_BASE });
+      if (result.setRefreshToken)
+        res.cookie(REFRESH_COOKIE, result.setRefreshToken, cookieOptions(req));
+      if (result.clearRefreshToken)
+        res.clearCookie(REFRESH_COOKIE, { path: API_BASE });
       if (result.body === undefined) res.status(result.status).end();
       else res.status(result.status).json(result.body);
     } catch (e) {

@@ -1,6 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname } from "node:path";
-import { createSeed, type DemoState, type SessionStore } from "../../frontend/src/demo-core/index";
+import { createSeed, type DemoState, type SessionStore } from "./core/index";
 
 // Keeps demo state and sign-in sessions on disk, so restarting the server doesn't lose data or sign
 // everyone out of the four demo windows. Plain JSON, rewritten after every change.
@@ -26,31 +32,33 @@ export function loadState(path: string): DemoState {
   return seed;
 }
 
-export const saveState = (path: string, state: DemoState) => writeJson(path, state);
+export const saveState = (path: string, state: DemoState) =>
+  writeJson(path, state);
 
 export function createFileSessionStore(path: string): SessionStore {
-  let sessions: Record<string, string> = {};
+  const sessions = new Map<string, string>();
   if (existsSync(path)) {
     try {
-      sessions = JSON.parse(readFileSync(path, "utf8")) as Record<string, string>;
+      for (const [token, userId] of Object.entries(
+        JSON.parse(readFileSync(path, "utf8")) as Record<string, string>,
+      )) {
+        sessions.set(token, userId);
+      }
     } catch {
-      sessions = {};
+      sessions.clear();
     }
   }
-  const save = () => writeJson(path, sessions);
+  const save = () => writeJson(path, Object.fromEntries(sessions));
   return {
     create(userId) {
       const token = `${userId}.${crypto.randomUUID()}`;
-      sessions[token] = userId;
+      sessions.set(token, userId);
       save();
       return token;
     },
-    get: (token) => (token ? sessions[token] : undefined),
+    get: (token) => (token ? sessions.get(token) : undefined),
     delete(token) {
-      if (token && sessions[token]) {
-        delete sessions[token];
-        save();
-      }
+      if (token && sessions.delete(token)) save();
     },
   };
 }

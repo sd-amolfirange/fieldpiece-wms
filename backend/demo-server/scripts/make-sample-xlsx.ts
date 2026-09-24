@@ -21,8 +21,36 @@ export const SAMPLE_HEADERS = [
   "Invoice number",
 ] as const;
 
-const FIRST_NAMES = ["A.", "B.", "C.", "D.", "G.", "J.", "K.", "L.", "M.", "N.", "P.", "R.", "S."];
-const SURNAMES = ["Bhosale", "Chavan", "Deshmukh", "Gaikwad", "Jadhav", "Kadam", "Mane", "Naik", "Sawant", "Shinde", "Thakur", "Wagh", "Yadav"];
+const FIRST_NAMES = [
+  "A.",
+  "B.",
+  "C.",
+  "D.",
+  "G.",
+  "J.",
+  "K.",
+  "L.",
+  "M.",
+  "N.",
+  "P.",
+  "R.",
+  "S.",
+];
+const SURNAMES = [
+  "Bhosale",
+  "Chavan",
+  "Deshmukh",
+  "Gaikwad",
+  "Jadhav",
+  "Kadam",
+  "Mane",
+  "Naik",
+  "Sawant",
+  "Shinde",
+  "Thakur",
+  "Wagh",
+  "Yadav",
+];
 const CITIES = ["Pune", "Pune", "Pune", "Pimpri", "Hinjewadi", "Kharadi"];
 
 export interface SampleRow {
@@ -59,13 +87,23 @@ export function sampleRows(): SampleRow[] {
 }
 
 async function main() {
-  const out = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "demo-assets", "coolair_sales_week38.xlsx");
+  const out = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "..",
+    "demo-assets",
+    "coolair_sales_week38.xlsx",
+  );
   mkdirSync(dirname(out), { recursive: true });
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "CoolAir Traders";
   const sheet = workbook.addWorksheet("Sales week 38");
-  sheet.columns = SAMPLE_HEADERS.map((header) => ({ header, width: header === "Customer email" ? 26 : 18 }));
+  sheet.columns = SAMPLE_HEADERS.map((header) => ({
+    header,
+    width: header === "Customer email" ? 26 : 18,
+  }));
   sheet.getRow(1).font = { bold: true };
 
   for (const r of sampleRows()) {
