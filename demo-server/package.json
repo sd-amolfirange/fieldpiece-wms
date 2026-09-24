@@ -1,0 +1,35 @@
+{
+  "name": "hvac-wms-demo-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared demo API for the HVAC Warranty demo. Reuses frontend/src/demo-core so every window and the phone see the same data.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "demo": "npm --prefix ../frontend run build:demo && tsx src/index.ts --serve-frontend",
+    "reset": "tsx scripts/reset.ts",
+    "sample-xlsx": "tsx scripts/make-sample-xlsx.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^22.20.4",
+    "tsx": "^4.23.15",
+    "typescript": "~5.6.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

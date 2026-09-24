@@ -1,0 +1,3 @@
+node_modules
+# Demo state, sessions and uploaded files (recreated from the seed on start)
+data
