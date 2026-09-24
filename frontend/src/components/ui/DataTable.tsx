@@ -24,6 +24,14 @@ import { Button } from "./Button";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyColumnDef<T> = ColumnDef<T, any>;
 
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    /** Extra classes for the column's header and cells in the desktop table, e.g. "hidden xl:table-cell". */
+    className?: string;
+  }
+}
+
 export interface DataTableProps<T> {
   columns: AnyColumnDef<T>[];
   data: T[] | undefined;
@@ -155,7 +163,10 @@ export function DataTable<T>({
                           key={header.id}
                           scope="col"
                           aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
-                          className="text-overline h-10 px-4 text-start text-ink-600"
+                          className={cn(
+                            "text-overline h-10 px-4 text-start text-ink-600",
+                            header.column.columnDef.meta?.className,
+                          )}
                         >
                           {header.isPlaceholder ? null : sortable ? (
                             <button
@@ -194,7 +205,10 @@ export function DataTable<T>({
                         )}
                       >
                         {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="px-4 text-sm">
+                          <td
+                            key={cell.id}
+                            className={cn("px-4 text-sm", cell.column.columnDef.meta?.className)}
+                          >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
                         ))}

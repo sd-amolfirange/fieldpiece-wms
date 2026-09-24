@@ -59,6 +59,13 @@ export default function ComplaintsListPage() {
       ? t("nav.complaintsAndClaims")
       : t("complaints.title");
 
+  // Dealer / distributor on a tablet (below xl): the tracker already shows the status, so received date, source,
+  // status and cover are left out to avoid sideways scrolling. Desktop shows every column.
+  const tabletHidden = useMemo(
+    () => (isPartner ? { className: "hidden xl:table-cell" } : undefined),
+    [isPartner],
+  );
+
   const columns = useMemo(
     () => [
       col.accessor("id", {
@@ -70,6 +77,7 @@ export default function ComplaintsListPage() {
         ),
       }),
       col.accessor("createdAt", {
+        meta: tabletHidden,
         header: t("complaints.columns.received"),
         cell: (i) => formatDateTime(i.getValue(), i18n.language),
       }),
@@ -96,6 +104,7 @@ export default function ComplaintsListPage() {
                   }),
                 ]),
             col.accessor("source", {
+              meta: tabletHidden,
               header: t("complaints.columns.source"),
               cell: (i) => (
                 <span className="flex flex-wrap items-center gap-1">
@@ -108,6 +117,7 @@ export default function ComplaintsListPage() {
             }),
           ]),
       col.accessor("status", {
+        meta: tabletHidden,
         header: t("complaints.columns.status"),
         cell: (i) => <ComplaintStatusBadge status={i.getValue()} />,
       }),
@@ -123,6 +133,7 @@ export default function ComplaintsListPage() {
         : []),
       col.accessor((c) => c.entitlement.reason, {
         id: "entitlement",
+        meta: tabletHidden,
         header: t("complaints.columns.entitlement"),
         enableSorting: false,
         cell: (i) => t(`entitlement.short.${i.getValue()}`),
@@ -140,7 +151,7 @@ export default function ComplaintsListPage() {
             }),
           ]),
     ],
-    [t, i18n.language, isCustomer, isPartner, role],
+    [t, i18n.language, isCustomer, isPartner, role, tabletHidden],
   );
 
   const complaintsTable = (
