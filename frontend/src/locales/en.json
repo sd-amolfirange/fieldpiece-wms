@@ -304,6 +304,8 @@
     "commentPlaceholder": "Write a comment",
     "outOfWarranty": "Out of warranty, paid repair quote",
     "allBrands": "All brands",
+    "viewOnly": "Claims on the units you sold. The admin handles claims with the manufacturer; you can follow their status here.",
+    "emptyPartner": "No claims on your units yet.",
     "filterBrand": "Brand",
     "countLink": "{{status}}: {{count}} claims. Show them",
     "details": "Claim details",
@@ -410,7 +412,8 @@
       "source": "Source",
       "status": "Status",
       "entitlement": "Covered",
-      "claim": "Claim"
+      "claim": "Claim",
+      "progress": "Progress"
     },
     "unit": "Unit",
     "pickUnitFirst": "Pick a unit to see what the warranty covers.",
@@ -440,6 +443,7 @@
     },
     "stepBy": "by {{name}}",
     "stepWaiting": "Waiting",
+    "trackerLabel": "Progress",
     "sendToService": "Send to service system",
     "sent": "Sent to the service system",
     "claim": "Manufacturer claim",
@@ -702,6 +706,7 @@
     "pickDealer": "Pick the dealer.",
     "invoiceRequired": "Add a photo or PDF of the invoice.",
     "reasonRequired": "Give a reason (at least 5 characters).",
+    "voidReason": "Choose why the warranty is void.",
     "pickUnit": "Pick the unit.",
     "describeFault": "Describe the fault (at least 5 characters).",
     "amount": "Enter the amount claimed."
@@ -796,6 +801,23 @@
       "PHYSICAL_DAMAGE": "physical damage",
       "OTHER": "other reason"
     },
+    "void": {
+      "button": "Void warranty",
+      "title": "Void this warranty?",
+      "help": "The unit and all its parts lose warranty cover. Complaints on it become chargeable and no manufacturer claim is raised. The reason, your name and the date are recorded.",
+      "reason": "Reason",
+      "reasons": {
+        "UNAUTHORISED_REPAIR": "Unauthorised repair",
+        "MISSED_SERVICING": "Missed servicing",
+        "PHYSICAL_DAMAGE": "Physical damage",
+        "OTHER": "Other"
+      },
+      "note": "Note",
+      "noteHelp": "What was found, for example who opened the unit.",
+      "confirm": "Void warranty",
+      "done": "Warranty voided",
+      "recorded": "Voided by {{name}} on {{date}}"
+    },
     "certificate": "Warranty certificate (PDF)",
     "qrLabel": "QR label",
     "printLabel": "Print label",
@@ -805,6 +827,7 @@
       "registered": "registered the unit ({{ref}})",
       "part_replaced": "replaced a part",
       "voided": "voided the warranty",
+      "voidedBecause": "voided the warranty: {{reason}}",
       "complaint_raised": "raised complaint {{ref}}",
       "claim_created": "created claim {{ref}}",
       "note": "added a note"
@@ -1004,6 +1027,7 @@
     "complaint_resolved": "Complaint {{id}} is resolved. The new {{part}} has its own warranty from today.",
     "claim_draft_created": "Draft claim {{id}} created for {{serial}}",
     "claim_approved_by_oem": "The manufacturer approved claim {{id}}.",
-    "claim_rejected_by_oem": "The manufacturer rejected claim {{id}}."
+    "claim_rejected_by_oem": "The manufacturer rejected claim {{id}}.",
+    "unit_voided": "The warranty on {{serial}} is void. Open the unit to see why."
   }
 }

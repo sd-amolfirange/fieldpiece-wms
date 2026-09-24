@@ -122,6 +122,8 @@ export interface UnitEvent {
   byName: string;
   /** Free text, e.g. the unauthorised-repair note. */
   text?: string;
+  /** "voided" events: why the warranty was voided. */
+  reason?: VoidReason;
   refId?: string;
 }
 

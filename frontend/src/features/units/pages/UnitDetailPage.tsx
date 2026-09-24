@@ -1,15 +1,18 @@
-import { MessageSquarePlus, Wrench } from "lucide-react";
+import { Ban, MessageSquarePlus, Wrench } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
-import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
+import { EmptyState, ErrorState, Skeleton, toast } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
-import { buttonVariants, Card, MonoId, Tabs, WarrantyStatusBadge } from "@/components/ui";
+import { Button, buttonVariants, Card, MonoId, Tabs, WarrantyStatusBadge } from "@/components/ui";
 import { toApiError } from "@/lib/api-error";
+import { formatDateTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { useCurrentRole } from "@/lib/session";
 import { PartWarrantyTable } from "../components/PartWarrantyTable";
 import { CertificateButton, QrLabelCard, UnitFactsCard, UnitHistory } from "../components/UnitCards";
-import { useUnit } from "../hooks";
+import { VoidWarrantyModal } from "../components/VoidWarrantyModal";
+import { useUnit, useVoidWarranty } from "../hooks";
 import { stillCoveredLine, unitStatusLine } from "../status-line";
 
 // A05 (admin), DL05 (dealer / distributor, read-only) and CU03 (customer, phone layout).
@@ -19,6 +22,8 @@ export default function UnitDetailPage() {
   const { t, i18n } = useTranslation();
   const role = useCurrentRole();
   const query = useUnit(serial);
+  const voidWarranty = useVoidWarranty(serial ?? "");
+  const [voidOpen, setVoidOpen] = useState(false);
 
   if (query.isLoading) {
     return (
@@ -64,8 +69,7 @@ export default function UnitDetailPage() {
       }
       actions={
         <>
-          {/* Dealers raise complaints from Phase 4 (DL06). */}
-          {(role === "admin" || isCustomer) && can(role, "complaints:create") ? (
+          {can(role, "complaints:create") ? (
             <Link
               to={`/complaints/new?serial=${encodeURIComponent(unit.serial)}`}
               className={buttonVariants({ variant: "secondary" })}
@@ -75,6 +79,11 @@ export default function UnitDetailPage() {
             </Link>
           ) : null}
           <CertificateButton unit={unit} variant={isCustomer ? "primary" : "secondary"} />
+          {can(role, "units:void") && !unit.void && unit.parts.length ? (
+            <Button variant="danger" icon={Ban} onClick={() => setVoidOpen(true)}>
+              {t("units.void.button")}
+            </Button>
+          ) : null}
         </>
       }
     />
@@ -84,8 +93,32 @@ export default function UnitDetailPage() {
     <p role="alert" className="mb-6 rounded border-s-4 border-danger bg-danger-bg p-4 text-body">
       {t("units.voidNotice", { reason: t(`units.voidReason.${unit.void.reason}`) })}
       {unit.void.note ? ` ${unit.void.note}` : ""}
+      <span className="block text-sm text-text-muted">
+        {t("units.void.recorded", {
+          name: unit.void.byName,
+          date: formatDateTime(unit.void.at, i18n.language),
+        })}
+      </span>
     </p>
   ) : null;
+
+  const voidModal =
+    role === "admin" ? (
+      <VoidWarrantyModal
+        open={voidOpen}
+        onOpenChange={setVoidOpen}
+        pending={voidWarranty.isPending}
+        onConfirm={(values) =>
+          voidWarranty.mutate(values, {
+            onSuccess: () => {
+              setVoidOpen(false);
+              toast.success(t("units.void.done"), unit.serial);
+            },
+            onError: (e) => toast.error(toApiError(e).message),
+          })
+        }
+      />
+    ) : null;
 
   const tabs = (
     <Tabs
@@ -129,6 +162,7 @@ export default function UnitDetailPage() {
           {can(role, "units:qr_label") ? <QrLabelCard unit={unit} /> : null}
         </div>
       </div>
+      {voidModal}
     </>
   );
 }

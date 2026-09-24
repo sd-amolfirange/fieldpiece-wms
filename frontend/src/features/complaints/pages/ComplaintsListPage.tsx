@@ -20,14 +20,18 @@ import {
   Input,
   MonoId,
   NativeSelect,
+  Tabs,
 } from "@/components/ui";
+import { PartnerClaimsTable } from "@/features/claims";
 import { formatDateTime } from "@/lib/format";
 import { useCurrentRole } from "@/lib/session";
 import { useTableParams } from "@/lib/use-table-params";
+import { ComplaintTracker } from "../components/ComplaintTracker";
 import { useComplaints } from "../hooks";
 
-// A07 Complaints (admin), My complaints (customer) and, from Phase 4, DL07 for dealers. The server returns only
-// the caller's complaints, newest first.
+// A07 Complaints (admin), My complaints (customer) and DL07 Complaints & claims (dealer / distributor: a status
+// tracker per complaint, and the claims on their units, view only). The server returns only the caller's
+// complaints, newest first.
 
 const col = createColumnHelper<ComplaintView>();
 
@@ -36,6 +40,7 @@ export default function ComplaintsListPage() {
   const role = useCurrentRole();
   const isAdmin = role === "admin";
   const isCustomer = role === "customer";
+  const isPartner = role === "dealer" || role === "distributor";
   const [params, update] = useTableParams({ sort: "-createdAt" });
   const [search, setSearch] = useState(params.q ?? "");
   const status = params.filters.status as ComplaintStatus | undefined;
@@ -48,7 +53,11 @@ export default function ComplaintsListPage() {
     status,
     source,
   });
-  const title = isCustomer ? t("nav.myComplaints") : t("complaints.title");
+  const title = isCustomer
+    ? t("nav.myComplaints")
+    : isPartner
+      ? t("nav.complaintsAndClaims")
+      : t("complaints.title");
 
   const columns = useMemo(
     () => [
@@ -76,20 +85,42 @@ export default function ComplaintsListPage() {
               enableSorting: false,
               cell: (i) => i.getValue() ?? "—",
             }),
-            col.accessor("dealerName", {
-              header: t("complaints.columns.dealer"),
-              enableSorting: false,
-              cell: (i) => i.getValue() ?? "—",
-            }),
+            // A dealer only ever sees its own name here, so the column is left out for dealers.
+            ...(role === "dealer"
+              ? []
+              : [
+                  col.accessor("dealerName", {
+                    header: t("complaints.columns.dealer"),
+                    enableSorting: false,
+                    cell: (i) => i.getValue() ?? "—",
+                  }),
+                ]),
             col.accessor("source", {
               header: t("complaints.columns.source"),
-              cell: (i) => <ComplaintSourceBadge status={i.getValue()} />,
+              cell: (i) => (
+                <span className="flex flex-wrap items-center gap-1">
+                  <ComplaintSourceBadge status={i.getValue()} />
+                  {i.getValue() === "DEALER" && i.row.original.dealerName && role !== "dealer" ? (
+                    <span className="text-sm">{i.row.original.dealerName}</span>
+                  ) : null}
+                </span>
+              ),
             }),
           ]),
       col.accessor("status", {
         header: t("complaints.columns.status"),
         cell: (i) => <ComplaintStatusBadge status={i.getValue()} />,
       }),
+      ...(isPartner
+        ? [
+            col.accessor("status", {
+              id: "progress",
+              header: t("complaints.columns.progress"),
+              enableSorting: false,
+              cell: (i) => <ComplaintTracker status={i.getValue()} />,
+            }),
+          ]
+        : []),
       col.accessor((c) => c.entitlement.reason, {
         id: "entitlement",
         header: t("complaints.columns.entitlement"),
@@ -109,7 +140,95 @@ export default function ComplaintsListPage() {
             }),
           ]),
     ],
-    [t, i18n.language, isCustomer],
+    [t, i18n.language, isCustomer, isPartner, role],
+  );
+
+  const complaintsTable = (
+    <DataTable
+      caption={title}
+      columns={columns}
+      data={query.data?.items}
+      total={query.data?.total ?? 0}
+      page={params.page}
+      pageSize={params.pageSize}
+      sort={params.sort}
+      onSortChange={(sort) => update({ sort })}
+      onPageChange={(page) => update({ page })}
+      getRowId={(row) => row.id}
+      isLoading={query.isLoading}
+      error={query.error}
+      onRetry={() => void query.refetch()}
+      emptyIcon={Truck}
+      emptyMessage={t("complaints.empty")}
+      toolbar={
+        isCustomer ? undefined : (
+          <>
+            <form
+              role="search"
+              className="relative w-full sm:w-72"
+              onSubmit={(e) => {
+                e.preventDefault();
+                update({ q: search.trim() });
+              }}
+            >
+              <label htmlFor="complaints-search" className="sr-only">
+                {t("complaints.searchPlaceholder")}
+              </label>
+              <Search
+                size={16}
+                strokeWidth={1.75}
+                aria-hidden
+                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-500"
+              />
+              <Input
+                id="complaints-search"
+                type="search"
+                className="ps-9"
+                placeholder={t("complaints.searchPlaceholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </form>
+            <label htmlFor="complaints-status" className="sr-only">
+              {t("complaints.filterStatus")}
+            </label>
+            <NativeSelect
+              id="complaints-status"
+              className="w-full sm:w-48"
+              value={status ?? ""}
+              onChange={(e) => update({ status: e.target.value })}
+            >
+              <option value="">{t("complaints.allStatuses")}</option>
+              {COMPLAINT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {t(`status.complaint.${s}`)}
+                </option>
+              ))}
+            </NativeSelect>
+            {isAdmin ? (
+              <>
+                <label htmlFor="complaints-source" className="sr-only">
+                  {t("complaints.filterSource")}
+                </label>
+                <NativeSelect
+                  id="complaints-source"
+                  className="w-full sm:w-48"
+                  value={source ?? ""}
+                  onChange={(e) => update({ source: e.target.value })}
+                >
+                  <option value="">{t("complaints.allSources")}</option>
+                  {COMPLAINT_SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {t(`status.source.${s}`)}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </>
+            ) : null}
+          </>
+        )
+      }
+    />
   );
 
   return (
@@ -127,91 +246,17 @@ export default function ComplaintsListPage() {
           </Link>
         }
       />
-      <DataTable
-        caption={title}
-        columns={columns}
-        data={query.data?.items}
-        total={query.data?.total ?? 0}
-        page={params.page}
-        pageSize={params.pageSize}
-        sort={params.sort}
-        onSortChange={(sort) => update({ sort })}
-        onPageChange={(page) => update({ page })}
-        getRowId={(row) => row.id}
-        isLoading={query.isLoading}
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        emptyIcon={Truck}
-        emptyMessage={t("complaints.empty")}
-        toolbar={
-          isCustomer ? undefined : (
-            <>
-              <form
-                role="search"
-                className="relative w-full sm:w-72"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  update({ q: search.trim() });
-                }}
-              >
-                <label htmlFor="complaints-search" className="sr-only">
-                  {t("complaints.searchPlaceholder")}
-                </label>
-                <Search
-                  size={16}
-                  strokeWidth={1.75}
-                  aria-hidden
-                  className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-500"
-                />
-                <Input
-                  id="complaints-search"
-                  type="search"
-                  className="ps-9"
-                  placeholder={t("complaints.searchPlaceholder")}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </form>
-              <label htmlFor="complaints-status" className="sr-only">
-                {t("complaints.filterStatus")}
-              </label>
-              <NativeSelect
-                id="complaints-status"
-                className="w-full sm:w-48"
-                value={status ?? ""}
-                onChange={(e) => update({ status: e.target.value })}
-              >
-                <option value="">{t("complaints.allStatuses")}</option>
-                {COMPLAINT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {t(`status.complaint.${s}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-              {isAdmin ? (
-                <>
-                  <label htmlFor="complaints-source" className="sr-only">
-                    {t("complaints.filterSource")}
-                  </label>
-                  <NativeSelect
-                    id="complaints-source"
-                    className="w-full sm:w-48"
-                    value={source ?? ""}
-                    onChange={(e) => update({ source: e.target.value })}
-                  >
-                    <option value="">{t("complaints.allSources")}</option>
-                    {COMPLAINT_SOURCES.map((s) => (
-                      <option key={s} value={s}>
-                        {t(`status.source.${s}`)}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </>
-              ) : null}
-            </>
-          )
-        }
-      />
+      {isPartner ? (
+        <Tabs
+          label={title}
+          items={[
+            { value: "complaints", label: t("complaints.title"), content: complaintsTable },
+            { value: "claims", label: t("claims.title"), content: <PartnerClaimsTable /> },
+          ]}
+        />
+      ) : (
+        complaintsTable
+      )}
     </div>
   );
 }

@@ -1,5 +1,7 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { VoidReason } from "@wms/domain";
 import { LIVE_REFRESH_MS } from "@/lib/query-client";
+import { refreshEverything } from "@/lib/refresh";
 import { unitsApi, type UnitFilters } from "./api";
 
 export const unitKeys = {
@@ -23,6 +25,14 @@ export function useUnit(serial: string | undefined) {
     queryFn: () => unitsApi.get(serial ?? ""),
     enabled: !!serial,
     refetchInterval: LIVE_REFRESH_MS,
+  });
+}
+
+export function useVoidWarranty(serial: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason: VoidReason; note?: string }) => unitsApi.voidWarranty(serial, body),
+    onSuccess: () => refreshEverything(qc),
   });
 }
 

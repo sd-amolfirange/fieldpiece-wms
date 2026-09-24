@@ -112,6 +112,9 @@ export default function ComplaintDetailPage() {
         <>
           <ComplaintStatusBadge status={c.status} />
           {isCustomer ? null : <ComplaintSourceBadge status={c.source} />}
+          {c.source === "DEALER" && c.dealerName && !isCustomer ? (
+            <span className="text-sm">{c.dealerName}</span>
+          ) : null}
           <span className="text-sm text-text-muted">
             <Link to={`/units/${c.unitSerial}`} className="underline-offset-2 hover:underline">
               <MonoId>{c.unitSerial}</MonoId>

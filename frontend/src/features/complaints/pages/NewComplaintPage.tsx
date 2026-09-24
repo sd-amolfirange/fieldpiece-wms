@@ -77,7 +77,14 @@ export default function NewComplaintPage() {
       <PageHeader
         title={title}
         breadcrumbs={[
-          { label: isCustomer ? t("nav.myComplaints") : t("complaints.title"), to: "/complaints" },
+          {
+            label: isCustomer
+              ? t("nav.myComplaints")
+              : role === "admin"
+                ? t("complaints.title")
+                : t("nav.complaintsAndClaims"),
+            to: "/complaints",
+          },
           { label: title },
         ]}
       />

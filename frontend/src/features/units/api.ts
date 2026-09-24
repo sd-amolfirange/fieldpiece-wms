@@ -1,4 +1,4 @@
-import type { Paginated, RegistrationView, UnitView, WarrantyStatus } from "@wms/domain";
+import type { Paginated, RegistrationView, UnitView, VoidReason, WarrantyStatus } from "@wms/domain";
 import { filesApi } from "@/features/files";
 import { saveBlob } from "@/lib/download";
 import { http } from "@/lib/http";
@@ -19,6 +19,9 @@ export const unitsApi = {
     filesApi
       .download(`/units/${encodeURIComponent(serial)}/certificate.pdf`)
       .then((blob) => saveBlob(blob, `warranty-${serial}.pdf`)),
+  /** A05: admin voids the warranty with a reason and a note (recorded with user and date). */
+  voidWarranty: (serial: string, body: { reason: VoidReason; note?: string }) =>
+    http.post<UnitView>(`/units/${encodeURIComponent(serial)}/void`, body).then((r) => r.data),
   /** The signed-in customer's self-registrations still waiting for approval (CU02). */
   myPendingRegistrations: () =>
     http

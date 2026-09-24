@@ -143,7 +143,10 @@ export function UnitHistory({ unit }: { unit: UnitView }) {
   const items: TimelineItem[] = [...unit.history]
     .sort((a, b) => b.at.localeCompare(a.at))
     .map((e, index) => {
-      const text = t(`units.history.${e.type}`, { ref: e.refId ?? "" });
+      const text =
+        e.type === "voided" && e.reason
+          ? t("units.history.voidedBecause", { reason: t(`units.voidReason.${e.reason}`) })
+          : t(`units.history.${e.type}`, { ref: e.refId ?? "" });
       const to = linkFor(e.type, e.refId);
       return {
         id: `${e.at}-${index}`,

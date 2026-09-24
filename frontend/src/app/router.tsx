@@ -1,10 +1,8 @@
-import { lazy, type ReactNode } from "react";
+import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { AdminTabs } from "@/features/admin/components/AdminTabs";
-import { useCurrentRole } from "@/lib/session";
 import type { Role } from "@/types";
 import { AppLayout } from "./AppLayout";
-import type { ScreenCode } from "./pages/ScreenPlaceholderPage";
 import { RequireRole } from "./RequireRole";
 import { RootLayout } from "./RootLayout";
 import { RouteError } from "./RouteError";
@@ -41,14 +39,7 @@ const guarded = (roles: readonly Role[] | undefined, children: RouteObject[]): R
   children,
 });
 
-type Screens = Partial<Record<Role, ScreenCode>>;
 const PARTNERS: Role[] = ["dealer", "distributor"];
-
-/** One path, built page for some roles and the placeholder for roles a later phase covers. */
-function ForRoles({ roles, page, screens }: { roles: Role[]; page: ReactNode; screens: Screens }) {
-  const role = useCurrentRole();
-  return role && roles.includes(role) ? page : <ScreenPlaceholderPage screens={screens} />;
-}
 
 export const routes: RouteObject[] = [
   {
@@ -101,37 +92,9 @@ export const routes: RouteObject[] = [
 
             // Shared screens: the demo server decides which rows each role gets.
             { path: "units/:serial", element: <UnitDetailPage /> }, // A05 / DL05 / CU03
-            // Dealer and distributor complaints (DL06, DL07) come in Phase 4.
-            {
-              path: "complaints", // A07 / My complaints
-              element: (
-                <ForRoles
-                  roles={["admin", "customer"]}
-                  page={<ComplaintsListPage />}
-                  screens={{ dealer: "DL07", distributor: "DL07" }}
-                />
-              ),
-            },
-            {
-              path: "complaints/new", // CU04 (admin: on a customer's behalf)
-              element: (
-                <ForRoles
-                  roles={["admin", "customer"]}
-                  page={<NewComplaintPage />}
-                  screens={{ dealer: "DL06", distributor: "DL06" }}
-                />
-              ),
-            },
-            {
-              path: "complaints/:id", // A08 / CU05
-              element: (
-                <ForRoles
-                  roles={["admin", "customer"]}
-                  page={<ComplaintDetailPage />}
-                  screens={{ dealer: "DL07", distributor: "DL07" }}
-                />
-              ),
-            },
+            { path: "complaints", element: <ComplaintsListPage /> }, // A07 / DL07 / My complaints
+            { path: "complaints/new", element: <NewComplaintPage /> }, // CU04 / DL06 (admin: on a customer's behalf)
+            { path: "complaints/:id", element: <ComplaintDetailPage /> }, // A08 / DL07 / CU05
 
             { path: "*", element: <NotFoundPage /> },
           ],

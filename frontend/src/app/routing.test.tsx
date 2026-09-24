@@ -62,10 +62,11 @@ describe("routing and role homes", () => {
   });
 
   it("shows the planned screen and its must-contain list for routes a later phase builds", async () => {
-    await signInAs("dealer.coolair@demo.wms");
-    renderAt("/complaints");
-    expect(await screen.findByRole("heading", { name: /DL07 · Complaints & claims/ })).toBeInTheDocument();
-    expect(screen.getByText("Claim status (view only)")).toBeInTheDocument();
+    // A11 is the last placeholder until Phase 5 (DL07 was here until Phase 4 built it).
+    await signInAs("admin@demo.wms");
+    renderAt("/admin/dealers");
+    expect(await screen.findByRole("heading", { name: /A11 · Dealers & users/ })).toBeInTheDocument();
+    expect(screen.getByText("Dealer accounts and logins")).toBeInTheDocument();
   });
 
   it("sends signed-out visitors to the sign-in page with the demo accounts", async () => {
