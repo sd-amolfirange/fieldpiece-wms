@@ -13,6 +13,7 @@ import {
   jobPhotoSvg,
   jobSerials,
   simulateJobResult,
+  simulateRegistrationEmail,
   rowsFromMatrix,
   templateCsv,
   MAX_UPLOAD_BYTES,
@@ -239,6 +240,28 @@ export function createApp({ db, sessions, uploadsDir, staticDir }: AppOptions) {
       const complaint = simulateJobResult(ctx, body, photos);
       db.onChange?.(db.state);
       res.json(complaint);
+    } catch (e) {
+      sendError(res, e);
+    }
+  });
+
+  // ---- simulator: a registration email arrives with the invoice attached (stored like an upload) ----
+  app.post(`${API_BASE}/simulate/registration-email`, (req, res) => {
+    try {
+      const user = userFromToken(db, sessions, bearer(req));
+      if (!user) throw new ServiceError(401, "unauthenticated", "Session expired. Sign in again.");
+      const ctx = contextFor(db, user);
+      const registration = simulateRegistrationEmail(ctx, (file) => {
+        const attachment = addAttachment(
+          ctx,
+          { name: file.name, mime: file.mime, size: file.content.length },
+          (id) => `${API_BASE}/files/${id}`,
+        );
+        writeFileSync(join(uploadsDir, attachment.id), file.content);
+        return attachment.id;
+      });
+      db.onChange?.(db.state);
+      res.json(registration);
     } catch (e) {
       sendError(res, e);
     }

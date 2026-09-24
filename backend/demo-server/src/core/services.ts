@@ -450,20 +450,28 @@ const DASHBOARD_CHANNELS: ChannelCount["channel"][] = [
   "ERP",
 ];
 
-export function dashboardSummary(ctx: Ctx): DashboardSummary {
+export function dashboardSummary(
+  ctx: Ctx,
+  filters: { dealerId?: string } = {},
+): DashboardSummary {
   const { state, user, today } = ctx;
   const month = today.slice(0, 7);
+  // DL01 for a distributor: optionally narrowed to one of its dealers (scoping still applies first).
+  const dealerFilter =
+    user.role === "distributor" && filters.dealerId
+      ? (row: { dealerId?: string }) => row.dealerId === filters.dealerId
+      : () => true;
   const units = state.units
-    .filter((u) => canSee(user, u, state.dealers))
+    .filter((u) => canSee(user, u, state.dealers) && dealerFilter(u))
     .map((u) => toUnitView(state, u, today));
-  const complaints = state.complaints.filter((c) =>
-    canSee(user, c, state.dealers),
+  const complaints = state.complaints.filter(
+    (c) => canSee(user, c, state.dealers) && dealerFilter(c),
   );
-  const claims = state.claims.filter((c) =>
-    canSeeClaim(user, c, state.dealers),
+  const claims = state.claims.filter(
+    (c) => canSeeClaim(user, c, state.dealers) && dealerFilter(c),
   );
-  const registrations = state.registrations.filter((r) =>
-    canSee(user, r, state.dealers),
+  const registrations = state.registrations.filter(
+    (r) => canSee(user, r, state.dealers) && dealerFilter(r),
   );
   const countStatus = (s: WarrantyStatus) =>
     units.filter((u) => u.status === s).length;
@@ -496,6 +504,23 @@ export function dashboardSummary(ctx: Ctx): DashboardSummary {
         count: channel.get(c) ?? 0,
       })),
       claimsByBrand: byBrand,
+      expiringSoon: units
+        .filter((u) => u.status === "EXPIRING_SOON")
+        .sort((a, b) => (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0))
+        .slice(0, 5)
+        .map((u) => ({
+          serial: u.serial,
+          modelName: u.modelName,
+          customerName: u.customerName,
+          dealerName: u.dealerName,
+          warrantyEnd:
+            u.parts.find((p) => p.partType === "UNIT")?.warrantyEnd ?? today,
+          daysRemaining: u.daysRemaining ?? 0,
+        })),
+      recentActivity: state.units
+        .flatMap((u) => u.history.map((e) => ({ ...e, serial: u.serial })))
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, 8),
     };
   }
 

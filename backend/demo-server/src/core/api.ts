@@ -24,6 +24,7 @@ import {
   simulateOemDecision,
   voidWarranty,
 } from "./complaints";
+import { simulateErpInvoice } from "./simulate";
 import { createSeed, DEMO_ACCOUNTS, DEMO_PASSWORD } from "./seed";
 import {
   authenticate,
@@ -286,7 +287,8 @@ export const routes: Route[] = [
   {
     method: "GET",
     path: "/dashboard/summary",
-    handler: (ctx) => dashboardSummary(ctx),
+    handler: (ctx, _p, req) =>
+      dashboardSummary(ctx, { dealerId: req.query.dealerId }),
   },
   {
     method: "GET",
@@ -322,6 +324,12 @@ export const routes: Route[] = [
     roles: ["admin"],
     handler: (ctx, p, req) =>
       claimTransition(ctx, p.id ?? "", (req.body ?? {}) as Parameters<typeof claimTransition>[2]),
+  },
+  {
+    method: "POST",
+    path: "/simulate/erp-invoice",
+    roles: ["admin"],
+    handler: (ctx) => simulateErpInvoice(ctx),
   },
   {
     method: "POST",

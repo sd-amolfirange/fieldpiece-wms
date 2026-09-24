@@ -19,6 +19,7 @@ import {
   type RowErrors,
   type Unit,
 } from "@wms/domain";
+import { logMessage } from "./complaints";
 import { visibleDealerIds } from "./scope";
 import {
   assertOwnAttachments,
@@ -171,6 +172,23 @@ function approve(
   reg.status = "APPROVED";
   reg.reviewedByName = reviewer;
   reg.reviewedAt = ctx.now;
+  // W6: an emailed registration updates the customer record in CRM once approved.
+  if (reg.channel === "EMAIL") {
+    const customer = state.customers.find((c) => c.id === reg.customerId);
+    logMessage(ctx, {
+      system: "CRM",
+      direction: "OUT",
+      type: "crm_update",
+      refId: reg.id,
+      payload: {
+        action: "customer_product_registered",
+        customer: { id: customer?.id, name: customer?.name, email: customer?.email, phone: customer?.phone },
+        product: { serial: reg.serial, modelCode: reg.modelCode, purchaseDate: reg.purchaseDate },
+        registrationId: reg.id,
+        channel: reg.channel,
+      },
+    });
+  }
   notify(
     state,
     recipientsFor(ctx, reg, { includeDealer: notifyDealer }),
