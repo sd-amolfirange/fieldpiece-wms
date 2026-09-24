@@ -1,6 +1,5 @@
 import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
-import { AdminTabs } from "@/features/admin/components/AdminTabs";
 import type { Role } from "@/types";
 import { AppLayout } from "./AppLayout";
 import { RequireRole } from "./RequireRole";
@@ -29,9 +28,9 @@ const NewComplaintPage = lazy(() => import("@/features/complaints/pages/NewCompl
 const ComplaintDetailPage = lazy(() => import("@/features/complaints/pages/ComplaintDetailPage"));
 const ClaimsListPage = lazy(() => import("@/features/claims/pages/ClaimsListPage"));
 const ClaimDetailPage = lazy(() => import("@/features/claims/pages/ClaimDetailPage"));
+const DealersUsersPage = lazy(() => import("@/features/admin/pages/DealersUsersPage"));
 const IntegrationLogPage = lazy(() => import("@/features/admin/pages/IntegrationLogPage"));
 const SimulatePage = lazy(() => import("@/features/admin/pages/SimulatePage"));
-const ScreenPlaceholderPage = lazy(() => import("./pages/ScreenPlaceholderPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 const guarded = (roles: readonly Role[] | undefined, children: RouteObject[]): RouteObject => ({
@@ -68,14 +67,7 @@ export const routes: RouteObject[] = [
                 { path: "models/:id", element: <ModelDetailPage /> }, // A06
                 { path: "claims", element: <ClaimsListPage /> }, // A09
                 { path: "claims/:id", element: <ClaimDetailPage /> }, // A10
-                {
-                  path: "admin/dealers",
-                  element: (
-                    <ScreenPlaceholderPage screens={{ admin: "A11" }}>
-                      <AdminTabs />
-                    </ScreenPlaceholderPage>
-                  ),
-                },
+                { path: "admin/dealers", element: <DealersUsersPage /> }, // A11
                 { path: "admin/integrations", element: <IntegrationLogPage /> }, // A12
                 { path: "admin/simulate", element: <SimulatePage /> }, // A13
               ],

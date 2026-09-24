@@ -11,6 +11,7 @@ export const adminKeys = {
   integrations: (filters: IntegrationFilters) => ["integrations", filters] as const,
   withService: ["complaints", "with-service"] as const,
   submittedClaims: ["claims", "submitted"] as const,
+  org: ["admin", "org"] as const,
 };
 
 // Legacy (out-of-scope screens).
@@ -20,6 +21,10 @@ export function useAdminUsers(params: PageParams) {
 
 export function useWarrantyPolicies() {
   return useQuery({ queryKey: adminKeys.policies, queryFn: adminApi.policies });
+}
+
+export function useOrgStructure() {
+  return useQuery({ queryKey: adminKeys.org, queryFn: adminApi.org });
 }
 
 export function useIntegrations(filters: IntegrationFilters) {
@@ -56,6 +61,8 @@ export function useSimulator() {
   const qc = useQueryClient();
   const onSuccess = () => refreshEverything(qc);
   return {
+    erpInvoice: useMutation({ mutationFn: adminApi.simulateErpInvoice, onSuccess }),
+    registrationEmail: useMutation({ mutationFn: adminApi.simulateRegistrationEmail, onSuccess }),
     jobResult: useMutation({ mutationFn: adminApi.simulateJobResult, onSuccess }),
     oemDecision: useMutation({ mutationFn: adminApi.simulateOemDecision, onSuccess }),
     reset: useMutation({ mutationFn: adminApi.resetDemo, onSuccess }),

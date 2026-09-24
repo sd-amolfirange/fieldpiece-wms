@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui";
@@ -61,12 +61,16 @@ describe("routing and role homes", () => {
     expect(await screen.findByText(/couldn't find that page/i)).toBeInTheDocument();
   });
 
-  it("shows the planned screen and its must-contain list for routes a later phase builds", async () => {
-    // A11 is the last placeholder until Phase 5 (DL07 was here until Phase 4 built it).
+  it("shows the admin the distributor -> dealer hierarchy and every login on A11", async () => {
+    // Replaces the placeholder-screen test: since Phase 5 every demo screen is built.
     await signInAs("admin@demo.wms");
     renderAt("/admin/dealers");
-    expect(await screen.findByRole("heading", { name: /A11 · Dealers & users/ })).toBeInTheDocument();
-    expect(screen.getByText("Dealer accounts and logins")).toBeInTheDocument();
+    const northStar = (await screen.findByRole("heading", { name: "NorthStar Distribution" })).closest(
+      "section",
+    )!;
+    expect(within(northStar).getByText("CoolAir Traders")).toBeInTheDocument();
+    expect(within(northStar).getByText("Breeze Point")).toBeInTheDocument();
+    expect(screen.getAllByText("dist.northstar@demo.wms").length).toBeGreaterThan(0);
   });
 
   it("sends signed-out visitors to the sign-in page with the demo accounts", async () => {

@@ -245,6 +245,17 @@
     "vsPrevious": "vs previous period",
     "viewData": "View data",
     "viewChart": "View chart",
+    "claimsByBrand": "Claims by brand",
+    "expiringSoonList": "Expiring soon",
+    "daysLeft_one": "{{count}} day left",
+    "daysLeft_other": "{{count}} days left",
+    "noneExpiring": "No warranties end in the next 30 days.",
+    "recentActivity": "Recent activity",
+    "dealerComparison": "Dealer comparison",
+    "dealer": "Dealer",
+    "showDealer": "Show",
+    "allDealers": "All my dealers",
+    "tileLink": "{{label}}: {{count}}. Open the list",
     "tiles": {
       "units": "Units",
       "active": "Active warranties",
@@ -394,6 +405,23 @@
     "integrations": "Integration log",
     "simulate": "Simulate"
   },
+  "org": {
+    "title": "Dealers & users",
+    "hierarchy": "Distributors and their dealers",
+    "distributorIn": "Distributor in {{city}}, {{count}} dealers. Its login sees all of them.",
+    "directDealers": "Dealers without a distributor",
+    "directHelp": "These dealers report to the brand directly.",
+    "users": "Accounts and logins",
+    "filterRole": "Role",
+    "allRoles": "All roles",
+    "noUsers": "No accounts for this role.",
+    "columns": {
+      "name": "Name",
+      "login": "Login",
+      "role": "Role",
+      "organisation": "Organisation"
+    }
+  },
   "complaints": {
     "title": "Complaints",
     "raise": "Raise complaint",
@@ -531,6 +559,14 @@
   "simulate": {
     "title": "Simulate",
     "intro": "Demo only. These buttons stand in for the systems around the warranty platform. In production the messages arrive on their own.",
+    "intake": {
+      "title": "Registrations from systems",
+      "help": "The ERP sends a sales invoice with 3 serials; a customer emails the registration mailbox with the invoice attached. Both land in the Registration inbox for the usual review.",
+      "erp": "ERP sales invoice (3 serials)",
+      "email": "Registration email with invoice",
+      "erpDone": "{{count}} registrations received from ERP",
+      "emailDone": "Registration email received"
+    },
     "jobResult": {
       "title": "Service system: job result",
       "help": "The technician finishes the visit and the service system returns the job result: parts replaced, serials, photos and sign-off.",
@@ -1028,6 +1064,8 @@
     "claim_draft_created": "Draft claim {{id}} created for {{serial}}",
     "claim_approved_by_oem": "The manufacturer approved claim {{id}}.",
     "claim_rejected_by_oem": "The manufacturer rejected claim {{id}}.",
-    "unit_voided": "The warranty on {{serial}} is void. Open the unit to see why."
+    "unit_voided": "The warranty on {{serial}} is void. Open the unit to see why.",
+    "erp_invoice_received": "ERP invoice {{invoice}}: {{count}} registrations to review",
+    "registration_email_received": "Registration email for {{serial}} to review"
   }
 }

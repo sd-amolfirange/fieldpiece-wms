@@ -1,5 +1,5 @@
 import type { PartType } from "@wms/domain";
-import { Ban, Check, RotateCcw, Wrench } from "lucide-react";
+import { Ban, Check, FileSpreadsheet, Mail, RotateCcw, Wrench } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@/components/feedback";
@@ -9,11 +9,53 @@ import { toApiError } from "@/lib/api-error";
 import { AdminTabs } from "../components/AdminTabs";
 import { useComplaintsWithService, useSimulator, useSubmittedClaims } from "../hooks";
 
-// A13 Simulate panel (demo only): stand-ins for the systems around the WMS. Phase 3 has the service system's
-// job result and the manufacturer's decision; the ERP invoice and the registration email come in Phase 5.
+// A13 Simulate panel (demo only): stand-ins for the systems around the WMS: the ERP sales feed and the
+// registration mailbox (W6), the service system's job result and the manufacturer's decision (W3).
 
 type ReplaceablePart = Exclude<PartType, "UNIT">;
 const PARTS: ReplaceablePart[] = ["COMPRESSOR", "PCB"];
+
+function IntakeCard() {
+  const { t } = useTranslation();
+  const { erpInvoice, registrationEmail } = useSimulator();
+  return (
+    <Card title={t("simulate.intake.title")}>
+      <div className="space-y-4">
+        <p className="text-sm text-text-muted">{t("simulate.intake.help")}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            icon={FileSpreadsheet}
+            loading={erpInvoice.isPending}
+            onClick={() =>
+              erpInvoice.mutate(undefined, {
+                onSuccess: (regs) =>
+                  toast.success(
+                    t("simulate.intake.erpDone", { count: regs.length }),
+                    regs.map((r) => r.serial).join(", "),
+                  ),
+                onError: (e) => toast.error(toApiError(e).message),
+              })
+            }
+          >
+            {t("simulate.intake.erp")}
+          </Button>
+          <Button
+            icon={Mail}
+            loading={registrationEmail.isPending}
+            onClick={() =>
+              registrationEmail.mutate(undefined, {
+                onSuccess: (reg) => toast.success(t("simulate.intake.emailDone"), reg.serial),
+                onError: (e) => toast.error(toApiError(e).message),
+              })
+            }
+          >
+            {t("simulate.intake.email")}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 function JobResultCard() {
   const { t } = useTranslation();
@@ -206,6 +248,7 @@ export default function SimulatePage() {
       <AdminTabs />
       <p className="mb-6 text-body text-text-muted">{t("simulate.intro")}</p>
       <div className="grid gap-6 lg:grid-cols-2">
+        <IntakeCard />
         <JobResultCard />
         <OemDecisionCard />
         <ResetCard />

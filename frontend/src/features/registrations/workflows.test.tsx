@@ -1,5 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { addDaysIso, todayIso } from "@wms/domain";
+import { adminApi } from "@/features/admin";
 import { useSession } from "@/lib/session";
 import { renderApp } from "@/test/render-app";
 import { signInAs } from "@/test/sign-in";
@@ -117,6 +118,64 @@ describe("W1: dealer bulk registration", () => {
       await signInAs("customer.rk@demo.wms");
       renderApp("/");
       expect(await screen.findByText("AER-SPL15-260991")).toBeInTheDocument();
+    },
+    WORKFLOW_TIMEOUT,
+  );
+});
+
+describe("W6: multi-channel intake and integrations", () => {
+  it(
+    "takes ERP and email registrations into the same inbox, logs the CRM update on approval, and counts the channel",
+    async () => {
+      await signInAs("admin@demo.wms");
+      const channelCount = async (label: string) => {
+        const a01 = renderApp("/");
+        const card = (await screen.findByRole("heading", { name: "Registrations by channel" })).closest(
+          "section",
+        )!;
+        await a01.user.click(within(card).getByRole("button", { name: "View data" }));
+        const row = within(card).getByText(label).closest("tr")!;
+        const value = Number(row.lastElementChild?.textContent);
+        a01.unmount();
+        return value;
+      };
+      const emailBefore = await channelCount("Email");
+
+      // A13: ERP sales invoice with 3 serials, and a registration email with the invoice attached.
+      const erp = await adminApi.simulateErpInvoice();
+      expect(erp.map((r) => r.channel)).toEqual(["ERP", "ERP", "ERP"]);
+      expect(new Set(erp.map((r) => r.serial)).size).toBe(3);
+      const email = await adminApi.simulateRegistrationEmail();
+      expect(email.channel).toBe("EMAIL");
+      expect(email.attachmentIds).toHaveLength(1);
+
+      // A02: new items with ERP and Email badges, same Pending status as every channel.
+      const a02 = renderApp("/registrations?status=PENDING");
+      const table = await screen.findByRole("table");
+      const emailRow = (await within(table).findByText(email.serial)).closest("tr")!;
+      expect(within(emailRow).getByText("Email")).toBeInTheDocument();
+      const erpRow = within(table).getByText(erp[0]!.serial).closest("tr")!;
+      expect(within(erpRow).getByText("ERP")).toBeInTheDocument();
+      a02.unmount();
+
+      // A03: approve the emailed registration.
+      const a03 = renderApp(`/registrations/${email.id}`);
+      await a03.user.click(await screen.findByRole("button", { name: "Approve" }));
+      expect(await screen.findByRole("link", { name: "Open unit" })).toBeInTheDocument();
+      a03.unmount();
+
+      // A12: inbound ERP and email, outbound CRM update for the approved email registration.
+      const log = (await adminApi.integrations({ pageSize: 100 })).items;
+      expect(log.some((m) => m.system === "ERP" && m.direction === "IN" && m.type === "erp_invoice")).toBe(
+        true,
+      );
+      expect(log.some((m) => m.system === "EMAIL" && m.direction === "IN" && m.refId === email.id)).toBe(
+        true,
+      );
+      expect(log.some((m) => m.system === "CRM" && m.direction === "OUT" && m.refId === email.id)).toBe(true);
+
+      // A01: the channel chart counts the approved email registration.
+      expect(await channelCount("Email")).toBe(emailBefore + 1);
     },
     WORKFLOW_TIMEOUT,
   );

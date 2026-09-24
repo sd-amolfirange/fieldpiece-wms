@@ -11,6 +11,7 @@ import {
   rowsFromMatrix,
   ServiceError,
   simulateJobResult,
+  simulateRegistrationEmail,
   userFromToken,
   type DemoResponse,
 } from "@demo-core";
@@ -164,6 +165,29 @@ export const handlers = [
         return attachment.id;
       });
       return HttpResponse.json(simulateJobResult(ctx, body, photos));
+    } catch (e) {
+      if (e instanceof ServiceError) return errorJson(e);
+      throw e;
+    }
+  }),
+
+  // Simulator: a registration email with the invoice attached (same as the Express route).
+  http.post(api("/simulate/registration-email"), ({ request }) => {
+    const user = userFromToken(mockDb, mockSessions, bearer(request));
+    if (!user)
+      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
+    try {
+      const ctx = contextFor(mockDb, user);
+      const registration = simulateRegistrationEmail(ctx, (file) => {
+        const attachment = addAttachment(
+          ctx,
+          { name: file.name, mime: file.mime, size: file.content.length },
+          (id) => `${basePath}/files/${id}`,
+        );
+        mockFiles.set(attachment.id, new Blob([file.content], { type: file.mime }));
+        return attachment.id;
+      });
+      return HttpResponse.json(registration);
     } catch (e) {
       if (e instanceof ServiceError) return errorJson(e);
       throw e;

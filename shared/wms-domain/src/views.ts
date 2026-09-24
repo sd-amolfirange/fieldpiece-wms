@@ -13,6 +13,7 @@ import type {
   ReplacedPart,
   Role,
   Unit,
+  UnitEvent,
   UnitPart,
   User,
   WarrantyStatus,
@@ -127,6 +128,21 @@ export interface BrandCount {
   count: number;
 }
 
+/** A01 expiring-soon list: units whose warranty ends within 30 days. */
+export interface ExpiringUnit {
+  serial: string;
+  modelName: string;
+  customerName?: string;
+  dealerName?: string;
+  warrantyEnd: IsoDate;
+  daysRemaining: number;
+}
+
+/** A01 recent activity: the latest unit events across the system. */
+export interface ActivityItem extends UnitEvent {
+  serial: string;
+}
+
 export interface DealerStats {
   dealerId: string;
   dealerName: string;
@@ -150,6 +166,8 @@ export type DashboardSummary =
       /** Approved registrations; bulk uploads count under Dealer. */
       registrationsByChannel: ChannelCount[];
       claimsByBrand: BrandCount[];
+      expiringSoon: ExpiringUnit[];
+      recentActivity: ActivityItem[];
     }
   | {
       role: "dealer" | "distributor";
