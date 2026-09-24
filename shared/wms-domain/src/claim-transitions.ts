@@ -30,7 +30,13 @@ export const CLAIM_TRANSITION_DEFS: readonly ClaimTransitionDef[] = [
     requires: ["amount"],
     tone: "primary",
   },
-  { action: "approve", from: "SUBMITTED", to: "APPROVED", actors: ["admin", "system"], tone: "primary" },
+  {
+    action: "approve",
+    from: "SUBMITTED",
+    to: "APPROVED",
+    actors: ["admin", "system"],
+    tone: "primary",
+  },
   {
     action: "reject",
     from: "SUBMITTED",
@@ -39,7 +45,13 @@ export const CLAIM_TRANSITION_DEFS: readonly ClaimTransitionDef[] = [
     requires: ["reason"],
     tone: "danger",
   },
-  { action: "mark_paid", from: "APPROVED", to: "PAID", actors: ["admin"], tone: "primary" },
+  {
+    action: "mark_paid",
+    from: "APPROVED",
+    to: "PAID",
+    actors: ["admin"],
+    tone: "primary",
+  },
 ];
 
 export function claimActionsFor(
@@ -47,7 +59,9 @@ export function claimActionsFor(
   actor: ClaimActor | undefined | null,
 ): ClaimTransitionDef[] {
   if (!actor) return [];
-  return CLAIM_TRANSITION_DEFS.filter((t) => t.from === status && t.actors.includes(actor));
+  return CLAIM_TRANSITION_DEFS.filter(
+    (t) => t.from === status && t.actors.includes(actor),
+  );
 }
 
 export function nextClaimStatus(
@@ -55,7 +69,9 @@ export function nextClaimStatus(
   action: ClaimActionName,
   actor: ClaimActor,
 ): ClaimStatus | null {
-  return claimActionsFor(status, actor).find((t) => t.action === action)?.to ?? null;
+  return (
+    claimActionsFor(status, actor).find((t) => t.action === action)?.to ?? null
+  );
 }
 
 /** Counted as "open" on dashboards: raised but not yet paid or rejected. */

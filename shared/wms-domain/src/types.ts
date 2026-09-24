@@ -1,5 +1,5 @@
 // Domain model for the HVAC warranty demo (docs/Demo workflows.md).
-// Shared by the UI, the MSW test handlers and the demo server, so this folder only uses relative imports.
+// Package @wms/domain: shared by frontend/ and backend/demo-server/. Pure data and rules only.
 
 /** ISO calendar date, yyyy-MM-dd. */
 export type IsoDate = string;
@@ -8,7 +8,13 @@ export type IsoDateTime = string;
 
 export type Role = "admin" | "dealer" | "distributor" | "customer";
 
-export const WARRANTY_STATUSES = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOID", "PENDING"] as const;
+export const WARRANTY_STATUSES = [
+  "ACTIVE",
+  "EXPIRING_SOON",
+  "EXPIRED",
+  "VOID",
+  "PENDING",
+] as const;
 export type WarrantyStatus = (typeof WARRANTY_STATUSES)[number];
 
 export const PART_TYPES = ["UNIT", "COMPRESSOR", "PCB"] as const;
@@ -94,11 +100,21 @@ export interface VoidRecord {
   at: IsoDateTime;
 }
 
-export const VOID_REASONS = ["UNAUTHORISED_REPAIR", "MISSED_SERVICING", "PHYSICAL_DAMAGE", "OTHER"] as const;
+export const VOID_REASONS = [
+  "UNAUTHORISED_REPAIR",
+  "MISSED_SERVICING",
+  "PHYSICAL_DAMAGE",
+  "OTHER",
+] as const;
 export type VoidReason = (typeof VOID_REASONS)[number];
 
 export type UnitEventType =
-  "registered" | "part_replaced" | "voided" | "complaint_raised" | "claim_created" | "note";
+  | "registered"
+  | "part_replaced"
+  | "voided"
+  | "complaint_raised"
+  | "claim_created"
+  | "note";
 
 export interface UnitEvent {
   at: IsoDateTime;
@@ -127,13 +143,27 @@ export interface Unit {
   history: UnitEvent[];
 }
 
-export const REGISTRATION_CHANNELS = ["DEALER", "PORTAL", "EMAIL", "ERP", "BULK"] as const;
+export const REGISTRATION_CHANNELS = [
+  "DEALER",
+  "PORTAL",
+  "EMAIL",
+  "ERP",
+  "BULK",
+] as const;
 export type RegistrationChannel = (typeof REGISTRATION_CHANNELS)[number];
 
-export const REGISTRATION_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
+export const REGISTRATION_STATUSES = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+] as const;
 export type RegistrationStatus = (typeof REGISTRATION_STATUSES)[number];
 
-export const REGISTRATION_FLAGS = ["EXCEPTION", "DUPLICATE", "MODEL_MISMATCH"] as const;
+export const REGISTRATION_FLAGS = [
+  "EXCEPTION",
+  "DUPLICATE",
+  "MODEL_MISMATCH",
+] as const;
 export type RegistrationFlag = (typeof REGISTRATION_FLAGS)[number];
 
 export interface RegistrationCustomer {
@@ -177,7 +207,8 @@ export type ComplaintStatus = (typeof COMPLAINT_STATUSES)[number];
 
 export type Coverage = "COVERED" | "CHARGEABLE";
 
-export type EntitlementReason = "VOID" | "NOT_REGISTERED" | "NOTHING_ACTIVE" | "PARTIAL" | "FULL";
+export type EntitlementReason =
+  "VOID" | "NOT_REGISTERED" | "NOTHING_ACTIVE" | "PARTIAL" | "FULL";
 
 export interface Entitlement {
   parts: Coverage;
@@ -232,10 +263,20 @@ export interface JobResult {
   notes?: string;
 }
 
-export const CLAIM_STATUSES = ["DRAFT", "SUBMITTED", "APPROVED", "PAID", "REJECTED"] as const;
+export const CLAIM_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "PAID",
+  "REJECTED",
+] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 
-export const FINANCE_POSTING_STATUSES = ["NOT_POSTED", "POSTED", "FAILED"] as const;
+export const FINANCE_POSTING_STATUSES = [
+  "NOT_POSTED",
+  "POSTED",
+  "FAILED",
+] as const;
 export type FinancePostingStatus = (typeof FINANCE_POSTING_STATUSES)[number];
 
 export interface ClaimEvent {
@@ -265,7 +306,14 @@ export interface Claim {
   history: ClaimEvent[];
 }
 
-export const INTEGRATION_SYSTEMS = ["CRM", "ERP", "FINANCE", "SERVICE", "OEM", "EMAIL"] as const;
+export const INTEGRATION_SYSTEMS = [
+  "CRM",
+  "ERP",
+  "FINANCE",
+  "SERVICE",
+  "OEM",
+  "EMAIL",
+] as const;
 export type IntegrationSystem = (typeof INTEGRATION_SYSTEMS)[number];
 
 export type IntegrationDirection = "IN" | "OUT";

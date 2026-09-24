@@ -1,5 +1,5 @@
 import type { UploadItem } from "@/components/ui";
-import type { Attachment } from "@/domain";
+import type { Attachment } from "@wms/domain";
 import { http } from "./http";
 
 // Real file uploads: each file goes to POST /uploads (multipart) and comes back as an Attachment whose

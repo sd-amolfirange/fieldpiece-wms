@@ -1,4 +1,10 @@
-import { addMonths, differenceInCalendarDays, format, isValid, parseISO } from "date-fns";
+import {
+  addMonths,
+  differenceInCalendarDays,
+  format,
+  isValid,
+  parseISO,
+} from "date-fns";
 import type { IsoDate } from "./types";
 
 // Calendar-date helpers. Warranty maths works on yyyy-MM-dd strings in local time, never on UTC timestamps,
@@ -9,7 +15,11 @@ export function todayIso(now: Date = new Date()): IsoDate {
 }
 
 export function isIsoDate(value: unknown): value is IsoDate {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isValid(parseISO(value));
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    isValid(parseISO(value))
+  );
 }
 
 /** Adds calendar months; month ends clamp (31 Jan + 1 month = 28/29 Feb). */

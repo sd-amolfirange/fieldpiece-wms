@@ -16,6 +16,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    // @wms/domain (shared/wms-domain) also depends on date-fns: bundle one copy.
+    dedupe: ["date-fns"],
   },
   server: {
     port: 5173,
@@ -42,12 +44,17 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Test-only: the MSW mocks run the backend demo core. Deliberately NOT in resolve.alias, so app code
+    // can't import it and no seed data or scoping logic ever reaches the production bundle.
+    alias: {
+      "@demo-core": fileURLToPath(new URL("../backend/demo-server/src/core/index.ts", import.meta.url)),
+    },
     include: ["src/**/*.test.{ts,tsx}"],
     css: false,
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["src/mocks/**", "src/test/**", "src/**/*.test.{ts,tsx}"],
+      exclude: ["src/test/**", "src/**/*.test.{ts,tsx}"],
       // Section 13: 90% on transitions, warranty maths and formatters.
       thresholds: {
         "src/features/claims/transitions.ts": { lines: 90, functions: 90, branches: 90 },

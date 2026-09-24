@@ -4,5 +4,4 @@ export * from "./warranty";
 export * from "./entitlement";
 export * from "./registration-rules";
 export * from "./claim-transitions";
-export * from "./scope";
 export * from "./views";

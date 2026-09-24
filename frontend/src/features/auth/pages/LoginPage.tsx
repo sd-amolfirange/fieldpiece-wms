@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { LogIn } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -9,11 +10,11 @@ import { Button, Card, FormField, Input, NativeSelect } from "@/components/ui";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { env } from "@/lib/env";
 import { useSession } from "@/lib/session";
+import { authApi } from "../api";
 import { useLogin } from "../hooks";
 import { loginSchema, type LoginForm } from "../schemas";
-import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "../types";
 
-const showDemoAccounts = env.enableMocks || env.demoMode;
+const showDemoAccounts = env.demoMode;
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -21,6 +22,13 @@ export default function LoginPage() {
   const location = useLocation();
   const status = useSession((s) => s.status);
   const login = useLogin();
+  const demoAccounts = useQuery({
+    queryKey: ["auth", "demo-accounts"],
+    queryFn: authApi.demoAccounts,
+    enabled: showDemoAccounts,
+    staleTime: Infinity,
+    retry: false,
+  });
   const from = (location.state as { from?: string } | null)?.from ?? "/";
 
   const {
@@ -35,8 +43,9 @@ export default function LoginPage() {
   });
 
   const pickAccount = (email: string) => {
-    setValue("email", email, { shouldValidate: !!email });
-    setValue("password", email ? DEMO_PASSWORD : "", { shouldValidate: !!email });
+    const account = demoAccounts.data?.find((a) => a.email === email);
+    setValue("email", account?.email ?? "", { shouldValidate: !!account });
+    setValue("password", account?.password ?? "", { shouldValidate: !!account });
   };
 
   if (status === "authenticated") return <Navigate to={from} replace />;
@@ -77,9 +86,9 @@ export default function LoginPage() {
             <FormField label={t("auth.mockRole")}>
               <NativeSelect defaultValue="" onChange={(e) => pickAccount(e.target.value)}>
                 <option value="">{t("auth.pickAccount")}</option>
-                {DEMO_ACCOUNTS.map((account) => (
+                {demoAccounts.data?.map((account) => (
                   <option key={account.email} value={account.email}>
-                    {t(account.labelKey)}
+                    {account.label}
                   </option>
                 ))}
               </NativeSelect>

@@ -69,12 +69,31 @@ export default tseslint.config(
     },
   },
   {
+    // Seed data, demo passwords and server scoping must never reach the app bundle.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/test/**", "src/**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [{ name: "@demo-core", message: "Backend demo code is for tests only (src/test/)." }],
+          patterns: [
+            {
+              group: ["**/backend/**"],
+              message: "The frontend talks to the backend over HTTP only.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/features/**/pages/**", "src/app/**", "src/test/**"],
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
     // Fixtures, the demo seed and tests index into arrays they just built; non-null assertions are fine here.
-    files: ["src/mocks/**", "src/demo-core/seed.ts", "src/**/*.test.{ts,tsx}"],
+    files: ["src/test/**", "src/**/*.test.{ts,tsx}"],
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },
   },
   {

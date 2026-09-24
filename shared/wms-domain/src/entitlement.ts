@@ -7,7 +7,10 @@ import { currentPart, currentParts, isCovered, partWarranty } from "./warranty";
 // - after that, a part is covered while its own warranty is active and it covers parts;
 // - labour follows the UNIT part only.
 
-export function entitlementFor(unit: Pick<Unit, "parts" | "void">, today: IsoDate): Entitlement {
+export function entitlementFor(
+  unit: Pick<Unit, "parts" | "void">,
+  today: IsoDate,
+): Entitlement {
   const chargeable = (reason: Entitlement["reason"]): Entitlement => ({
     parts: "CHARGEABLE",
     labour: "CHARGEABLE",
@@ -21,7 +24,8 @@ export function entitlementFor(unit: Pick<Unit, "parts" | "void">, today: IsoDat
   if (!fitted.length) return chargeable("NOT_REGISTERED");
 
   const unitPart = currentPart(unit, "UNIT");
-  const unitActive = !!unitPart && isCovered(partWarranty(unitPart, today).status);
+  const unitActive =
+    !!unitPart && isCovered(partWarranty(unitPart, today).status);
 
   const covered = new Set<PartType>();
   for (const part of fitted) {
@@ -31,14 +35,22 @@ export function entitlementFor(unit: Pick<Unit, "parts" | "void">, today: IsoDat
   }
 
   const parts = covered.size ? "COVERED" : "CHARGEABLE";
-  const labour = unitActive && unitPart?.coversLabour ? "COVERED" : "CHARGEABLE";
+  const labour =
+    unitActive && unitPart?.coversLabour ? "COVERED" : "CHARGEABLE";
   const coveredCount = [parts, labour].filter((c) => c === "COVERED").length;
 
   return {
     parts,
     labour,
-    coveredPartTypes: fitted.map((p) => p.partType).filter((t) => covered.has(t)),
+    coveredPartTypes: fitted
+      .map((p) => p.partType)
+      .filter((t) => covered.has(t)),
     claimable: coveredCount > 0,
-    reason: coveredCount === 2 ? "FULL" : coveredCount === 1 ? "PARTIAL" : "NOTHING_ACTIVE",
+    reason:
+      coveredCount === 2
+        ? "FULL"
+        : coveredCount === 1
+          ? "PARTIAL"
+          : "NOTHING_ACTIVE",
   };
 }

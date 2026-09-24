@@ -8,9 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:mock": "vite --mode mock",
     "build": "tsc -b && vite build",
-    "build:demo": "tsc -b && vite build --mode demo",
+    "build:showcase": "tsc -b && vite build --mode showcase",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint . --max-warnings 0",
@@ -35,6 +34,7 @@
     "@radix-ui/react-tooltip": "^1.1.4",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-table": "^8.20.5",
+    "@wms/domain": "file:../shared/wms-domain",
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -57,6 +57,7 @@
     "@eslint/js": "^9.16.0",
     "@playwright/test": "^1.49.0",
     "@tailwindcss/forms": "^0.5.9",
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
@@ -91,11 +92,6 @@
     ],
     "*.{css,json,md,html}": [
       "prettier --write"
-    ]
-  },
-  "msw": {
-    "workerDirectory": [
-      "public"
     ]
   }
 }

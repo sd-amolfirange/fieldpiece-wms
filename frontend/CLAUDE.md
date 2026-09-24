@@ -9,6 +9,15 @@
 - Ignore `FIELDPIECE_WARRANTY_FRONTEND_INSTRUCTIONS.md`. Code comments that say "Section x.y" refer to that old brief.
 - Out of scope, don't build: technician app, inventory, budget, AMC, compliance, offline mode.
 
+## Repository layout
+
+- `frontend/`: UI only. Talks to the backend over HTTP. May keep UI-only permission checks (hiding menus/buttons).
+- `backend/demo-server/`: the demo API. Scoping, permissions, services, seed data and demo accounts live here only.
+- `shared/wms-domain/` (`@wms/domain`): pure rules and API types both sides need. No scoping, seed data or I/O.
+- The server never imports from `frontend/`. App code never imports backend code; only `src/test/` may use the
+  Vitest-only `@demo-core` alias. The production bundle must contain no seed data, demo emails or passwords
+  (check `dist/` after `npm run build`).
+
 ## Visual design is frozen
 
 The existing look must stay exactly as it is. Only features and behaviour change.
@@ -41,10 +50,12 @@ The existing look must stay exactly as it is. Only features and behaviour change
 ## Process
 
 - Work on branch `demo-workflows`.
-- After each phase: run `npm run typecheck`, `npm run lint` and `npm test` (all must pass), then stop with a short
+- After each phase: run `typecheck`, `lint`, `test` and `build` in `frontend/`, `shared/wms-domain/` and
+  `backend/demo-server/` (all must pass), then stop with a short
   summary (what changed, what to click to check it) and wait for approval before the next phase.
 - Before each commit, check the diff. If any file in the "visual design is frozen" list changed, undo it.
-  `git diff --quiet e51b09e -- src/styles tailwind.config.ts src/components/layout src/assets public/favicon.svg`
-  must succeed (`nav-items.ts` is the one allowed exception in `src/components/layout`).
+  `git diff --name-only e51b09e -- src/styles tailwind.config.ts src/components/layout src/assets public/favicon.svg`
+  may only list the approved exceptions: `nav-items.ts` (menu data), `Logo.tsx` (390px header fit),
+  `TopBar.tsx` (environment tag via `VITE_SHOW_ENV_TAG`) and `ScaffoldPage.tsx` (placeholder text).
 - Commit messages must pass `.husky/commit-msg`: use `WMS-<n>: <summary>`, for example
   `WMS-004: Phase 1: demo server and seed data`.

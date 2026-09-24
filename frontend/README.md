@@ -9,21 +9,21 @@ Zustand, react-hook-form + zod, Recharts, i18next, MSW, Vitest, Playwright.
 
 ## Getting started
 
+See [docs/demo-setup.md](docs/demo-setup.md). In short, with `shared/wms-domain` and `backend/demo-server`
+installed:
+
 ```bash
-cd frontend
-npm install
-npm run dev:mock     # runs against MSW mocks, no backend needed -> http://localhost:5173
+cd backend/demo-server && npm run dev   # demo API on http://localhost:4000/api
+cd frontend && npm run dev              # app on http://localhost:5173 (forwards /api)
 ```
 
-In mock mode the sign-in screen has a **Sign in as** picker, so you can try every role. Any email and password work.
-
-To run against a real API, copy `.env.example` to `.env.local`, set `VITE_API_BASE_URL`, and run `npm run dev`.
+In development the sign-in page offers the demo accounts (**Sign in as**), loaded from the demo server.
 
 ## Scripts
 
 | Script                       | What it does                                                                                   |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| `npm run dev` / `dev:mock`   | Dev server (real API / MSW mocks)                                                              |
+| `npm run dev`                | Dev server; `/api` goes to the demo server on port 4000                                        |
 | `npm run build`              | Type-check and production build                                                                |
 | `npm run typecheck`          | `tsc -b` only                                                                                  |
 | `npm run lint`               | ESLint, zero warnings allowed                                                                  |
@@ -45,8 +45,8 @@ src/
 │   └── feedback/   EmptyState, ErrorState, Skeleton, Toast
 ├── features/<name>/ api.ts · hooks.ts · schemas.ts · types.ts · components/ · pages/
 ├── lib/            http (axios), query client, session, permissions, warranty maths, formatters, i18n
-├── mocks/          MSW handlers + fixtures for every endpoint
 ├── locales/        en / es / fr strings
+├── test/           test setup; mocks/ = test-only MSW adapter over the backend demo core
 ├── styles/         tokens.css (the ONLY place hex values live), globals.css
 └── types/          shared domain + API types
 ```

@@ -144,15 +144,8 @@
     "backToSignIn": "Back to sign in",
     "mockRole": "Sign in as",
     "mockNotice": "Mock sign-in. The real identity provider (OIDC with PKCE) is still to be confirmed.",
-    "demoNotice": "Demo sign-in: pick a demo account below, or type its email. The password is demo.",
+    "demoNotice": "Demo sign-in: pick a demo account below to fill in its email and password.",
     "pickAccount": "Choose a demo account",
-    "demoAccounts": {
-      "admin": "Admin: WMS office admin",
-      "dealer": "Dealer: CoolAir Traders, Pune",
-      "distributor": "Distributor: NorthStar Distribution",
-      "customer": "Customer: R. Kulkarni",
-      "breeze": "Dealer: Breeze Point, Nashik"
-    },
     "invalidCredentials": "Email or password is wrong. Check them and try again.",
     "checkWarrantyLink": "Just want to check a warranty?"
   },
@@ -202,7 +195,9 @@
       "registrationsThisMonth": "Registrations this month",
       "pending": "Pending",
       "rejected": "Rejected",
-      "claimsInProgress": "Claims in progress"
+      "claimsInProgress": "Claims in progress",
+      "awaitingRegistration": "Awaiting registration",
+      "voided": "Void"
     }
   },
   "registrations": {
@@ -287,6 +282,7 @@
   "admin": { "users": "Users", "policies": "Warranty policies", "settings": "Settings" },
   "screens": {
     "phase": "{{code}} (Phase {{phase}})",
+    "comingLater": "Coming in a later phase: {{section}}",
     "A02": {
       "title": "Registration inbox",
       "mustContain": [

@@ -11,9 +11,13 @@ export function TopBar() {
 
   return (
     <div className="no-print flex h-topbar items-center justify-between bg-topbar px-4 text-xs text-ink-300 md:px-6">
-      <span className="text-overline rounded-sm bg-ink-700 px-2 py-0.5 text-brand-500">
-        {t(`app.environment.${envKey}`)}
-      </span>
+      {env.showEnvironmentTag ? (
+        <span className="text-overline rounded-sm bg-ink-700 px-2 py-0.5 text-brand-500">
+          {t(`app.environment.${envKey}`)}
+        </span>
+      ) : (
+        <span />
+      )}
       <div className="flex items-center gap-4">
         <a
           href="https://www.fieldpiece.com/support/"

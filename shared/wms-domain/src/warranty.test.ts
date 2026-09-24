@@ -1,12 +1,36 @@
 import { addMonthsIso, daysBetween } from "./dates";
 import { entitlementFor } from "./entitlement";
 import type { Model, Unit } from "./types";
-import { buildUnitParts, currentPart, partWarranty, replacePart, unitWarranty } from "./warranty";
+import {
+  buildUnitParts,
+  currentPart,
+  partWarranty,
+  replacePart,
+  unitWarranty,
+} from "./warranty";
 
 const template: Model["parts"] = [
-  { partType: "UNIT", warrantyMonths: 12, coversParts: true, coversLabour: true, serialised: false },
-  { partType: "COMPRESSOR", warrantyMonths: 120, coversParts: true, coversLabour: false, serialised: true },
-  { partType: "PCB", warrantyMonths: 60, coversParts: true, coversLabour: false, serialised: true },
+  {
+    partType: "UNIT",
+    warrantyMonths: 12,
+    coversParts: true,
+    coversLabour: true,
+    serialised: false,
+  },
+  {
+    partType: "COMPRESSOR",
+    warrantyMonths: 120,
+    coversParts: true,
+    coversLabour: false,
+    serialised: true,
+  },
+  {
+    partType: "PCB",
+    warrantyMonths: 60,
+    coversParts: true,
+    coversLabour: false,
+    serialised: true,
+  },
 ];
 
 const unitInstalled = (date: string, extra: Partial<Unit> = {}): Unit => ({
@@ -55,24 +79,40 @@ describe("partWarranty", () => {
   const part = { warrantyEnd: "2026-10-24" };
 
   it("is Active with days remaining", () => {
-    expect(partWarranty(part, "2026-09-23")).toEqual({ status: "ACTIVE", daysRemaining: 31 });
+    expect(partWarranty(part, "2026-09-23")).toEqual({
+      status: "ACTIVE",
+      daysRemaining: 31,
+    });
   });
 
   it("is Expiring soon at 30 days or fewer", () => {
-    expect(partWarranty(part, "2026-09-24")).toEqual({ status: "EXPIRING_SOON", daysRemaining: 30 });
+    expect(partWarranty(part, "2026-09-24")).toEqual({
+      status: "EXPIRING_SOON",
+      daysRemaining: 30,
+    });
   });
 
   it("still covers the end day itself", () => {
-    expect(partWarranty(part, "2026-10-24")).toEqual({ status: "EXPIRING_SOON", daysRemaining: 0 });
-    expect(partWarranty(part, "2026-10-25")).toEqual({ status: "EXPIRED", daysRemaining: 0 });
+    expect(partWarranty(part, "2026-10-24")).toEqual({
+      status: "EXPIRING_SOON",
+      daysRemaining: 0,
+    });
+    expect(partWarranty(part, "2026-10-25")).toEqual({
+      status: "EXPIRED",
+      daysRemaining: 0,
+    });
   });
 
   it("is Void whatever the dates", () => {
-    expect(partWarranty(part, "2026-09-01", { voided: true }).status).toBe("VOID");
+    expect(partWarranty(part, "2026-09-01", { voided: true }).status).toBe(
+      "VOID",
+    );
   });
 
   it("treats a replaced part as no longer covered", () => {
-    expect(partWarranty({ ...part, replacedAt: "2026-09-01" }, "2026-09-02").status).toBe("EXPIRED");
+    expect(
+      partWarranty({ ...part, replacedAt: "2026-09-01" }, "2026-09-02").status,
+    ).toBe("EXPIRED");
   });
 });
 
@@ -84,12 +124,19 @@ describe("unitWarranty", () => {
   it("follows the UNIT part even when the compressor is still covered", () => {
     const unit = unitInstalled("2021-03-11");
     expect(unitWarranty(unit, "2026-09-24").status).toBe("EXPIRED");
-    expect(partWarranty(currentPart(unit, "COMPRESSOR")!, "2026-09-24").status).toBe("ACTIVE");
+    expect(
+      partWarranty(currentPart(unit, "COMPRESSOR")!, "2026-09-24").status,
+    ).toBe("ACTIVE");
   });
 
   it("is Void once voided", () => {
     const unit = unitInstalled("2026-01-01", {
-      void: { reason: "UNAUTHORISED_REPAIR", by: "u", byName: "Admin", at: "2026-09-24T10:00:00Z" },
+      void: {
+        reason: "UNAUTHORISED_REPAIR",
+        by: "u",
+        byName: "Admin",
+        at: "2026-09-24T10:00:00Z",
+      },
     });
     expect(unitWarranty(unit, "2026-09-24").status).toBe("VOID");
   });
@@ -105,7 +152,10 @@ describe("replacePart", () => {
     });
     const old = parts.find((p) => p.serial === "CP-1");
     const replacement = currentPart({ parts }, "COMPRESSOR");
-    expect(old).toMatchObject({ replacedAt: "2026-09-24", replacedBySerial: "CP-NEW" });
+    expect(old).toMatchObject({
+      replacedAt: "2026-09-24",
+      replacedBySerial: "CP-NEW",
+    });
     expect(replacement).toMatchObject({
       serial: "CP-NEW",
       replacesSerial: "CP-1",
@@ -129,13 +179,23 @@ describe("entitlementFor", () => {
 
   it("unit warranty active: every part and labour covered", () => {
     const e = entitlementFor(unitInstalled("2026-03-01"), "2026-09-24");
-    expect(e).toMatchObject({ parts: "COVERED", labour: "COVERED", claimable: true, reason: "FULL" });
+    expect(e).toMatchObject({
+      parts: "COVERED",
+      labour: "COVERED",
+      claimable: true,
+      reason: "FULL",
+    });
     expect(e.coveredPartTypes).toEqual(["UNIT", "COMPRESSOR", "PCB"]);
   });
 
   it("void unit: chargeable and never claimable (W5)", () => {
     const unit = unitInstalled("2026-03-01", {
-      void: { reason: "UNAUTHORISED_REPAIR", by: "u", byName: "Admin", at: "2026-09-24T10:00:00Z" },
+      void: {
+        reason: "UNAUTHORISED_REPAIR",
+        by: "u",
+        byName: "Admin",
+        at: "2026-09-24T10:00:00Z",
+      },
     });
     expect(entitlementFor(unit, "2026-09-24")).toMatchObject({
       parts: "CHARGEABLE",
@@ -146,7 +206,9 @@ describe("entitlementFor", () => {
   });
 
   it("nothing active: chargeable", () => {
-    expect(entitlementFor(unitInstalled("2010-01-01"), "2026-09-24")).toMatchObject({
+    expect(
+      entitlementFor(unitInstalled("2010-01-01"), "2026-09-24"),
+    ).toMatchObject({
       parts: "CHARGEABLE",
       claimable: false,
       reason: "NOTHING_ACTIVE",
@@ -154,6 +216,8 @@ describe("entitlementFor", () => {
   });
 
   it("unregistered unit: chargeable", () => {
-    expect(entitlementFor({ parts: [] }, "2026-09-24").reason).toBe("NOT_REGISTERED");
+    expect(entitlementFor({ parts: [] }, "2026-09-24").reason).toBe(
+      "NOT_REGISTERED",
+    );
   });
 });

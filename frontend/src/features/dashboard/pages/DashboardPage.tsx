@@ -15,11 +15,15 @@ import { useDashboardSummary } from "../hooks";
 function tiles(summary: DashboardSummary): { key: string; value: number }[] {
   switch (summary.role) {
     case "admin":
+      // Units counts every unit in the Units list, so the status cards always add up to it:
+      // active + expiring + expired + awaiting registration + void.
       return [
         { key: "units", value: summary.units },
         { key: "active", value: summary.active },
         { key: "expiring30", value: summary.expiring30 },
         { key: "expired", value: summary.expired },
+        ...(summary.pending ? [{ key: "awaitingRegistration", value: summary.pending }] : []),
+        ...(summary.voided ? [{ key: "voided", value: summary.voided }] : []),
         { key: "openClaims", value: summary.openClaims },
       ];
     case "customer":

@@ -3,8 +3,8 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import "@/lib/i18n";
 import { i18n } from "@/lib/i18n";
-import { resetMockDb } from "@/mocks/db";
-import { server } from "@/mocks/server";
+import { resetMockDb } from "./mocks/db";
+import { server } from "./mocks/server";
 
 beforeAll(async () => {
   await i18n.changeLanguage("en");

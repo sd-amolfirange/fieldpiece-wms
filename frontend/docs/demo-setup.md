@@ -1,22 +1,26 @@
 # Running the HVAC Warranty demo
 
-The demo has two parts:
+The repository has three parts:
 
-- **`demo-server/`**: a small Node + Express API that holds all demo data (units, registrations, complaints,
-  claims, uploaded files). Every window and the phone talk to this one server, so they all see the same state.
-- **`frontend/`**: the React web app.
+| Folder                 | What it is                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `backend/demo-server/` | Node + Express demo API. It holds all demo data (units, registrations, complaints, claims, uploaded files), applies every scoping and permission rule, and owns the seed data and demo accounts. Every window and the phone talk to this one server, so they all see the same state. |
+| `frontend/`            | The React web app. It talks to the demo server over HTTP only.                                                                                                                                                                                                                       |
+| `shared/wms-domain/`   | Package `@wms/domain`: pure rules both sides need (types, part-wise warranty status and days remaining, entitlement, registration row checks, claim status steps). No scoping, seed data or I/O.                                                                                     |
 
-Demo data is saved in `demo-server/data/` and survives a restart. The sample bulk file is
+Demo data is saved in `backend/demo-server/data/` and survives a restart. The sample bulk file is
 `demo-assets/coolair_sales_week38.xlsx`.
 
 ## 1. First-time setup
 
-You need Node.js 20 or later.
+You need Node.js 20 or later. Install the shared package first, because the other two link to it.
 
 ```bash
-cd frontend
+cd shared/wms-domain
 npm install
-cd ../demo-server
+cd ../../backend/demo-server
+npm install
+cd ../../frontend
 npm install
 ```
 
@@ -29,18 +33,19 @@ npm install
 ### Option A: one URL (use this for the actual demo)
 
 ```bash
-cd demo-server
+cd backend/demo-server
 npm run demo
 ```
 
-This builds the frontend and serves the app and the API together on **http://localhost:4000**. Use this for
-the phone (section 4), because a tunnel then needs only one port.
+This builds the frontend (`npm run build:showcase`: demo accounts on the sign-in page, no environment tag) and
+serves the app and the API together on **http://localhost:4000**. Use this for the phone (section 4), because a
+tunnel then needs only one port.
 
 ### Option B: development (two terminals, live reload)
 
 ```bash
 # terminal 1
-cd demo-server
+cd backend/demo-server
 npm run dev          # API on http://localhost:4000/api
 
 # terminal 2
@@ -53,7 +58,9 @@ Set `PORT` to run the server on another port. The frontend dev server then needs
 
 ## 3. Sign in
 
-The sign-in page lists the demo accounts under **Sign in as**. The password for every account is **`demo`**.
+The sign-in page lists the demo accounts under **Sign in as**. Picking one fills in its email and password. The
+list and the password come from the demo server (`GET /api/auth/demo-accounts`); nothing about the accounts is
+compiled into the app. The shared password is **`Demo#2026`** if you type it by hand.
 
 | Role         | Login                     | Sees                                                              |
 | ------------ | ------------------------- | ----------------------------------------------------------------- |
@@ -100,7 +107,7 @@ accepts `*.trycloudflare.com` and `*.ngrok-free.app` hosts. Option A is faster o
 
 ### Before you expose the laptop
 
-- A tunnel URL is public while it runs, and the demo passwords are public. Stop the tunnel (Ctrl+C) after the
+- A tunnel URL is public while it runs, and the sign-in page offers the demo accounts to anyone who opens it. Stop the tunnel (Ctrl+C) after the
   demo.
 - Check your company's policy on tunnels before using one on a work network or laptop.
 
@@ -111,30 +118,34 @@ accepts `*.trycloudflare.com` and `*.ngrok-free.app` hosts. Option A is faster o
 - **From the command line**, with the server stopped:
 
   ```bash
-  cd demo-server
+  cd backend/demo-server
   npm run reset
   ```
 
-  This deletes `demo-server/data/` (state, sessions and uploaded files). The next start loads the seed again.
+  This deletes `backend/demo-server/data/` (state, sessions and uploaded files). The next start loads the seed again.
 
 The seed places "expiring soon" and "active" units relative to the day you reset, so reset on the morning of the
 demo.
 
 ## 6. Other commands
 
-| Where          | Command               | What it does                                                                                                   |
-| -------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `demo-server/` | `npm run sample-xlsx` | Recreates `demo-assets/coolair_sales_week38.xlsx` (25 rows; rows 7, 15 and 22 contain the 3 deliberate errors) |
-| `demo-server/` | `npm run typecheck`   | Type-checks the server and the shared demo code                                                                |
-| `frontend/`    | `npm run dev:mock`    | Runs the app alone against in-browser mocks (single window only, no shared state)                              |
-| `frontend/`    | `npm test`            | Unit tests, including the shared demo logic                                                                    |
+Each of the three folders has `typecheck`, `lint`, `test` and `build` scripts.
+
+| Where                  | Command                       | What it does                                                                                                   |
+| ---------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `backend/demo-server/` | `npm run sample-xlsx`         | Recreates `demo-assets/coolair_sales_week38.xlsx` (25 rows; rows 7, 15 and 22 contain the 3 deliberate errors) |
+| `backend/demo-server/` | `npm run build` / `npm start` | Bundles the server into `dist/index.js` and runs it with plain Node (API only)                                 |
+| `backend/demo-server/` | `npm test`                    | Seed, scoping, permissions and endpoint tests                                                                  |
+| `shared/wms-domain/`   | `npm test`                    | Warranty, entitlement, row-check and claim-step tests                                                          |
+| `frontend/`            | `npm test`                    | UI and integration tests. Their MSW mocks run the backend demo core, test-only.                                |
+| `frontend/`            | `npm run build:showcase`      | The demo build used by `npm run demo`                                                                          |
 
 ## 7. Troubleshooting
 
-| Problem                                    | Fix                                                          |
-| ------------------------------------------ | ------------------------------------------------------------ |
-| `EADDRINUSE` on start                      | Another process uses port 4000: stop it, or set `PORT`.      |
-| "No frontend build found"                  | Start with `npm run demo`, not `npm start --serve-frontend`. |
-| Signed in as the wrong user after a reload | Two roles share a browser profile; see section 3.            |
-| Phone camera doesn't open                  | The page isn't HTTPS: use the tunnel URL (section 4).        |
-| Data looks wrong                           | Reset demo data (section 5).                                 |
+| Problem                                    | Fix                                                     |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `EADDRINUSE` on start                      | Another process uses port 4000: stop it, or set `PORT`. |
+| "No frontend build found"                  | Start with `npm run demo` in `backend/demo-server/`.    |
+| Signed in as the wrong user after a reload | Two roles share a browser profile; see section 3.       |
+| Phone camera doesn't open                  | The page isn't HTTPS: use the tunnel URL (section 4).   |
+| Data looks wrong                           | Reset demo data (section 5).                            |

@@ -70,6 +70,7 @@ describe("routing and role homes", () => {
   it("sends signed-out visitors to the sign-in page with the demo accounts", async () => {
     renderAt("/units");
     expect(await screen.findByRole("heading", { name: "Sign in to HVAC Warranty" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Customer: R. Kulkarni" })).toBeInTheDocument();
+    // Loaded from the demo server, not compiled into the app.
+    expect(await screen.findByRole("option", { name: "Customer: R. Kulkarni" })).toBeInTheDocument();
   });
 });

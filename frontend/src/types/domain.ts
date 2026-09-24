@@ -1,8 +1,8 @@
 // LEGACY types from the original scaffold. Only the screens that are now unreachable (RMA, customers,
 // reports, policies, settings, public check) and pages awaiting their rebuild still use them.
-// New code imports the HVAC demo model from "@/domain".
+// New code imports the HVAC demo model from "@wms/domain" (shared/wms-domain).
 
-import type { Role, SessionUser } from "@/domain";
+import type { Role, SessionUser } from "@wms/domain";
 
 export type { Role, SessionUser };
 

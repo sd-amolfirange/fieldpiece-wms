@@ -25,8 +25,8 @@ export function Logo({ className, compact }: LogoProps) {
       />
       {compact ? null : (
         <>
-          <span className="h-6 w-px bg-current opacity-60" aria-hidden />
-          <span className="text-h3 font-normal">{t("app.name")}</span>
+          <span className="hidden h-6 w-px bg-current opacity-60 md:block" aria-hidden />
+          <span className="hidden text-h3 font-normal md:block">{t("app.name")}</span>
         </>
       )}
     </Link>

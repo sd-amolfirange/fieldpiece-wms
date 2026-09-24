@@ -1,5 +1,13 @@
 import { addMonthsIso, daysBetween } from "./dates";
-import type { IsoDate, Model, ModelPart, PartType, Unit, UnitPart, WarrantyStatus } from "./types";
+import type {
+  IsoDate,
+  Model,
+  ModelPart,
+  PartType,
+  Unit,
+  UnitPart,
+  WarrantyStatus,
+} from "./types";
 
 // Warranty rules (docs/Demo workflows.md):
 // - every part has its own warranty: end = start + the model template's months, compared with today;
@@ -24,19 +32,27 @@ export function partWarranty(
   if (part.replacedAt) return { status: "EXPIRED", daysRemaining: 0 };
   const days = daysBetween(today, part.warrantyEnd);
   if (days < 0) return { status: "EXPIRED", daysRemaining: 0 };
-  return { status: days <= EXPIRING_SOON_DAYS ? "EXPIRING_SOON" : "ACTIVE", daysRemaining: days };
+  return {
+    status: days <= EXPIRING_SOON_DAYS ? "EXPIRING_SOON" : "ACTIVE",
+    daysRemaining: days,
+  };
 }
 
 /** Parts currently fitted (replaced parts stay on the unit as history). */
-export const currentParts = (unit: Pick<Unit, "parts">) => unit.parts.filter((p) => !p.replacedAt);
+export const currentParts = (unit: Pick<Unit, "parts">) =>
+  unit.parts.filter((p) => !p.replacedAt);
 
 export const currentPart = (unit: Pick<Unit, "parts">, partType: PartType) =>
   currentParts(unit).find((p) => p.partType === partType);
 
-export const isCovered = (status: WarrantyStatus) => status === "ACTIVE" || status === "EXPIRING_SOON";
+export const isCovered = (status: WarrantyStatus) =>
+  status === "ACTIVE" || status === "EXPIRING_SOON";
 
 /** Overall unit status: the UNIT part's warranty, Void, or Pending when the unit isn't registered yet. */
-export function unitWarranty(unit: Pick<Unit, "parts" | "void">, today: IsoDate): PartWarranty {
+export function unitWarranty(
+  unit: Pick<Unit, "parts" | "void">,
+  today: IsoDate,
+): PartWarranty {
   if (unit.void) return { status: "VOID", daysRemaining: 0 };
   const unitPart = currentPart(unit, "UNIT");
   if (!unitPart) return { status: "PENDING", daysRemaining: 0 };
@@ -44,10 +60,16 @@ export function unitWarranty(unit: Pick<Unit, "parts" | "void">, today: IsoDate)
 }
 
 /** Warranty starts at installation when known, otherwise at purchase (docs: "usually from the installation date"). */
-export const warrantyStartDate = (unit: Pick<Unit, "installDate" | "purchaseDate">) =>
-  unit.installDate ?? unit.purchaseDate;
+export const warrantyStartDate = (
+  unit: Pick<Unit, "installDate" | "purchaseDate">,
+) => unit.installDate ?? unit.purchaseDate;
 
-function partFromTemplate(line: ModelPart, id: string, start: IsoDate, serial?: string): UnitPart {
+function partFromTemplate(
+  line: ModelPart,
+  id: string,
+  start: IsoDate,
+  serial?: string,
+): UnitPart {
   return {
     id,
     partType: line.partType,
@@ -63,10 +85,18 @@ function partFromTemplate(line: ModelPart, id: string, start: IsoDate, serial?: 
 export function buildUnitParts(
   model: Pick<Model, "parts">,
   start: IsoDate,
-  { serials = {}, idPrefix }: { serials?: Partial<Record<PartType, string>>; idPrefix: string },
+  {
+    serials = {},
+    idPrefix,
+  }: { serials?: Partial<Record<PartType, string>>; idPrefix: string },
 ): UnitPart[] {
   return model.parts.map((line) =>
-    partFromTemplate(line, `${idPrefix}-${line.partType.toLowerCase()}`, start, serials[line.partType]),
+    partFromTemplate(
+      line,
+      `${idPrefix}-${line.partType.toLowerCase()}`,
+      start,
+      serials[line.partType],
+    ),
   );
 }
 
@@ -74,7 +104,11 @@ export function buildUnitParts(
 export function replacePart(
   parts: UnitPart[],
   line: ModelPart,
-  { newSerial, date, newId }: { newSerial: string; date: IsoDate; newId: string },
+  {
+    newSerial,
+    date,
+    newId,
+  }: { newSerial: string; date: IsoDate; newId: string },
 ): UnitPart[] {
   const old = parts.find((p) => p.partType === line.partType && !p.replacedAt);
   const replacement: UnitPart = {
@@ -82,7 +116,9 @@ export function replacePart(
     replacesSerial: old?.serial,
   };
   return [
-    ...parts.map((p) => (p === old ? { ...p, replacedAt: date, replacedBySerial: newSerial } : p)),
+    ...parts.map((p) =>
+      p === old ? { ...p, replacedAt: date, replacedBySerial: newSerial } : p,
+    ),
     replacement,
   ];
 }

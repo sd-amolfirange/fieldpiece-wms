@@ -117,10 +117,14 @@ export interface DealerStats {
 export type DashboardSummary =
   | {
       role: "admin";
+      /** Every unit in the Units list; equals active + expiring30 + expired + pending + voided. */
       units: number;
       active: number;
       expiring30: number;
       expired: number;
+      /** Known to the system (e.g. sold, QR label printed) but not registered yet. */
+      pending: number;
+      voided: number;
       openClaims: number;
       /** Approved registrations; bulk uploads count under Dealer. */
       registrationsByChannel: ChannelCount[];

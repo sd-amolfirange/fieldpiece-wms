@@ -7,18 +7,18 @@ import {
   ServiceError,
   userFromToken,
   type DemoResponse,
-} from "@/demo-core";
+} from "@demo-core";
 import { env } from "@/lib/env";
 import { mockDb, mockFiles, mockSessions } from "./db";
 import { legacyHandlers } from "./legacy-handlers";
 
-// MSW adapter over the shared demo API (src/demo-core), so tests and `npm run dev:mock` behave exactly like
-// demo-server/. Only transport details live here.
+// TEST-ONLY MSW adapter over the backend's demo API (backend/demo-server/src/core via `@demo-core`), so unit
+// tests hit the same endpoints, scoping and errors as the real demo server. Only transport details live here.
 
 const basePath = new URL(env.apiBaseUrl, "http://localhost").pathname.replace(/\/$/, "");
 const api = (path: string) => `*${basePath}${path}`;
 
-// Stands in for the httpOnly refresh cookie across page reloads in mock mode. Mock-only.
+// Stands in for the httpOnly refresh cookie.
 const SESSION_KEY = "wms-mock-session";
 const readSession = () => {
   try {

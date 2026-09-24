@@ -22,7 +22,10 @@
     "noUncheckedIndexedAccess": true,
 
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] },
+    "paths": {
+      "@/*": ["src/*"],
+      "@demo-core": ["../backend/demo-server/src/core/index.ts"]
+    },
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src"]

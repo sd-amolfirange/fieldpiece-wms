@@ -1,1 +1,1 @@
-export type { DashboardSummary } from "@/domain";
+export type { DashboardSummary } from "@wms/domain";

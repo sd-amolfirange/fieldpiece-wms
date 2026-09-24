@@ -27,7 +27,7 @@ export function ScaffoldPage({ title, breadcrumbs, actions, section, todo, child
       <Card>
         <EmptyState icon={Construction} message={t("common.comingSoon")} className="py-6" />
         <div className="mx-auto max-w-xl">
-          <p className="text-overline mb-2 text-text-muted">Build guide, Section {section}</p>
+          <p className="text-overline mb-2 text-text-muted">{t("screens.comingLater", { section })}</p>
           <ul className="list-disc space-y-1 ps-5 text-body">
             {todo.map((item) => (
               <li key={item}>{item}</li>

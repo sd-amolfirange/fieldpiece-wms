@@ -1,6 +1,7 @@
-import { createSeed, createSessionStore, type DemoDb } from "@/demo-core";
+import { createSeed, createSessionStore, type DemoDb } from "@demo-core";
 
-// In-memory demo database for MSW (unit tests and `npm run dev:mock`). The real demo runs on demo-server/.
+// TEST-ONLY in-memory demo database for MSW. It runs the backend's demo core (backend/demo-server/src/core)
+// through the `@demo-core` alias, which only Vitest resolves, so none of it can reach the app bundle.
 
 export const mockDb: DemoDb = { state: createSeed() };
 export const mockSessions = createSessionStore();

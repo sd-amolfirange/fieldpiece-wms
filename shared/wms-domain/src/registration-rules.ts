@@ -14,7 +14,8 @@ export interface RegistrationRowInput {
   invoiceNumber?: string;
 }
 
-export type RegistrationField = "serial" | "modelCode" | "installDate" | "customerName" | "customerPhone";
+export type RegistrationField =
+  "serial" | "modelCode" | "installDate" | "customerName" | "customerPhone";
 
 export type RowErrorCode =
   | "required"
@@ -41,7 +42,10 @@ export interface RowContext {
   today: IsoDate;
 }
 
-export function validateRegistrationRow(row: RegistrationRowInput, ctx: RowContext): RowErrors {
+export function validateRegistrationRow(
+  row: RegistrationRowInput,
+  ctx: RowContext,
+): RowErrors {
   const errors: RowErrors = {};
   const serial = normalizeSerialValue(row.serial);
   const modelCode = (row.modelCode ?? "").trim().toUpperCase();
