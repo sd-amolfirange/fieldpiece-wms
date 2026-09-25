@@ -1,33 +1,23 @@
 import { type Env, EnvSchema } from "../../src/config/env";
 
-// e2e runs against a separate database (wms_test) and Redis DB 1, so it never touches dev data.
-// Override with TEST_DATABASE_URL / TEST_DATABASE_OWNER_URL / TEST_REDIS_URL in CI.
+// The e2e suite uses its own database (wms_hvac_e2e) and Redis DB 3, so it never touches dev data or the
+// browser tests' database. Override with TEST_E2E_DATABASE_URL / TEST_E2E_DATABASE_OWNER_URL in CI.
 
-export const TEST_DB_APP_URL =
-  process.env.TEST_DATABASE_URL ?? "postgresql://wms_app:localdev@localhost:5433/wms_test";
-export const TEST_DB_OWNER_URL =
-  process.env.TEST_DATABASE_OWNER_URL ?? "postgresql://wms_owner:localdev@localhost:5433/wms_test";
-export const TEST_REDIS_URL = process.env.TEST_REDIS_URL ?? "redis://localhost:6379/1";
+export const E2E_DB_APP_URL =
+  process.env.TEST_E2E_DATABASE_URL ?? "postgresql://wms_app:localdev@localhost:5433/wms_hvac_e2e";
+export const E2E_DB_OWNER_URL =
+  process.env.TEST_E2E_DATABASE_OWNER_URL ?? "postgresql://wms_owner:localdev@localhost:5433/wms_hvac_e2e";
 
 export function testEnv(overrides: Partial<Record<string, string>> = {}): Env {
   return EnvSchema.parse({
     NODE_ENV: "test",
-    CORS_ORIGINS: "http://localhost:5173",
-    DATABASE_URL: TEST_DB_APP_URL,
-    REDIS_URL: TEST_REDIS_URL,
-    OIDC_ISSUER: "http://localhost:3000/dev-idp",
-    OIDC_AUDIENCE: "fieldpiece-wms-api",
-    OIDC_JWKS_URI: "http://localhost:3000/dev-idp/.well-known/jwks.json",
-    DEV_IDP_ENABLED: "true",
-    DEV_IDP_KEY_FILE: "", // in-memory key per test run
-    STORAGE_DRIVER: "minio",
-    STORAGE_BUCKET: "wms-attachments-test",
-    STORAGE_ENDPOINT: "http://localhost:9000",
-    STORAGE_ACCESS_KEY: "minio",
-    STORAGE_SECRET_KEY: "localdev123",
-    SWAGGER_ENABLED: "false",
+    DATABASE_URL: E2E_DB_APP_URL,
+    AUTH_JWT_SECRET: "e2e-tests-only-secret-0123456789abcdefghijklmnop",
+    STORAGE_DRIVER: "local",
+    STORAGE_LOCAL_DIR: "var/storage-e2e",
+    DEMO_FEATURES_ENABLED: "true",
+    AUTH_LOGIN_LIMIT_PER_MINUTE: "1000",
     LOG_LEVEL: "error",
-    REQUIRE_PROOF_OF_PURCHASE: "false",
     ...overrides,
   });
 }

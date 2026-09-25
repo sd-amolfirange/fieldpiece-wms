@@ -1,46 +1,75 @@
-import { HttpStatus } from "@nestjs/common";
-import { ErrorCode } from "./error-codes";
+// Expected failures, in the error body the frontend reads (frontend/docs/api-contract.md, "Errors"):
+//   { code, message, fieldErrors?, requestId }
+// `code` is a stable lowercase machine code; `fieldErrors` values are i18n keys the frontend shows under the field.
+// Services throw AppError; the global filter serialises it. Never throw a bare Error for an expected failure.
 
-export type FieldErrors = Record<string, string[]>;
+/** Every code the API returns. The frontend has behaviour or text for these. */
+export const ERROR_CODES = [
+  "unauthenticated",
+  "invalid_credentials",
+  "forbidden",
+  "not_found",
+  "validation_error",
+  "bad_request",
+  "rate_limited",
+  "server_error",
+  // files
+  "too_large",
+  "unsupported_type",
+  "upload_failed",
+  "invalid_attachment",
+  "empty_file",
+  // registrations
+  "duplicate_serial",
+  "not_pending",
+  "unknown_model",
+  "nothing_to_merge",
+  // units
+  "already_void",
+  "not_registered",
+  // complaints and service
+  "already_sent",
+  "not_with_service",
+  "no_such_part",
+  // claims and integrations
+  "invalid_transition",
+  "not_failed",
+] as const;
 
-/**
- * Expected business failure (Section 15). Services throw this; the global filter maps it to the
- * Section 6.4 error body. Never throw a bare Error for an expected failure.
- */
+export type ErrorCode = (typeof ERROR_CODES)[number];
+
+/** Field name -> i18n key (e.g. `{ purchaseDate: "validation.date" }`). */
+export type FieldErrors = Record<string, string>;
+
 export class AppError extends Error {
   constructor(
+    readonly status: number,
     readonly code: ErrorCode,
-    readonly status: HttpStatus,
     message: string,
     readonly fieldErrors?: FieldErrors,
-    /** Extra, safe-to-expose details (e.g. whether the caller owns a duplicate registration). */
-    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "AppError";
   }
 
-  static notFound(what = "Resource"): AppError {
-    return new AppError(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, `${what} not found.`);
+  static unauthenticated(message = "Session expired. Sign in again."): AppError {
+    return new AppError(401, "unauthenticated", message);
   }
 
   static forbidden(message = "You don't have access to this."): AppError {
-    return new AppError(ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN, message);
+    return new AppError(403, "forbidden", message);
   }
 
-  static unprocessable(code: ErrorCode, message: string, fieldErrors?: FieldErrors): AppError {
-    return new AppError(code, HttpStatus.UNPROCESSABLE_ENTITY, message, fieldErrors);
+  /** Also used for rows outside the caller's scope, so ids can't be probed. */
+  static notFound(what: string): AppError {
+    return new AppError(404, "not_found", `${what} not found.`);
   }
 
-  static conflict(code: ErrorCode, message: string, details?: Record<string, unknown>): AppError {
-    return new AppError(code, HttpStatus.CONFLICT, message, undefined, details);
+  static validation(message: string, fieldErrors?: FieldErrors): AppError {
+    return new AppError(422, "validation_error", message, fieldErrors);
   }
 
-  static staleVersion(): AppError {
-    return new AppError(
-      ErrorCode.STALE_VERSION,
-      HttpStatus.CONFLICT,
-      "Someone else changed this record. Reload it and try again.",
-    );
+  static conflict(code: ErrorCode, message: string, fieldErrors?: FieldErrors): AppError {
+    return new AppError(409, code, message, fieldErrors);
   }
 }

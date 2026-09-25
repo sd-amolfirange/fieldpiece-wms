@@ -1,5 +1,5 @@
 import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
-import { type ExecutionContext, Injectable, Logger } from "@nestjs/common";
+import { type ExecutionContext, Injectable, Logger, SetMetadata } from "@nestjs/common";
 import {
   ThrottlerGuard,
   type ThrottlerModuleOptions,
@@ -8,9 +8,14 @@ import {
 } from "@nestjs/throttler";
 import type { FastifyRequest } from "fastify";
 import type { Redis } from "ioredis";
-import { IS_PUBLIC } from "../auth/decorators";
+import type { Env } from "../../config/env";
 
-/** Per-user tracking when authenticated, per-IP otherwise (Section 11.4). */
+const SIGN_IN_ROUTE = "throttle:signIn";
+
+/** Marks the password check, which gets its own, tighter per-IP limit. */
+export const SignInRateLimit = () => SetMetadata(SIGN_IN_ROUTE, true);
+
+/** Per user when signed in, per IP otherwise. */
 @Injectable()
 export class AppThrottlerGuard extends ThrottlerGuard {
   protected override getTracker(req: Record<string, unknown>): Promise<string> {
@@ -19,11 +24,8 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   }
 }
 
-/**
- * Redis-backed counters, falling back to an in-process limiter when Redis is down (Section 10),
- * so an outage degrades rate limiting instead of failing requests.
- */
-export class FallbackThrottlerStorage implements ThrottlerStorage {
+/** Redis counters, falling back to in-process counters when Redis is down, so an outage never fails requests. */
+class FallbackThrottlerStorage implements ThrottlerStorage {
   private readonly logger = new Logger(FallbackThrottlerStorage.name);
   private readonly memory = new ThrottlerStorageService();
 
@@ -42,16 +44,19 @@ export class FallbackThrottlerStorage implements ThrottlerStorage {
 const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const isWrite = (ctx: ExecutionContext) =>
   WRITE_METHODS.has(ctx.switchToHttp().getRequest<FastifyRequest>().method);
-const isPublicRoute = (ctx: ExecutionContext) => Reflect.getMetadata(IS_PUBLIC, ctx.getHandler()) === true;
+const isSignIn = (ctx: ExecutionContext) => Reflect.getMetadata(SIGN_IN_ROUTE, ctx.getHandler()) === true;
 
-/** Section 11.4 limits. Route-specific tighter limits use @Throttle() on the handler. */
-export function throttlerOptions(redis: Redis): ThrottlerModuleOptions {
+/**
+ * Limits: 600 requests a minute per user (the UI polls lists every 5 s in several tabs), 120 writes a minute, and
+ * AUTH_LOGIN_LIMIT_PER_MINUTE password attempts per IP. Clients get 429 with Retry-After.
+ */
+export function throttlerOptions(env: Env, redis: Redis | null): ThrottlerModuleOptions {
   return {
     throttlers: [
-      { name: "default", ttl: 60_000, limit: 300 },
-      { name: "writes", ttl: 60_000, limit: 60, skipIf: (ctx) => !isWrite(ctx) },
-      { name: "publicDaily", ttl: 86_400_000, limit: 500, skipIf: (ctx) => !isPublicRoute(ctx) },
+      { name: "default", ttl: 60_000, limit: 600 },
+      { name: "writes", ttl: 60_000, limit: 120, skipIf: (ctx) => !isWrite(ctx) },
+      { name: "signIn", ttl: 60_000, limit: env.AUTH_LOGIN_LIMIT_PER_MINUTE, skipIf: (ctx) => !isSignIn(ctx) },
     ],
-    storage: new FallbackThrottlerStorage(new ThrottlerStorageRedisService(redis)),
+    storage: redis ? new FallbackThrottlerStorage(new ThrottlerStorageRedisService(redis)) : undefined,
   };
 }

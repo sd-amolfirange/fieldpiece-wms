@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { type Prisma, PrismaClient } from "@prisma/client";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env";
 
@@ -15,17 +15,21 @@ function withPoolParams(url: string, env: Env): string {
   return parsed.toString();
 }
 
-/** Primary database client. Services own transactions via `prisma.$transaction(async (tx) => ...)`. */
+/** Database client. Services own transactions via `prisma.tx(async (tx) => ...)`. */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor(@Inject(ENV) env: Env) {
+  constructor(@Inject(ENV) private readonly env: Env) {
     super({
       datasourceUrl: withPoolParams(env.DATABASE_URL, env),
       log: [{ emit: "event", level: "warn" }],
-      transactionOptions: { timeout: env.DB_STATEMENT_TIMEOUT_MS, maxWait: 2000 },
     });
+  }
+
+  /** Interactive transaction with the configured timeout. Read-committed; conflicting writes use row locks. */
+  tx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    return this.$transaction(fn, { timeout: this.env.DB_TRANSACTION_TIMEOUT_MS, maxWait: 5000 });
   }
 
   async onModuleInit(): Promise<void> {
@@ -35,21 +39,5 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
     this.logger.log("Database connections closed");
-  }
-}
-
-/** Read replica for reports and heavy reads (Section 9.2). Falls back to the primary when not configured. */
-@Injectable()
-export class ReplicaPrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-  constructor(@Inject(ENV) env: Env) {
-    super({ datasourceUrl: withPoolParams(env.DATABASE_REPLICA_URL ?? env.DATABASE_URL, env) });
-  }
-
-  async onModuleInit(): Promise<void> {
-    await this.$connect();
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await this.$disconnect();
   }
 }

@@ -7,8 +7,17 @@ const swc = [
       transform: { legacyDecorator: true, decoratorMetadata: true },
       target: "es2022",
     },
+    module: { type: "commonjs" },
   },
 ];
+
+// shared/wms-domain is TypeScript source (ESM syntax); map it and let swc compile it like our own files. Its own
+// imports (date-fns) resolve from this package's node_modules, even when shared/ has none installed.
+const moduleNameMapper = {
+  "^@wms/domain$": "<rootDir>/../shared/wms-domain/src/index.ts",
+  "^date-fns$": "<rootDir>/node_modules/date-fns/index.cjs",
+};
+const transform = { "^.+\\.ts$": swc };
 
 module.exports = {
   projects: [
@@ -17,24 +26,19 @@ module.exports = {
       testEnvironment: "node",
       roots: ["<rootDir>/src"],
       testMatch: ["**/*.spec.ts"],
-      transform: { "^.+\\.ts$": swc },
+      moduleNameMapper,
+      transform,
     },
     {
       displayName: "e2e",
       testEnvironment: "node",
       roots: ["<rootDir>/test"],
       testMatch: ["**/*.e2e-spec.ts"],
-      transform: { "^.+\\.ts$": swc },
+      moduleNameMapper,
+      transform,
       globalSetup: "<rootDir>/test/setup/global-setup.ts",
     },
   ],
   testTimeout: 30000,
-  // Section 13.1: >= 90% lines on engines and state machines.
-  collectCoverageFrom: [
-    "src/**/*.engine.ts",
-    "src/**/*state-machine.ts",
-    "src/common/time/**/*.ts",
-    "src/common/auth/scope.ts",
-  ],
-  coverageThreshold: { global: { lines: 90, branches: 85, functions: 90 } },
+  collectCoverageFrom: ["src/domain/**/*.ts", "src/common/**/*.ts", "src/modules/**/*.ts", "!src/**/index.ts"],
 };

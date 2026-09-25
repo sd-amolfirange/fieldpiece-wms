@@ -3,11 +3,25 @@ import boundaries from "eslint-plugin-boundaries";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-// Section 15: type-checked rules, module boundaries, no floating promises, no $queryRawUnsafe, no console.
+// Type-checked rules, module boundaries, no floating promises, no unsafe raw SQL, no console.
 
 export default tseslint.config(
   {
-    ignores: ["dist", "coverage", "node_modules", "prisma/migrations", "eslint.config.mjs", "jest.config.js"],
+    ignores: [
+      "dist",
+      "coverage",
+      "node_modules",
+      "var",
+      "test-results",
+      "prisma/migrations",
+      // Separate package with its own lint config (the mock server the frontend's unit tests use).
+      "demo-server",
+      // Playwright config run from ../frontend (checked by Playwright itself).
+      "test/ui",
+      "eslint.config.mjs",
+      "jest.config.js",
+      "webpack.config.js",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -21,10 +35,10 @@ export default tseslint.config(
       "boundaries/include": ["src/**/*.ts"],
       "boundaries/elements": [
         { type: "module", pattern: "src/modules/*", mode: "folder", capture: ["name"] },
+        { type: "domain", pattern: "src/domain", mode: "folder" },
         { type: "common", pattern: "src/common", mode: "folder" },
         { type: "infra", pattern: "src/infra", mode: "folder" },
         { type: "config", pattern: "src/config", mode: "folder" },
-        { type: "worker", pattern: "src/worker", mode: "folder" },
         { type: "app", pattern: "src/*.ts", mode: "file" },
         { type: "cli", pattern: "src/cli", mode: "folder" },
       ],
@@ -44,11 +58,10 @@ export default tseslint.config(
         "error",
         {
           selector: "MemberExpression[property.name=/^\\$(queryRawUnsafe|executeRawUnsafe)$/]",
-          message:
-            "Use the tagged $queryRaw / $executeRaw templates. Unsafe raw SQL is banned (Section 11.2).",
+          message: "Use the tagged $queryRaw / $executeRaw templates. Unsafe raw SQL is banned.",
         },
       ],
-      // Section 3.2: layers only depend downwards; modules talk to each other through their index.ts.
+      // Layers only depend downwards; modules talk to each other through their index.ts.
       "boundaries/element-types": [
         "error",
         {
@@ -57,9 +70,9 @@ export default tseslint.config(
             { from: "config", allow: ["config", "common"] },
             { from: "common", allow: ["common", "config", "infra"] },
             { from: "infra", allow: ["infra", "common", "config"] },
-            { from: "module", allow: ["module", "common", "infra", "config"] },
-            { from: "worker", allow: ["worker", "module", "common", "infra", "config"] },
-            { from: "app", allow: ["app", "module", "common", "infra", "config", "worker"] },
+            { from: "domain", allow: ["domain", "common"] },
+            { from: "module", allow: ["module", "domain", "common", "infra", "config"] },
+            { from: "app", allow: ["app", "module", "common", "infra", "config"] },
             { from: "cli", allow: ["app", "common", "config"] },
           ],
         },
@@ -69,7 +82,7 @@ export default tseslint.config(
         {
           default: "disallow",
           rules: [
-            { target: ["common", "infra", "config", "worker", "app", "cli"], allow: "**" },
+            { target: ["common", "domain", "infra", "config", "app", "cli"], allow: "**" },
             { target: ["module"], allow: "index.ts" },
           ],
         },
@@ -83,6 +96,9 @@ export default tseslint.config(
       "boundaries/element-types": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
       "@typescript-eslint/unbound-method": "off",
     },
   },

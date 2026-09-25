@@ -1,19 +1,17 @@
 import { Module } from "@nestjs/common";
-import { AttachmentsModule } from "../attachments";
-import { CustomersModule } from "../customers";
-import { PoliciesModule } from "../policies";
-import { ProductsModule } from "../products";
-import { WarrantyModule } from "../warranty";
-import { CertificateService } from "./certificate.service";
-import { RegistrationImportService } from "./registration-import.service";
-import { RegistrationsController } from "./registrations.controller";
-import { RegistrationsRepository } from "./registrations.repository";
+import { CatalogModule } from "../catalog";
+import { FilesModule } from "../files";
+import { IntegrationsModule } from "../integrations";
+import { NotificationsModule } from "../notifications";
+import { UnitsModule } from "../units";
+import { BulkImportsService } from "./bulk-imports.service";
+import { BulkImportsController, RegistrationsController } from "./registrations.controller";
 import { RegistrationsService } from "./registrations.service";
 
 @Module({
-  imports: [ProductsModule, PoliciesModule, CustomersModule, AttachmentsModule, WarrantyModule],
-  controllers: [RegistrationsController],
-  providers: [RegistrationsService, RegistrationsRepository, RegistrationImportService, CertificateService],
-  exports: [RegistrationsService, RegistrationImportService, CertificateService],
+  imports: [CatalogModule, FilesModule, IntegrationsModule, NotificationsModule, UnitsModule],
+  controllers: [RegistrationsController, BulkImportsController],
+  providers: [RegistrationsService, BulkImportsService],
+  exports: [RegistrationsService],
 })
 export class RegistrationsModule {}

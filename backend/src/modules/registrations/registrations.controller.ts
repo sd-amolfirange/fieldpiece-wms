@@ -1,163 +1,198 @@
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import {
-  Body,
-  Controller,
-  Get,
-  Header,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Query,
-  Res,
-} from "@nestjs/common";
-import {
-  ApiBearerAuth,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiProduces,
-  ApiTags,
-} from "@nestjs/swagger";
-import { Throttle } from "@nestjs/throttler";
-import type { FastifyReply } from "fastify";
-import type { RequestContext } from "../../common/auth/auth-user";
-import { Ctx, Roles } from "../../common/auth/decorators";
-import { ErrorCode } from "../../common/errors/error-codes";
-import { IfMatch, setEtag } from "../../common/http/concurrency";
-import { ApiErrors } from "../../common/http/swagger";
-import {
-  CertificateUrlDto,
-  CreateRegistrationDto,
-  ImportStatusDto,
-  RegistrationDetailDto,
-  RegistrationDto,
-  RegistrationListQueryDto,
-  RegistrationPageDto,
-  StartImportDto,
-  VoidRegistrationDto,
-} from "./dto";
-import { IMPORT_TEMPLATE_HEADERS, RegistrationImportService } from "./registration-import.service";
+  REGISTRATION_CHANNELS,
+  REGISTRATION_FLAGS,
+  REGISTRATION_STATUSES,
+  type BulkImportView,
+  type Paginated,
+  type RegistrationView,
+} from "@wms/domain";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import type { Ctx as RequestCtx } from "../../common/auth/context";
+import { CookieAuth, Ctx, Roles } from "../../common/auth/decorators";
+import { contentDisposition } from "../../common/http/file-response";
+import type { RawQuery } from "../../common/http/list-query";
+import { readMultipart } from "../../common/http/multipart";
+import { BulkImportsService } from "./bulk-imports.service";
 import { RegistrationsService } from "./registrations.service";
+import { templateCsv, templateXlsx } from "./sheets";
+
+const ALL = ["admin", "dealer", "distributor", "customer"] as const;
+const body = (b: unknown) => (b ?? {}) as Record<string, unknown>;
 
 @ApiTags("registrations")
-@ApiBearerAuth("jwt")
-@Controller()
+@Controller("registrations")
 export class RegistrationsController {
-  constructor(
-    private readonly registrations: RegistrationsService,
-    private readonly imports: RegistrationImportService,
-  ) {}
+  constructor(private readonly registrations: RegistrationsService) {}
 
-  @Get("registrations")
+  @Get()
+  @Roles(...ALL)
   @ApiOperation({
-    summary: "List registrations",
-    description: "Scoped: own (technician), own org (distributor), all (staff).",
+    summary: "Registration inbox (A02) / the customer's own (CU02)",
+    description: "`q` matches serial, customer, model code and dealer. Newest first by default.",
   })
-  @ApiOkResponse({ type: RegistrationPageDto })
-  @ApiErrors()
-  list(@Ctx() ctx: RequestContext, @Query() query: RegistrationListQueryDto) {
-    return this.registrations.list(ctx.user, query);
+  @ApiQuery({ name: "status", required: false, enum: REGISTRATION_STATUSES })
+  @ApiQuery({ name: "channel", required: false, enum: REGISTRATION_CHANNELS })
+  @ApiQuery({ name: "flag", required: false, enum: REGISTRATION_FLAGS })
+  @ApiOkResponse({ description: "Paginated<RegistrationView>" })
+  list(@Ctx() ctx: RequestCtx, @Query() query: RawQuery): Promise<Paginated<RegistrationView>> {
+    return this.registrations.list(ctx, query);
   }
 
-  @Post("registrations")
-  @Roles("technician", "distributor", "claims_agent", "admin")
+  @Post()
+  @HttpCode(200)
+  @Roles(...ALL)
   @ApiOperation({
-    summary: "Register a product",
-    description: "Supports Idempotency-Key. A duplicate active serial returns 409 with `details.ownedByYou`.",
+    summary: "Register a unit (CU01, DL03)",
+    description:
+      "Customer: always PENDING (needs purchaseDate and an invoice). Dealer, distributor, admin: approved at once " +
+      "unless the serial is already registered; other problems answer 422 with `rowErrors.<code>` field errors.",
   })
-  @ApiCreatedResponse({ type: RegistrationDto })
-  @ApiErrors({
-    409: [ErrorCode.REGISTRATION_DUPLICATE_SERIAL],
-    422: [
-      ErrorCode.PRODUCT_NOT_FOUND,
-      ErrorCode.SERIAL_FORMAT_INVALID,
-      ErrorCode.PURCHASE_IN_FUTURE,
-      ErrorCode.PURCHASE_BEFORE_LAUNCH,
-      ErrorCode.PROOF_OF_PURCHASE_REQUIRED,
-      ErrorCode.CUSTOMER_REQUIRED,
-      ErrorCode.ATTACHMENT_NOT_CLEAN,
-      ErrorCode.POLICY_NOT_FOUND,
-    ],
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        serial: { type: "string" },
+        modelCode: { type: "string" },
+        installDate: { type: "string", format: "date" },
+        purchaseDate: { type: "string", format: "date" },
+        customerName: { type: "string" },
+        customerPhone: { type: "string" },
+        customerEmail: { type: "string" },
+        city: { type: "string" },
+        invoiceNumber: { type: "string" },
+        location: { type: "string" },
+        dealerId: { type: "string" },
+        attachmentIds: { type: "array", items: { type: "string" } },
+      },
+    },
   })
-  create(@Ctx() ctx: RequestContext, @Body() body: CreateRegistrationDto) {
-    return this.registrations.create(ctx, body);
+  @ApiOkResponse({ description: "RegistrationView" })
+  create(@Ctx() ctx: RequestCtx, @Body() payload: unknown): Promise<RegistrationView> {
+    return this.registrations.create(ctx, payload);
   }
 
-  @Get("registrations/import-template")
-  @Roles("distributor", "admin")
-  @Header("Content-Type", "text/csv; charset=utf-8")
-  @Header("Content-Disposition", 'attachment; filename="registration-import-template.csv"')
-  @ApiOperation({ summary: "Bulk import CSV template" })
-  @ApiProduces("text/csv")
-  @ApiErrors()
-  template(): string {
-    return `${IMPORT_TEMPLATE_HEADERS.join(",")}\nSC680-100500,SC680,2026-03-01,Jordan Lee,Northside Heating & Air,jordan@example.com,555-0100,12 Main St,,Fresno,CA,93650,US\n`;
-  }
-
-  @Post("registrations/imports")
-  @Roles("distributor", "admin")
-  @Throttle({ writes: { limit: 5, ttl: 3_600_000 } }) // Section 11.4 (per user; per-org is a TODO)
-  @ApiOperation({
-    summary: "Start a bulk import",
-    description: "Async. Poll GET /imports/{jobId}. Max 10,000 rows.",
-  })
-  @ApiCreatedResponse({ type: ImportStatusDto })
-  @ApiErrors({ 422: [ErrorCode.ATTACHMENT_INVALID, ErrorCode.ATTACHMENT_NOT_CLEAN] })
-  startImport(@Ctx() ctx: RequestContext, @Body() body: StartImportDto) {
-    return this.imports.start(ctx, body.attachmentId);
-  }
-
-  @Get("imports/:jobId")
-  @Roles("distributor", "admin")
-  @ApiOperation({ summary: "Import job status", description: "Progress plus a link to the error report." })
-  @ApiOkResponse({ type: ImportStatusDto })
-  @ApiErrors({ 404: [ErrorCode.NOT_FOUND] })
-  importStatus(@Ctx() ctx: RequestContext, @Param("jobId", ParseUUIDPipe) jobId: string) {
-    return this.imports.status(ctx.user, jobId);
-  }
-
-  @Get("registrations/:id")
-  @ApiOperation({ summary: "Get a registration", description: "Returns an ETag for If-Match." })
-  @ApiOkResponse({ type: RegistrationDetailDto })
-  @ApiErrors({ 404: [ErrorCode.NOT_FOUND] })
-  async get(
-    @Ctx() ctx: RequestContext,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Res({ passthrough: true }) reply: FastifyReply,
-  ) {
-    const registration = await this.registrations.get(ctx.user, id);
-    setEtag(reply, registration.version);
-    return registration;
-  }
-
-  @Post("registrations/:id/void")
+  @Post("bulk-approve")
+  @HttpCode(200)
   @Roles("admin")
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Void a registration", description: "Requires If-Match. Audited and alerted." })
-  @ApiOkResponse({ type: RegistrationDto })
-  @ApiErrors({
-    404: [ErrorCode.NOT_FOUND],
-    409: [ErrorCode.STALE_VERSION, ErrorCode.CONFLICT],
-    428: [ErrorCode.PRECONDITION_REQUIRED],
-  })
-  async void(
-    @Ctx() ctx: RequestContext,
-    @Param("id", ParseUUIDPipe) id: string,
-    @IfMatch() version: number,
-    @Body() body: VoidRegistrationDto,
-    @Res({ passthrough: true }) reply: FastifyReply,
-  ) {
-    const registration = await this.registrations.void(ctx, id, version, body.reason);
-    setEtag(reply, registration.version);
-    return registration;
+  @ApiOperation({ summary: "Approve several pending registrations", description: "Skips duplicates, decided rows and unknown models." })
+  @ApiBody({ schema: { type: "object", properties: { ids: { type: "array", items: { type: "string" } } } } })
+  @ApiOkResponse({ description: "`{ approved, skipped }`" })
+  bulkApprove(@Ctx() ctx: RequestCtx, @Body() payload: unknown) {
+    return this.registrations.bulkApprove(ctx, body(payload).ids);
   }
 
-  @Get("registrations/:id/certificate")
-  @ApiOperation({ summary: "Warranty certificate", description: "Signed URL to the PDF (5-minute expiry)." })
-  @ApiOkResponse({ type: CertificateUrlDto })
-  @ApiErrors({ 404: [ErrorCode.NOT_FOUND], 409: [ErrorCode.CERTIFICATE_NOT_READY] })
-  certificate(@Ctx() ctx: RequestContext, @Param("id", ParseUUIDPipe) id: string) {
-    return this.registrations.certificateUrl(ctx.user, id);
+  @Get(":id")
+  @Roles(...ALL)
+  @ApiOperation({ summary: "Registration (A03)", description: "Includes `duplicateOf` (admins) when the serial is registered." })
+  @ApiOkResponse({ description: "RegistrationView" })
+  get(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<RegistrationView> {
+    return this.registrations.get(ctx, id);
+  }
+
+  @Post(":id/approve")
+  @HttpCode(200)
+  @Roles("admin")
+  @ApiOperation({ summary: "Approve", description: "`409 duplicate_serial`, `409 not_pending`, `409 unknown_model`." })
+  @ApiOkResponse({ description: "RegistrationView" })
+  approve(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<RegistrationView> {
+    return this.registrations.approveOne(ctx, id);
+  }
+
+  @Post(":id/reject")
+  @HttpCode(200)
+  @Roles("admin")
+  @ApiOperation({ summary: "Reject with a reason", description: "`422` validation.reasonRequired." })
+  @ApiBody({ schema: { type: "object", required: ["reason"], properties: { reason: { type: "string" } } } })
+  @ApiOkResponse({ description: "RegistrationView" })
+  reject(@Ctx() ctx: RequestCtx, @Param("id") id: string, @Body() payload: unknown): Promise<RegistrationView> {
+    return this.registrations.reject(ctx, id, body(payload).reason);
+  }
+
+  @Post(":id/merge")
+  @HttpCode(200)
+  @Roles("admin")
+  @ApiOperation({ summary: "Merge a duplicate into the existing unit", description: "`409 nothing_to_merge`." })
+  @ApiOkResponse({ description: "RegistrationView" })
+  merge(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<RegistrationView> {
+    return this.registrations.merge(ctx, id);
+  }
+}
+
+@ApiTags("bulk-imports")
+@Controller("bulk-imports")
+export class BulkImportsController {
+  constructor(private readonly bulk: BulkImportsService) {}
+
+  @Get("template.csv")
+  @Roles(...ALL)
+  @CookieAuth()
+  @ApiOperation({ summary: "CSV template" })
+  async templateCsv(@Res() reply: FastifyReply): Promise<void> {
+    await reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", contentDisposition("attachment", "registration-template.csv"))
+      .send(templateCsv());
+  }
+
+  @Get("template.xlsx")
+  @Roles(...ALL)
+  @CookieAuth()
+  @ApiOperation({ summary: "Excel template" })
+  async templateXlsx(@Res() reply: FastifyReply): Promise<void> {
+    await reply
+      .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .header("Content-Disposition", contentDisposition("attachment", "registration-template.xlsx"))
+      .send(await templateXlsx());
+  }
+
+  @Post()
+  @HttpCode(201)
+  @Roles("admin", "dealer", "distributor")
+  @ApiOperation({
+    summary: "Upload a sheet (DL02)",
+    description: "Multipart: `file` (.xlsx or .csv, 5 MB), optional `name`, `dealerId` (distributor or admin).",
+  })
+  @ApiConsumes("multipart/form-data")
+  @ApiCreatedResponse({ description: "BulkImportView" })
+  async upload(@Ctx() ctx: RequestCtx, @Req() request: FastifyRequest): Promise<BulkImportView> {
+    const form = await readMultipart(request, this.bulk.maxBytes, this.bulk.tooLargeMessage);
+    return this.bulk.create(ctx, form.file, { name: form.fields.name, dealerId: form.fields.dealerId });
+  }
+
+  @Get()
+  @Roles("admin", "dealer", "distributor")
+  @ApiOperation({ summary: "Upload history", description: "Newest first." })
+  @ApiOkResponse({ description: "BulkImportView[]" })
+  list(@Ctx() ctx: RequestCtx): Promise<BulkImportView[]> {
+    return this.bulk.list(ctx);
+  }
+
+  @Get(":id")
+  @Roles("admin", "dealer", "distributor")
+  @ApiOperation({ summary: "One upload with its rows" })
+  @ApiOkResponse({ description: "BulkImportView" })
+  get(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<BulkImportView> {
+    return this.bulk.get(ctx, id);
+  }
+
+  @Put(":id/rows")
+  @Roles("admin", "dealer", "distributor")
+  @ApiOperation({ summary: "Resubmit fixed rows", description: "Only rows in ERROR are re-checked." })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        rows: {
+          type: "array",
+          items: { type: "object", properties: { rowNumber: { type: "integer" }, values: { type: "object" } } },
+        },
+      },
+    },
+  })
+  @ApiOkResponse({ description: "BulkImportView" })
+  resubmit(@Ctx() ctx: RequestCtx, @Param("id") id: string, @Body() payload: unknown): Promise<BulkImportView> {
+    return this.bulk.resubmit(ctx, id, body(payload).rows);
   }
 }

@@ -1,6 +1,7 @@
 name: fieldpiece-wms
 
-# Local development stack (build guide Section 2.2).
+# Local development stack. `docker compose up -d` starts Postgres, Redis and pgAdmin; run the API on the host
+# (`npm run start:dev`). `docker compose --profile app up -d --build` also runs the API in a container.
 # Host ports are overridable because 5432 is often taken by a locally installed Postgres.
 
 services:
@@ -13,7 +14,7 @@ services:
     ports: ["${POSTGRES_PORT:-5433}:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro # creates app roles, extensions, test DB
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro # creates the app roles and databases
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wms_owner -d wms"]
       interval: 5s
@@ -32,10 +33,10 @@ services:
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     ports: ["${PGADMIN_PORT:-5050}:80"]
     volumes:
-      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro # pre-registers the local DB
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
     depends_on: [postgres]
 
-  redis:
+  redis: # optional: shared rate-limit counters
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports: ["${REDIS_PORT:-6379}:6379"]
@@ -44,46 +45,39 @@ services:
       interval: 5s
       retries: 10
 
-  minio:
-    image: quay.io/minio/minio:latest # Docker Hub minio/* images are no longer published
+  minio: # optional S3-compatible storage (STORAGE_DRIVER=minio); the default local driver needs nothing
+    profiles: ["minio"]
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:latest}
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-localdev123}
-      # Browser uploads go straight to storage with presigned URLs (ADR-008), so the web origin needs CORS.
-      MINIO_API_CORS_ALLOW_ORIGIN: ${WEB_ORIGINS:-http://localhost:5173,http://localhost:5174}
     ports: ["${MINIO_PORT:-9000}:9000", "${MINIO_CONSOLE_PORT:-9001}:9001"]
     volumes: [miniodata:/data]
 
-  mailpit: # catches outgoing email locally
-    image: axllent/mailpit
-    ports: ["${MAILPIT_UI_PORT:-8025}:8025", "${MAILPIT_SMTP_PORT:-1025}:1025"]
+  migrate:
+    profiles: ["app"]
+    build: { context: .., dockerfile: backend/Dockerfile, target: migrate }
+    environment:
+      DATABASE_URL: postgresql://wms_app:localdev@postgres:5432/wms_hvac
+      DATABASE_MIGRATION_URL: postgresql://wms_owner:${POSTGRES_PASSWORD:-localdev}@postgres:5432/wms_hvac
+    depends_on:
+      postgres: { condition: service_healthy }
 
   api:
     profiles: ["app"]
-    build: { context: ., target: dev }
+    build: { context: .., dockerfile: backend/Dockerfile, target: runtime }
     env_file: .env
-    environment: &container-env
-      DATABASE_URL: postgresql://wms_app:localdev@postgres:5432/wms
-      DATABASE_MIGRATION_URL: postgresql://wms_owner:${POSTGRES_PASSWORD:-localdev}@postgres:5432/wms
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://wms_app:localdev@postgres:5432/wms_hvac
       REDIS_URL: redis://redis:6379
-      STORAGE_ENDPOINT: http://minio:9000
-      SMTP_URL: smtp://mailpit:1025
-    command: sh -c "pnpm prisma migrate deploy && pnpm start:dev"
-    ports: ["3000:3000", "9229:9229"] # 9229 = debugger
-    volumes: [".:/app", "/app/node_modules"]
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /home/node/storage
+    ports: ["${API_PORT:-4000}:4000"]
+    volumes: [apistorage:/home/node/storage]
     depends_on:
-      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
-      minio: { condition: service_started } # the API creates the bucket on startup in local dev
 
-  worker:
-    profiles: ["app"]
-    build: { context: ., target: dev }
-    env_file: .env
-    environment: *container-env
-    command: pnpm worker:dev
-    volumes: [".:/app", "/app/node_modules"]
-    depends_on: [api]
-
-volumes: { pgdata: {}, miniodata: {} }
+volumes: { pgdata: {}, miniodata: {}, apistorage: {} }

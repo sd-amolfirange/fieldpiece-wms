@@ -1,0 +1,15 @@
+# Build context is the repository root (see Dockerfile). Only backend/ and shared/wms-domain/src are needed.
+.git
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!backend/.env.example
+frontend
+demo-assets
+backend/demo-server
+backend/var
+backend/test-results
+backend/test
+shared/wms-domain/src/**/*.test.ts

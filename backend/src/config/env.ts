@@ -1,45 +1,66 @@
 import { existsSync } from "node:fs";
 import { z } from "zod";
 
-// Validated environment (build guide Section 4). The app refuses to start if config is invalid.
+// Validated environment. The process refuses to start on invalid config instead of running half-configured.
 
-const bool = z
-  .enum(["true", "false", "1", "0"])
-  .default("false")
-  .transform((v) => v === "true" || v === "1");
+/** Booleans are parsed explicitly: `z.coerce.boolean()` would turn the string "false" into true. */
+const bool = (fallback: "true" | "false") =>
+  z
+    .enum(["true", "false", "1", "0"])
+    .default(fallback)
+    .transform((v) => v === "true" || v === "1");
+
+const isTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export const EnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "staging", "production"]),
-    PORT: z.coerce.number().int().positive().default(3000),
-    API_PREFIX: z.string().default("api/v1"),
-    CORS_ORIGINS: z.string().transform((s) =>
-      s
-        .split(",")
-        .map((o) => o.trim())
-        .filter(Boolean),
-    ),
+    PORT: z.coerce.number().int().positive().default(4000),
+    /** Every route lives under this prefix. The frontend calls `${VITE_API_BASE_URL}` = "/api". */
+    API_PREFIX: z
+      .string()
+      .default("api")
+      .transform((p) => p.replace(/^\/+|\/+$/g, "")),
+    CORS_ORIGINS: z
+      .string()
+      .default("")
+      .transform((s) =>
+        s
+          .split(",")
+          .map((o) => o.trim())
+          .filter(Boolean),
+      ),
 
-    DATABASE_URL: z.string().url(), // via PgBouncer in prod
-    DATABASE_REPLICA_URL: z.string().url().optional(),
+    DATABASE_URL: z.string().url(),
+    /** Owner connection, used only by migrations (Prisma `directUrl`). */
+    DATABASE_MIGRATION_URL: z.string().url().optional(),
     DB_POOL_MAX: z.coerce.number().int().positive().default(10),
-    DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+    DB_TRANSACTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 
-    REDIS_URL: z.string().url(),
+    /** Rate-limit counters. Empty = in-process counters (fine for a single instance). */
+    REDIS_URL: z.string().url().optional(),
 
-    OIDC_ISSUER: z.string().url(),
-    OIDC_AUDIENCE: z.string().min(1),
-    OIDC_JWKS_URI: z.string().url(),
-    OIDC_ROLES_CLAIM: z.string().default("roles"),
-    DEV_IDP_ENABLED: bool,
-    /** Where the dev IdP persists its signing key so tokens survive restarts. Empty = in-memory. */
-    DEV_IDP_KEY_FILE: z.string().default(".dev-keys/dev-idp.jwk.json"),
+    // Sessions: short-lived access JWT in the response body, long-lived refresh token in an httpOnly cookie.
+    AUTH_JWT_SECRET: z.string().min(32, "Use at least 32 random characters"),
+    AUTH_JWT_ISSUER: z.string().default("hvac-wms-api"),
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    /** Idle lifetime of a refresh session; every refresh extends it. */
+    AUTH_SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(14),
+    AUTH_LOGIN_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
 
-    STORAGE_DRIVER: z.enum(["s3", "azure", "minio"]),
-    STORAGE_BUCKET: z.string().min(1),
+    // Object storage for uploads.
+    STORAGE_DRIVER: z.enum(["local", "s3", "minio"]).default("local"),
+    /** local driver: folder for the files. */
+    STORAGE_LOCAL_DIR: z.string().default("var/storage"),
+    STORAGE_BUCKET: z.string().default("wms-attachments"),
     STORAGE_ENDPOINT: z.string().url().optional(),
-    /** Endpoint baked into presigned URLs; must be reachable from the browser. Defaults to STORAGE_ENDPOINT. */
-    STORAGE_PUBLIC_ENDPOINT: z.string().url().optional(),
     STORAGE_REGION: z.string().default("us-east-1"),
     STORAGE_ACCESS_KEY: z.string().optional(),
     STORAGE_SECRET_KEY: z.string().optional(),
@@ -47,55 +68,55 @@ export const EnvSchema = z
       .number()
       .int()
       .positive()
-      .default(10 * 1024 * 1024),
+      .default(15 * 1024 * 1024),
+    BULK_IMPORT_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(5 * 1024 * 1024),
+    BULK_IMPORT_MAX_ROWS: z.coerce.number().int().positive().default(5000),
 
-    SMTP_URL: z.string().optional(),
-    MAIL_FROM: z.string().default("Fieldpiece Warranty <no-reply@fieldpiece.local>"),
-    WEB_APP_URL: z.string().url().default("http://localhost:5173"),
-    /** Browser-reachable origin of this API, for URLs the API hands out (product images). */
-    API_PUBLIC_URL: z.string().url().default("http://localhost:3000"),
+    /**
+     * Calendar used for "today" (warranty status, future-date checks, "this month"). Warranty dates have no time
+     * zone; this decides when a day starts. [CONFIRM] with the business.
+     */
+    APP_TIMEZONE: z.string().default("Asia/Kolkata").refine(isTimeZone, "Unknown IANA time zone"),
+    /** SessionUser.currency. [CONFIRM] per organisation once more than one market is live. */
+    APP_CURRENCY: z.string().length(3).default("INR"),
 
-    SWAGGER_ENABLED: bool,
+    /**
+     * Demo-only endpoints: the "Sign in as" account list (GET /auth/demo-accounts) and the A13 simulator
+     * (POST /simulate/*). Refused in production.
+     */
+    DEMO_FEATURES_ENABLED: bool("false"),
+    /** Password of the seeded demo accounts. */
+    DEMO_PASSWORD: z.string().min(8).default("Demo#2026"),
+
+    SWAGGER_ENABLED: bool("false"),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
-    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
-
-    // Business settings [CONFIRM]
-    EXPIRING_SOON_DAYS: z.coerce.number().int().min(1).max(365).default(60),
-    SLA_REVIEW_BUSINESS_HOURS: z.coerce.number().positive().default(48),
-    BUSINESS_DAY_START_HOUR: z.coerce.number().int().min(0).max(23).default(8),
-    BUSINESS_DAY_END_HOUR: z.coerce.number().int().min(1).max(24).default(17),
-    REQUIRE_PROOF_OF_PURCHASE: bool,
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === "production" && env.DEV_IDP_ENABLED) {
+    if (env.NODE_ENV === "production" && env.DEMO_FEATURES_ENABLED) {
       ctx.addIssue({
         code: "custom",
-        path: ["DEV_IDP_ENABLED"],
-        message: "The dev IdP must never run in production",
+        path: ["DEMO_FEATURES_ENABLED"],
+        message: "Demo accounts and the simulator must never run in production",
       });
     }
-    if (env.NODE_ENV === "production" && env.SWAGGER_ENABLED) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["SWAGGER_ENABLED"],
-        message: "Swagger UI is off in production (6.6)",
-      });
+    if (env.NODE_ENV === "production" && env.STORAGE_DRIVER === "local") {
+      ctx.addIssue({ code: "custom", path: ["STORAGE_DRIVER"], message: "Use s3 in production" });
     }
-    if (env.BUSINESS_DAY_END_HOUR <= env.BUSINESS_DAY_START_HOUR) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["BUSINESS_DAY_END_HOUR"],
-        message: "Must be after the start hour",
-      });
-    }
-    if (env.STORAGE_DRIVER !== "azure" && (!env.STORAGE_ACCESS_KEY || !env.STORAGE_SECRET_KEY)) {
+    if (env.STORAGE_DRIVER !== "local" && (!env.STORAGE_ACCESS_KEY || !env.STORAGE_SECRET_KEY)) {
       ctx.addIssue({ code: "custom", path: ["STORAGE_ACCESS_KEY"], message: "Required for s3 / minio" });
+    }
+    if (env.NODE_ENV === "production" && env.CORS_ORIGINS.some((o) => o === "*")) {
+      ctx.addIssue({ code: "custom", path: ["CORS_ORIGINS"], message: "List the allowed origins explicitly" });
     }
   });
 
 export type Env = z.infer<typeof EnvSchema>;
 
-/** Parses process.env. Prints every problem and exits, instead of starting half-configured. */
+/** Parses process.env. Prints every problem at once, then refuses to start. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const result = EnvSchema.safeParse(source);
   if (!result.success) {
@@ -105,10 +126,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return result.data;
 }
 
-/**
- * Loads `.env` for local development. Real environment variables always win, and production never reads a
- * file: secrets are injected by the platform (Section 4).
- */
+/** Loads `.env` for local development. Real environment variables win; production never reads a file. */
 export function loadDotEnv(path = ".env"): void {
   if (process.env.NODE_ENV === "production" || !existsSync(path)) return;
   process.loadEnvFile(path);

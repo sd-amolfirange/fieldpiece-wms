@@ -1,0 +1,1399 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/health/live": {
+      "get": {
+        "operationId": "Health_live",
+        "summary": "Liveness",
+        "description": "200 if the event loop responds. No dependency checks.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Alive"
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "operationId": "Health_ready",
+        "summary": "Readiness",
+        "description": "Checks Postgres (1 s) and Redis. 503 while shutting down.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Ready"
+          },
+          "503": {
+            "description": "Not ready"
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "Auth_login",
+        "summary": "Sign in",
+        "description": "Checks email and password. Returns a short-lived access token (send it as `Authorization: Bearer`) and sets the httpOnly `wms_refresh` cookie for POST /auth/refresh.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ accessToken, user: SessionUser }`"
+          },
+          "401": {
+            "description": "`invalid_credentials`"
+          },
+          "429": {
+            "description": "`rate_limited`"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "Auth_refresh",
+        "summary": "New access token from the refresh cookie",
+        "description": "Reads `wms_refresh`, extends the session and returns a fresh access token.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`{ accessToken, user: SessionUser }`"
+          },
+          "401": {
+            "description": "`unauthenticated`: the session ended or expired"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "Auth_logout",
+        "summary": "Sign out",
+        "description": "Ends the session (refresh cookie and access token).",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Signed out"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/models": {
+      "get": {
+        "operationId": "Catalog_models",
+        "summary": "Models with their part templates",
+        "description": "A06 and every model picker.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ModelView[]"
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/brands": {
+      "get": {
+        "operationId": "Catalog_brands",
+        "summary": "Brands",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Brand[]"
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/dealers": {
+      "get": {
+        "operationId": "Catalog_dealers",
+        "summary": "Dealers the caller may see",
+        "description": "Admin: all; distributor: its dealers; dealer: itself.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "DealerView[]"
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/admin/org": {
+      "get": {
+        "operationId": "Catalog_org",
+        "summary": "Distributor -> dealer hierarchy and user accounts (A11)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OrgStructure"
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/uploads": {
+      "post": {
+        "operationId": "Files_upload",
+        "summary": "Upload a file",
+        "description": "Multipart: `file`, optional `name`. Photos, videos and PDF; 15 MB by default (UPLOAD_MAX_BYTES).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Attachment"
+          },
+          "413": {
+            "description": "`too_large`"
+          },
+          "415": {
+            "description": "`unsupported_type`"
+          }
+        },
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/files/{id}": {
+      "get": {
+        "operationId": "Files_download",
+        "summary": "Download a file",
+        "description": "Visible to the uploader, admins and anyone who can see a record that references it. Accepts the bearer token or the session cookie (for <img src> and plain links).",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file, `Content-Disposition: inline`"
+          }
+        },
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "Notifications_list",
+        "summary": "The caller's latest notifications",
+        "description": "Newest first, at most 30.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Notification[]"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/read": {
+      "post": {
+        "operationId": "Notifications_markRead",
+        "summary": "Mark notifications read",
+        "description": "No ids = all of the caller's notifications.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ ok: true }`"
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/integrations": {
+      "get": {
+        "operationId": "Integrations_list",
+        "summary": "Integration log (A12)",
+        "description": "Every message in and out, newest first.",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "PENDING",
+                "SUCCESS",
+                "FAILED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "direction",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "IN",
+                "OUT"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "system",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CRM",
+                "ERP",
+                "FINANCE",
+                "SERVICE",
+                "OEM",
+                "EMAIL"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated<IntegrationMessage>"
+          }
+        },
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/{id}/retry": {
+      "post": {
+        "operationId": "Integrations_retry",
+        "summary": "Retry a failed message",
+        "description": "Sends a FAILED message again (attempts + 1). `409 not_failed` for other messages.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated IntegrationMessage"
+          }
+        },
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/units": {
+      "get": {
+        "operationId": "Units_list",
+        "summary": "Units in the caller's scope",
+        "description": "A04, DL04, CU02. `q` matches serial, customer, dealer and model code. Default sort `serial`.",
+        "parameters": [
+          {
+            "name": "dealerId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ACTIVE",
+                "EXPIRING_SOON",
+                "EXPIRED",
+                "VOID",
+                "PENDING"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated<UnitView>"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
+    "/api/units/{serial}": {
+      "get": {
+        "operationId": "Units_get",
+        "summary": "Unit with part-wise warranty status for today",
+        "description": "404 if not visible.",
+        "parameters": [
+          {
+            "name": "serial",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "UnitView"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
+    "/api/units/{serial}/certificate.pdf": {
+      "get": {
+        "operationId": "Units_certificate",
+        "summary": "Warranty certificate PDF",
+        "description": "Bearer token or the session cookie.",
+        "parameters": [
+          {
+            "name": "serial",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "application/pdf"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
+    "/api/units/{serial}/entitlement": {
+      "get": {
+        "operationId": "Units_entitlement",
+        "summary": "What a complaint on this unit would be entitled to today (CU04, DL06)",
+        "parameters": [
+          {
+            "name": "serial",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entitlement"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
+    "/api/units/{serial}/void": {
+      "post": {
+        "operationId": "Units_voidWarranty",
+        "summary": "Void the warranty (W5)",
+        "description": "`422` validation.voidReason; `409 already_void`; `409 not_registered`.",
+        "parameters": [
+          {
+            "name": "serial",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "UNAUTHORISED_REPAIR",
+                      "MISSED_SERVICING",
+                      "PHYSICAL_DAMAGE",
+                      "OTHER"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "UnitView with `void` set"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
+    "/api/registrations": {
+      "get": {
+        "operationId": "Registrations_list",
+        "summary": "Registration inbox (A02) / the customer's own (CU02)",
+        "description": "`q` matches serial, customer, model code and dealer. Newest first by default.",
+        "parameters": [
+          {
+            "name": "flag",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "EXCEPTION",
+                "DUPLICATE",
+                "MODEL_MISMATCH"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "DEALER",
+                "PORTAL",
+                "EMAIL",
+                "ERP",
+                "BULK"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated<RegistrationView>"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      },
+      "post": {
+        "operationId": "Registrations_create",
+        "summary": "Register a unit (CU01, DL03)",
+        "description": "Customer: always PENDING (needs purchaseDate and an invoice). Dealer, distributor, admin: approved at once unless the serial is already registered; other problems answer 422 with `rowErrors.<code>` field errors.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "serial": {
+                    "type": "string"
+                  },
+                  "modelCode": {
+                    "type": "string"
+                  },
+                  "installDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "purchaseDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "customerName": {
+                    "type": "string"
+                  },
+                  "customerPhone": {
+                    "type": "string"
+                  },
+                  "customerEmail": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "invoiceNumber": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "dealerId": {
+                    "type": "string"
+                  },
+                  "attachmentIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RegistrationView"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      }
+    },
+    "/api/registrations/bulk-approve": {
+      "post": {
+        "operationId": "Registrations_bulkApprove",
+        "summary": "Approve several pending registrations",
+        "description": "Skips duplicates, decided rows and unknown models.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{ approved, skipped }`"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      }
+    },
+    "/api/registrations/{id}": {
+      "get": {
+        "operationId": "Registrations_get",
+        "summary": "Registration (A03)",
+        "description": "Includes `duplicateOf` (admins) when the serial is registered.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RegistrationView"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      }
+    },
+    "/api/registrations/{id}/approve": {
+      "post": {
+        "operationId": "Registrations_approve",
+        "summary": "Approve",
+        "description": "`409 duplicate_serial`, `409 not_pending`, `409 unknown_model`.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RegistrationView"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      }
+    },
+    "/api/registrations/{id}/reject": {
+      "post": {
+        "operationId": "Registrations_reject",
+        "summary": "Reject with a reason",
+        "description": "`422` validation.reasonRequired.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RegistrationView"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      }
+    },
+    "/api/registrations/{id}/merge": {
+      "post": {
+        "operationId": "Registrations_merge",
+        "summary": "Merge a duplicate into the existing unit",
+        "description": "`409 nothing_to_merge`.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RegistrationView"
+          }
+        },
+        "tags": [
+          "registrations"
+        ]
+      }
+    },
+    "/api/bulk-imports/template.csv": {
+      "get": {
+        "operationId": "BulkImports_templateCsv",
+        "summary": "CSV template",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "bulk-imports"
+        ]
+      }
+    },
+    "/api/bulk-imports/template.xlsx": {
+      "get": {
+        "operationId": "BulkImports_templateXlsx",
+        "summary": "Excel template",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "bulk-imports"
+        ]
+      }
+    },
+    "/api/bulk-imports": {
+      "post": {
+        "operationId": "BulkImports_upload",
+        "summary": "Upload a sheet (DL02)",
+        "description": "Multipart: `file` (.xlsx or .csv, 5 MB), optional `name`, `dealerId` (distributor or admin).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "BulkImportView"
+          }
+        },
+        "tags": [
+          "bulk-imports"
+        ]
+      },
+      "get": {
+        "operationId": "BulkImports_list",
+        "summary": "Upload history",
+        "description": "Newest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "BulkImportView[]"
+          }
+        },
+        "tags": [
+          "bulk-imports"
+        ]
+      }
+    },
+    "/api/bulk-imports/{id}": {
+      "get": {
+        "operationId": "BulkImports_get",
+        "summary": "One upload with its rows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "BulkImportView"
+          }
+        },
+        "tags": [
+          "bulk-imports"
+        ]
+      }
+    },
+    "/api/bulk-imports/{id}/rows": {
+      "put": {
+        "operationId": "BulkImports_resubmit",
+        "summary": "Resubmit fixed rows",
+        "description": "Only rows in ERROR are re-checked.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "rowNumber": {
+                          "type": "integer"
+                        },
+                        "values": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "BulkImportView"
+          }
+        },
+        "tags": [
+          "bulk-imports"
+        ]
+      }
+    },
+    "/api/claims": {
+      "get": {
+        "operationId": "Claims_list",
+        "summary": "Claims (A09, DL07)",
+        "description": "`q` matches id, serial, RMA number and brand. Dealers and distributors get their own, read-only.",
+        "parameters": [
+          {
+            "name": "brandId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "DRAFT",
+                "SUBMITTED",
+                "APPROVED",
+                "PAID",
+                "REJECTED"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated<ClaimView>"
+          }
+        },
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/api/claims/counts": {
+      "get": {
+        "operationId": "Claims_counts",
+        "summary": "Claim counts by status (A09 tiles)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Record<ClaimStatus, number>"
+          }
+        },
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/api/claims/{id}": {
+      "get": {
+        "operationId": "Claims_get",
+        "summary": "Claim with the job result as evidence (A10)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClaimView"
+          }
+        },
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/api/claims/{id}/transitions": {
+      "post": {
+        "operationId": "Claims_transition",
+        "summary": "Move a claim to its next status",
+        "description": "`submit` (needs amount > 0; rmaNumber optional) writes the OEM submission; `mark_paid` posts to Finance. `422` validation.amount / validation.reasonRequired; `409 invalid_transition`.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "submit",
+                      "approve",
+                      "reject",
+                      "mark_paid"
+                    ]
+                  },
+                  "rmaNumber": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ClaimView"
+          }
+        },
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/api/complaints": {
+      "get": {
+        "operationId": "Complaints_list",
+        "summary": "Complaints in the caller's scope (A07, DL07, CU05)",
+        "description": "`q` matches id, serial, customer and dealer. Newest first by default.",
+        "parameters": [
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CUSTOMER",
+                "DEALER",
+                "ADMIN"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "NEW",
+                "WITH_SERVICE",
+                "RESOLVED"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated<ComplaintView>"
+          }
+        },
+        "tags": [
+          "complaints"
+        ]
+      },
+      "post": {
+        "operationId": "Complaints_create",
+        "summary": "Raise a complaint (CU04, DL06)",
+        "description": "The source follows the caller's role; the server decides the entitlement. `422` validation.describeFault; `409 not_registered`; `404` for a unit outside the caller's scope.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "unitSerial",
+                  "description"
+                ],
+                "properties": {
+                  "unitSerial": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 5
+                  },
+                  "attachmentIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ComplaintView"
+          }
+        },
+        "tags": [
+          "complaints"
+        ]
+      }
+    },
+    "/api/complaints/{id}": {
+      "get": {
+        "operationId": "Complaints_get",
+        "summary": "Complaint with entitlement, job result and claim status (A08, CU05)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ComplaintView"
+          }
+        },
+        "tags": [
+          "complaints"
+        ]
+      }
+    },
+    "/api/complaints/{id}/send-to-service": {
+      "post": {
+        "operationId": "Complaints_sendToService",
+        "summary": "Send to the service system (A08)",
+        "description": "NEW -> WITH_SERVICE; writes the outbound service request. `409 already_sent`.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ComplaintView"
+          }
+        },
+        "tags": [
+          "complaints"
+        ]
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "operationId": "Dashboard_summary",
+        "summary": "Dashboard numbers for the caller's role (A01, DL01, customer home)",
+        "description": "A union by `role`. `dealerId` (distributors only) narrows every number to one of its dealers.",
+        "parameters": [
+          {
+            "name": "dealerId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DashboardSummary"
+          }
+        },
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/auth/demo-accounts": {
+      "get": {
+        "operationId": "Demo_accounts",
+        "summary": "Demo only: accounts for the sign-in page's picker",
+        "description": "Not mounted in production.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`{ email, label, password }[]`"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/reset": {
+      "post": {
+        "operationId": "Demo_reset",
+        "summary": "Demo only: replace all data with the seed, dated from today",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`{ ok: true }`"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/erp-invoice": {
+      "post": {
+        "operationId": "Demo_erpInvoice",
+        "summary": "Demo only: an ERP sales invoice with 3 new serials (W6)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "RegistrationView[]"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/registration-email": {
+      "post": {
+        "operationId": "Demo_registrationEmail",
+        "summary": "Demo only: a registration email with the invoice attached (W6)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "RegistrationView"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/job-result": {
+      "post": {
+        "operationId": "Demo_jobResult",
+        "summary": "Demo only: the service system's job result for a WITH_SERVICE complaint (W3)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "complaintId"
+                ],
+                "properties": {
+                  "complaintId": {
+                    "type": "string"
+                  },
+                  "partType": {
+                    "type": "string",
+                    "enum": [
+                      "COMPRESSOR",
+                      "PCB"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ComplaintView"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/oem-decision": {
+      "post": {
+        "operationId": "Demo_oemDecision",
+        "summary": "Demo only: the manufacturer's decision on a SUBMITTED claim (W3)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "claimId",
+                  "decision"
+                ],
+                "properties": {
+                  "claimId": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "APPROVED",
+                      "REJECTED"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ClaimView"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Warranty Management API",
+    "description": "Units with part-wise warranties, registrations from every channel, complaints, service hand-off, manufacturer claims and the integration log. Contract: frontend/docs/api-contract.md.",
+    "version": "0.2.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      },
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "wms_refresh"
+      }
+    },
+    "schemas": {}
+  }
+}

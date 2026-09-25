@@ -27,7 +27,8 @@ async function main(): Promise<void> {
         if (method === undefined) continue;
         if (classPublic || Reflect.getMetadata(IS_PUBLIC, handler) === true) {
           const path = String(Reflect.getMetadata(PATH_METADATA, handler) ?? "");
-          routes.push(`${RequestMethod[method].padEnd(6)} /${[base, path].filter(Boolean).join("/")}`);
+          const full = `/${[base, path].join("/")}`.replace(/\/{2,}/g, "/");
+          routes.push(`${RequestMethod[method].padEnd(6)} ${full}`);
         }
       }
     }

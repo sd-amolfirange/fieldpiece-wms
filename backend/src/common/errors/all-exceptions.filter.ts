@@ -1,53 +1,31 @@
-import {
-  type ArgumentsHost,
-  Catch,
-  type ExceptionFilter,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from "@nestjs/common";
+import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from "@nestjs/common";
 import { ThrottlerException } from "@nestjs/throttler";
 import { Prisma } from "@prisma/client";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { ZodValidationException } from "nestjs-zod";
-import type { ZodError } from "zod";
-import { AppError, type FieldErrors } from "./app-error";
-import { ErrorCode } from "./error-codes";
+import { AppError, type ErrorCode, type FieldErrors } from "./app-error";
 
-/** Section 6.4 error body. */
 export interface ErrorBody {
   code: ErrorCode;
   message: string;
   fieldErrors?: FieldErrors;
-  details?: Record<string, unknown>;
+  /** Correlates with the log line and the X-Request-Id header. */
   requestId: string;
 }
 
-function toFieldErrors(error: ZodError): FieldErrors {
-  const fields: FieldErrors = {};
-  for (const issue of error.issues) {
-    const key = issue.path.join(".") || "_";
-    (fields[key] ??= []).push(issue.message);
-  }
-  return fields;
-}
-
-const STATUS_CODES: Partial<Record<number, ErrorCode>> = {
-  400: ErrorCode.VALIDATION_FAILED,
-  401: ErrorCode.UNAUTHENTICATED,
-  403: ErrorCode.FORBIDDEN,
-  404: ErrorCode.NOT_FOUND,
-  409: ErrorCode.CONFLICT,
-  413: ErrorCode.PAYLOAD_TOO_LARGE,
-  415: ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-  428: ErrorCode.PRECONDITION_REQUIRED,
-  429: ErrorCode.RATE_LIMITED,
-  503: ErrorCode.SERVICE_UNAVAILABLE,
+const BY_STATUS: Partial<Record<number, [ErrorCode, string]>> = {
+  400: ["bad_request", "The request couldn't be read. Check the format."],
+  401: ["unauthenticated", "Session expired. Sign in again."],
+  403: ["forbidden", "You don't have access to this."],
+  404: ["not_found", "Not found."],
+  406: ["bad_request", "The requested format isn't available."],
+  413: ["too_large", "The request is too large."],
+  415: ["unsupported_type", "This content type isn't supported."],
+  429: ["rate_limited", "Too many requests. Wait a minute, then try again."],
 };
 
 /**
- * Maps every error to the Section 6.4 body. Never returns stack traces, SQL or internal hostnames:
- * unexpected errors get a generic message and are logged with the request ID.
+ * Maps every error to the contract's error body. Never returns stack traces, SQL or internal hostnames:
+ * unexpected errors get a generic message and are logged with the request id.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -63,81 +41,48 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (status >= 500) {
       this.logger.error({ err: exception, requestId, route: request.routeOptions?.url }, "Unhandled error");
     }
-    void reply.status(status).send(body);
+    if (reply.sent) return; // a stream failed after the headers went out; nothing more can be sent
+    void reply.status(status).header("Cache-Control", "no-store").send(body);
   }
 
   private map(exception: unknown, requestId: string): [number, ErrorBody] {
     if (exception instanceof AppError) {
       return [
         exception.status,
-        {
-          code: exception.code,
-          message: exception.message,
-          fieldErrors: exception.fieldErrors,
-          details: exception.details,
-          requestId,
-        },
-      ];
-    }
-
-    if (exception instanceof ZodValidationException) {
-      return [
-        HttpStatus.BAD_REQUEST,
-        {
-          code: ErrorCode.VALIDATION_FAILED,
-          message: "Check the highlighted fields.",
-          fieldErrors: toFieldErrors(exception.getZodError()),
-          requestId,
-        },
+        { code: exception.code, message: exception.message, fieldErrors: exception.fieldErrors, requestId },
       ];
     }
 
     if (exception instanceof ThrottlerException) {
-      return [
-        HttpStatus.TOO_MANY_REQUESTS,
-        {
-          code: ErrorCode.RATE_LIMITED,
-          message: "Too many requests. Wait a minute, then try again.",
-          requestId,
-        },
-      ];
+      const [code, message] = BY_STATUS[429]!;
+      return [429, { code, message, requestId }];
     }
 
+    // Expected constraint races surface here only if a service missed them; never leak the SQL.
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      if (exception.code === "P2025") {
+      if (exception.code === "P2025") return [404, { code: "not_found", message: "Not found.", requestId }];
+      if (exception.code === "P2002" || exception.code === "P2034") {
         return [
-          HttpStatus.NOT_FOUND,
-          { code: ErrorCode.NOT_FOUND, message: "Resource not found.", requestId },
-        ];
-      }
-      if (exception.code === "P2002") {
-        return [
-          HttpStatus.CONFLICT,
-          { code: ErrorCode.CONFLICT, message: "This conflicts with an existing record.", requestId },
+          409,
+          { code: "invalid_transition", message: "This changed in the meantime. Refresh and try again.", requestId },
         ];
       }
     }
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      const code =
-        STATUS_CODES[status] ?? (status >= 500 ? ErrorCode.INTERNAL_ERROR : ErrorCode.VALIDATION_FAILED);
-      const message = status >= 500 ? "Something went wrong. Try again." : exception.message;
-      return [status, { code, message, requestId }];
+      const known = BY_STATUS[status];
+      if (known) return [status, { code: known[0], message: known[1], requestId }];
+      if (status < 500) return [status, { code: "bad_request", message: exception.message, requestId }];
     }
 
-    // Fastify's own errors (body too large, bad JSON, unsupported content type) carry a statusCode.
+    // Fastify's own errors (bad JSON, body too large, multipart limits) carry a statusCode.
     const statusCode = (exception as { statusCode?: unknown } | null)?.statusCode;
     if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) {
-      const code = STATUS_CODES[statusCode] ?? ErrorCode.VALIDATION_FAILED;
-      const message =
-        statusCode === 413 ? "The request is too large." : "The request couldn't be read. Check the format.";
+      const [code, message] = BY_STATUS[statusCode] ?? BY_STATUS[400]!;
       return [statusCode, { code, message, requestId }];
     }
 
-    return [
-      HttpStatus.INTERNAL_SERVER_ERROR,
-      { code: ErrorCode.INTERNAL_ERROR, message: "Something went wrong. Try again.", requestId },
-    ];
+    return [500, { code: "server_error", message: "Something went wrong. Try again.", requestId }];
   }
 }

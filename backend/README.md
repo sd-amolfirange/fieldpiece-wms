@@ -1,128 +1,116 @@
-# Fieldpiece WMS: Backend
+# Warranty Management API (`backend/`)
 
-API and background worker for the Fieldpiece Warranty Management System. Built to
-[FIELDPIECE_WARRANTY_BACKEND_INSTRUCTIONS.md](FIELDPIECE_WARRANTY_BACKEND_INSTRUCTIONS.md) (the "build guide"). Read it
-before changing anything.
+The real backend behind the React app in `../frontend`. It implements the contract the frontend already uses
+(`../frontend/docs/api-contract.md`) on NestJS + PostgreSQL, so the frontend runs against it **without code changes**.
+The domain is the one in `../frontend/docs/demo-workflows.md`: units with part-wise warranties, registrations from
+every channel, complaints, service hand-off, manufacturer claims, the integration log and notifications.
 
-**Stack:** Node 20, NestJS 10 on Fastify, TypeScript (strict), Prisma 6 + PostgreSQL 16, Redis + BullMQ, S3-compatible
-object storage (MinIO locally), zod (env + DTOs via `nestjs-zod`), pino, Jest.
+`demo-server/` in this folder is the old in-memory mock. It stays because the frontend's unit tests run against its
+core (the `@demo-core` alias in `frontend/vite.config.ts`). The real API doesn't use it.
+
+**Stack:** Node 22, NestJS 10 on Fastify, TypeScript (strict), Prisma 6 + PostgreSQL 16, optional Redis (rate-limit
+counters), local-folder or S3-compatible file storage, pino, Jest, Playwright (via the frontend's specs).
+
+**Shared rules:** warranty status, entitlement, registration row checks and claim status steps come from
+`../shared/wms-domain` (`@wms/domain`), the same code the frontend runs. The build bundles it (webpack via Nest CLI,
+tsconfig `paths`), so the two can't drift.
 
 ## Getting started
 
 ```bash
 cd backend
-cp .env.example .env
-docker compose up -d                 # postgres :5433, redis :6379, minio :9000/:9001, mailpit :8025, pgadmin :5050
-pnpm install
-pnpm db:deploy && pnpm db:seed       # migrate as wms_owner, then load demo data (safe to re-run)
-pnpm db:seed:images                  # optional, needs internet: official product photos into MinIO
-pnpm start:dev                       # API   -> http://localhost:3000/api/v1   (Swagger at /docs)
-pnpm worker:dev                      # worker: outbox relay, email, PDFs, file scan, imports, SLA + purge jobs
+cp .env.example .env                 # already set up for local development
+docker compose up -d                 # Postgres :5433, Redis :6379, pgAdmin :5050
+npm install
+npm run db:deploy                    # migrations, as the owner role
+npm run db:seed                      # demo data (safe to re-run; replaces business data)
+npm run start:dev                    # API on http://localhost:4000/api, Swagger on http://localhost:4000/docs
 ```
 
-Then start the frontend with `npm run dev` in `../frontend`. It talks to this API and to the dev identity provider.
+Then, in `../frontend`: `npm run dev` and open http://localhost:5173. The frontend's dev server proxies `/api` to
+port 4000 by default (`DEMO_API_URL`), which is why the API listens there. Don't run the mock server at the same time.
 
-Postgres is on host port **5433** so it doesn't clash with a locally installed Postgres on 5432.
+Sign in with the "Sign in as" picker, or with any demo account and `DEMO_PASSWORD` (`Demo#2026`):
 
-### Signing in (development)
+| Email                     | Role                                   |
+| ------------------------- | -------------------------------------- |
+| `admin@demo.wms`          | Admin (sees everything)                |
+| `dealer.coolair@demo.wms` | Dealer CoolAir Traders                 |
+| `dealer.breeze@demo.wms`  | Dealer Breeze Point                    |
+| `dist.northstar@demo.wms` | Distributor NorthStar (both dealers)   |
+| `customer.rk@demo.wms`    | Customer R. Kulkarni                   |
 
-`DEV_IDP_ENABLED=true` turns on a built-in identity provider at `/dev-idp`. It signs real RS256 tokens and serves a
-JWKS, so the guard verifies tokens exactly as it would with the production IdP. There are no passwords. Pick a seeded
-user on the sign-in screen:
-
-| Email               | Role                              |
-| ------------------- | --------------------------------- |
-| `tech@example.com`  | Technician                        |
-| `dist@example.com`  | Distributor (sees its org's data) |
-| `agent@example.com` | Claims agent                      |
-| `svc@example.com`   | Service center                    |
-| `admin@example.com` | Admin                             |
-
-Roles come from the `users` table, not the token (cached for 60 s). The dev IdP refuses to start when
-`NODE_ENV=production`.
-
-### Local tools
-
-| Tool          | URL                        | Login                          |
-| ------------- | -------------------------- | ------------------------------ |
-| Swagger       | http://localhost:3000/docs | —                              |
-| Mailpit       | http://localhost:8025      | —                              |
-| MinIO console | http://localhost:9001      | values in `.env` (`STORAGE_*`) |
-| pgAdmin       | http://localhost:5050      | values in `docker-compose.yml` |
+Postgres is on host port **5433** so it doesn't clash with a local install. If your Docker volume was created by
+an earlier version of this backend, the `wms_hvac*` databases don't exist yet: create them with the three
+`CREATE DATABASE` lines in `docker/postgres/init/01-roles.sql` (or remove the volume to start over).
 
 ## Scripts
 
-| Script                          | What it does                                                             |
-| ------------------------------- | ------------------------------------------------------------------------ |
-| `pnpm start:dev` / `worker:dev` | API / worker with watch mode                                             |
-| `pnpm build`, `start`, `worker` | Compile, then run `dist/main.js` / `dist/worker.js`                      |
-| `pnpm typecheck` / `lint`       | `tsc --noEmit` / ESLint with zero warnings                               |
-| `pnpm test` / `test:cov`        | Unit tests (engines, state machines, scope, SLA, file policy)            |
-| `pnpm test:e2e`                 | HTTP tests through `app.inject` against the `wms_test` DB and Redis DB 1 |
-| `pnpm db:migrate` / `db:deploy` | Create a migration (dev) / apply migrations                              |
-| `pnpm db:seed`                  | Idempotent demo data                                                     |
-| `pnpm db:seed:images`           | Loads official product photos into storage (`--force` replaces them)     |
-| `pnpm openapi:export`           | Writes `openapi.json` (the frontend types mirror it)                     |
-| `pnpm routes:public`            | Lists every route that skips auth. Review it in each PR.                 |
+| Script                         | What it does                                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `npm run start:dev`            | API in watch mode                                                                              |
+| `npm run build` / `npm start`  | Webpack build to `dist/`, then run `dist/main.js`                                              |
+| `npm run typecheck` / `lint`   | `tsc --noEmit` (includes the shared rules) / ESLint with zero warnings                         |
+| `npm test`                     | Unit tests (scope, sessions, sheets, files, dates, job helpers)                                |
+| `npm run test:e2e`             | API tests through `app.inject` against the `wms_hvac_e2e` database, with a fixed clock         |
+| `npm run test:ui`              | **The frontend's own Playwright specs (`../frontend/e2e`, unchanged) against this API**        |
+| `npm run db:deploy` / `db:migrate` | Apply migrations / create a new one (development)                                          |
+| `npm run db:seed`              | Load the demo data set (refuses in production without `--force`)                               |
+| `npm run openapi:export`       | Writes `openapi.json` (committed: the machine-readable contract)                               |
+| `npm run routes:public`        | Lists every unauthenticated route. Review it in each PR (there are 6).                         |
 
-The e2e suite needs `docker compose up -d`. It migrates `wms_test` itself and truncates it before each suite, so it
-never touches dev data. Suites share that database, so always run them serially (the script passes `--runInBand`).
+`test:e2e` and `test:ui` need `docker compose up -d`. `test:ui` also needs `npm run build` first and a Chromium for
+Playwright (`npx playwright install chromium` in `../frontend`); it migrates and seeds `wms_hvac_test` itself.
 
 ## Layout
 
 ```
 src/
-├── main.ts / worker.ts   two entry points, one image (API vs worker command)
-├── app.factory.ts        middleware shared by production and tests: request id, helmet, CORS, prefix, Swagger
-├── config/               zod-validated env; the process exits on bad config
-├── common/               auth (guard, JWT verifier, scope helpers), errors, If-Match/ETag, idempotency, throttling,
-│                         pagination, validation, UTC date + business-hours maths, logger
-├── infra/                prisma (primary + read replica), redis/cache, blob storage, transactional outbox
-├── modules/<name>/       controller · service · dto · index.ts (the only file other modules may import)
-│   users, dev-idp, health, audit, products, policies, warranty, customers, attachments,
-│   registrations, claims, rma, reports
-├── worker/               outbox relay, notifications, maintenance
-└── cli/                  openapi export, public-route listing
-prisma/                   schema, hand-reviewed SQL migrations, seed
-test/                     e2e harness, factories, suites
+├── main.ts, app.factory.ts, app.module.ts   bootstrap; middleware shared by production, tests and CLIs
+├── config/        zod-validated env; the process refuses to start on bad config
+├── common/        auth decorators and request context, errors, list queries, multipart, file headers,
+│                  rate limits, ids (Postgres sequences), dates, business calendar, logger
+├── domain/        scoping rules (who sees which rows) and the row -> API view mappers
+├── infra/         Prisma, optional Redis, blob storage (local folder or S3/MinIO)
+├── modules/<name>/  controller · service · index.ts (the only file other modules may import)
+│     auth, catalog (models, brands, dealers, org), files, units, registrations (incl. bulk import),
+│     complaints, claims, integrations, notifications, dashboard, health, demo (accounts, simulator, seed)
+└── cli/           OpenAPI export, public-route listing
+prisma/            schema, migrations (hand-reviewed SQL), seed entry point
+test/e2e/          API suites;  test/ui/  Playwright config that reuses the frontend's specs
 ```
 
-## Rules the tooling and review enforce
+## Rules the code and tests enforce
 
-- **Modules import each other only through `index.ts`** (eslint-plugin-boundaries). Cross-module calls that would
-  create a cycle go through a port (for example, claims issues RMAs via `RmaIssuer`).
-- **Everything is deny-by-default.** A route needs `@Roles(...)` or an explicit `@Public()`. There are 10 public routes.
-- **Out-of-scope rows return 404, not 403**, so IDs can't be probed. Use the helpers in `common/auth/scope.ts`.
-- **Mutations on existing records need `If-Match`.** A missing header gets 428; a stale one gets 409 `STALE_VERSION`.
-  Creates accept `Idempotency-Key`.
-- **Side effects go through the outbox** in the same transaction as the change. Never send email or enqueue a job
-  directly from a request.
-- **Status changes only through the state machines** (`claims/claim-state-machine.ts`, `rma/rma-state-machine.ts`).
-  Responses carry `allowedActions`, and the UI renders buttons from them.
-- **No `$queryRawUnsafe` / `$executeRawUnsafe`** (lint-banned). Use tagged `$queryRaw`.
-- **Lists are paginated on the server** with `?page=&pageSize=&sort=&q=` (`common/pagination`). `pageSize` is
-  capped at 100 and `sort` must be on the endpoint's allow-list.
-- **Product photos live in object storage**, never as external URLs. `products.image_key` holds the key and
-  responses carry a versioned `imageUrl` (`API_PUBLIC_URL` + `/products/{sku}/image?v=...`). A new upload means
-  a new URL, so the image route can send `Cache-Control: immutable`.
-- **Dates are UTC, date-only values are `DATE` columns.** Warranty end = start + months − 1 day.
-- **The app connects as `wms_app`**, which can't run DDL or delete audit rows. Migrations run as `wms_owner`.
+- **Deny by default.** Every route needs a signed-in user unless it's `@Public()`; `@Roles()` limits it further.
+- **Scope on the server.** Admin: everything; distributor: its dealers' rows; dealer: its own; customer: rows with
+  its customer id, never claims. Out-of-scope rows answer **404**, not 403 (`src/domain/scope.ts`).
+- **Sessions:** email + password (scrypt) → short-lived access JWT in the body + httpOnly `wms_refresh` cookie
+  (`Path=/api`, SameSite=Lax, Secure on HTTPS). Only the cookie token's SHA-256 is stored. Every request re-checks
+  the session, so signing out ends the access token too. The cookie authenticates **only** file downloads
+  (`@CookieAuth()`: `<img src>`, `<object>`, plain links), never JSON endpoints.
+- **Status changes only through the shared state machine** (`nextClaimStatus`), with compare-and-set updates, so
+  concurrent actions can't both win. Units and registrations are row-locked while they change.
+- **One transaction per business change**, including its notifications and integration-log entries.
+- **Errors** always look like `{ code, message, fieldErrors?, requestId }`; codes and field-error i18n keys are the
+  ones the frontend knows (`src/common/errors/app-error.ts`).
+- **No unsafe raw SQL** (lint-banned). Sort columns come from allow-lists.
+- **Least privilege:** the app connects as `wms_app` (rows only, no DDL); migrations run as `wms_owner`.
+- **Demo features** (`DEMO_FEATURES_ENABLED`: the sign-in account list and the A13 simulator) aren't mounted unless
+  enabled, and the API refuses to start with them in production.
 
-## Deviations from the build guide
+## Deployment notes
 
-1. **Storage images.** `minio/minio` and `minio/mc` are no longer pullable from Docker Hub, so compose uses
-   `quay.io/minio/minio`, and the API creates the bucket at startup in development. The Azure Blob adapter is a
-   TODO behind the `BlobStorage` interface.
-2. **Malware scan** checks file type by magic bytes and size only. The antivirus engine is a TODO in the scan job.
-   Files stay `PENDING` → `CLEAN`/`INFECTED` exactly as the guide describes, so an AV engine can be added without
-   changing callers.
-3. **Audit log partitions.** `audit_log` is partitioned by month, but rows currently land in the default partition.
-   Creating monthly partitions needs DDL rights the app role doesn't have. Make it a migration or a DBA job before go-live.
-4. **Pagination** is `page`/`pageSize` everywhere, including claims (the guide suggests keyset for large lists).
-   Revisit once claim volumes are known.
-5. **Test database.** e2e uses the compose `wms_test` database instead of Testcontainers, which keeps it fast on Windows
-   dev machines. CI can point `TEST_DATABASE_URL` / `TEST_DATABASE_OWNER_URL` / `TEST_REDIS_URL` elsewhere.
-6. **Identity.** The dev IdP stands in until Fieldpiece confirms the provider. Switching means setting the `OIDC_*`
-   values and `DEV_IDP_ENABLED=false`. No other code changes.
+- Build the image from the repository root: `docker build -f backend/Dockerfile --target runtime .` (target
+  `migrate` applies migrations). `docker compose --profile app up -d --build` runs both locally.
+- Set `AUTH_JWT_SECRET` (32+ random characters), `DATABASE_URL`, `STORAGE_DRIVER=s3` with its bucket and keys,
+  `CORS_ORIGINS` if the frontend is on another origin, and `DEMO_FEATURES_ENABLED=false`.
+- Serve the frontend and `/api` from the same site (reverse proxy), so the session cookie and `<img src>` file URLs
+  work without third-party cookies.
 
-Search the code for `TODO` and `[CONFIRM]` to find open work and questions for Fieldpiece.
+## Open items [CONFIRM]
+
+Search the code for `[CONFIRM]` and `TODO`. The main ones: the real integrations (service system, OEM, ERP, CRM,
+Finance, mailbox) replace the simulator and the "recorded as delivered" outbound log; password reset
+(`POST /auth/forgot-password` isn't implemented: the frontend hides it in the demo build); an identity provider if
+Fieldpiece wants SSO; business time zone and currency per market.

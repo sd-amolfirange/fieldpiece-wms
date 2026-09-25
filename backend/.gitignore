@@ -5,5 +5,6 @@ coverage
 .env
 .env.*
 !.env.example
-openapi.json
-.dev-keys
+# Local file storage (STORAGE_DRIVER=local) and test output
+var
+test-results

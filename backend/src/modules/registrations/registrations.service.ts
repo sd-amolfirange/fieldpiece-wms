@@ -1,396 +1,547 @@
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { Prisma, type Customer } from "@prisma/client";
-import type { AuthUser, RequestContext } from "../../common/auth/auth-user";
-import { registrationScope } from "../../common/auth/scope";
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import {
+  buildUnitParts,
+  hasErrors,
+  isIsoDate,
+  needsAdminReview,
+  normalizeSerialValue,
+  REGISTRATION_CHANNELS,
+  REGISTRATION_FLAGS,
+  REGISTRATION_STATUSES,
+  validateRegistrationRow,
+  type IsoDate,
+  type Paginated,
+  type RegistrationChannel,
+  type RegistrationCustomer,
+  type RegistrationFlag,
+  type RegistrationRowInput,
+  type RegistrationView,
+  type RowContext,
+} from "@wms/domain";
+import type { Actor, Ctx } from "../../common/auth/context";
+import { toDbDate, toDbDateOpt } from "../../common/db/dates";
+import { nextId } from "../../common/db/ids";
 import { AppError } from "../../common/errors/app-error";
-import { ErrorCode } from "../../common/errors/error-codes";
-import { orderByFrom, pageArgs, type Paginated } from "../../common/pagination/pagination";
-import { Clock } from "../../common/time/clock";
-import { addUtcDays, formatIsoDate, parseIsoDate, startOfUtcDay } from "../../common/time/utc-date";
-import { ENV } from "../../config/config.module";
-import type { Env } from "../../config/env";
-import { OutboxService } from "../../infra/outbox/outbox.service";
-import { PrismaService, type Tx } from "../../infra/prisma/prisma.service";
-import { BlobStorage } from "../../infra/storage/blob-storage";
-import { AttachmentsService } from "../attachments";
-import { AuditService } from "../audit";
-import { CustomersService } from "../customers";
-import { PoliciesService } from "../policies";
-import { ProductsService } from "../products";
-import { computeWarranty, computeWarrantyStatus, WarrantyService } from "../warranty";
-import type {
-  CreateRegistrationInput,
-  RegistrationDetailResponse,
-  RegistrationListQueryDto,
-  RegistrationResponse,
-} from "./dto";
-import { checkRegistrationRules } from "./registration-rules";
-import { type RegistrationRow, RegistrationsRepository } from "./registrations.repository";
+import {
+  listQuery,
+  pageArgs,
+  queryEnum,
+  type RawQuery,
+  resolveSort,
+} from "../../common/http/list-query";
+import { type Db, PrismaService, type Tx } from "../../infra/prisma/prisma.service";
+import { canSee, dealerIdFor, requireRole, scopeWhere } from "../../domain/scope";
+import { modelInclude, registrationInclude, type RegistrationRow, toModelView, toRegistrationView } from "../../domain/views";
+import { CatalogService } from "../catalog";
+import { FilesService } from "../files";
+import { IntegrationLog } from "../integrations";
+import { Notifier } from "../notifications";
+import { UnitsRepository, UnitsService } from "../units";
+import { createBody, emailKey, phoneKey, rowFieldErrors, rowToFields } from "./registration-input";
 
-const CERT_URL_TTL = 300;
+// Registration rules (api-contract §5.3, docs/demo-workflows.md W1, W2, W6):
+// - Customer (Portal): always Pending; flagged when the serial is unknown, already registered or the model differs.
+// - Dealer / distributor / admin (form or bulk): clean rows are approved at once; a duplicate serial goes to admin
+//   review; other problems come back as field errors to fix.
+// - Approval creates or completes the unit and attaches the model's parts, each with its own warranty.
+
+/** Who a registration is written by: a signed-in user, or the system for ERP and email intake. */
+export interface Submitter {
+  id: string;
+  name: string;
+}
+
+export interface NewRegistration {
+  serial: string;
+  modelCode: string;
+  customer: RegistrationCustomer;
+  customerId?: string;
+  dealerId?: string;
+  installDate?: IsoDate;
+  purchaseDate?: IsoDate;
+  invoiceNumber?: string;
+  location?: string;
+  attachmentIds?: string[];
+  duplicateOfSerial?: string;
+  batchId?: string;
+}
+
+type OrderBy = Prisma.RegistrationOrderByWithRelationInput;
+const SORTS: Record<string, (dir: Prisma.SortOrder) => OrderBy> = {
+  id: (dir) => ({ id: dir }),
+  channel: (dir) => ({ channel: dir }),
+  status: (dir) => ({ status: dir }),
+  serial: (dir) => ({ serial: dir }),
+  modelCode: (dir) => ({ modelCode: dir }),
+  customer: (dir) => ({ customerName: dir }),
+  customerName: (dir) => ({ customerName: dir }),
+  installDate: (dir) => ({ installDate: dir }),
+  purchaseDate: (dir) => ({ purchaseDate: dir }),
+  invoiceNumber: (dir) => ({ invoiceNumber: dir }),
+  submittedByName: (dir) => ({ submittedByName: dir }),
+  submittedAt: (dir) => ({ submittedAt: dir }),
+  reviewedAt: (dir) => ({ reviewedAt: dir }),
+  dealerName: (dir) => ({ dealer: { name: dir } }),
+};
+
+const isUniqueViolation = (err: unknown) =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+
+const duplicateSerial = () =>
+  AppError.conflict("duplicate_serial", "This serial is already registered. Merge or reject the registration.");
 
 @Injectable()
 export class RegistrationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly repo: RegistrationsRepository,
-    private readonly products: ProductsService,
-    private readonly policies: PoliciesService,
-    private readonly customers: CustomersService,
-    private readonly attachments: AttachmentsService,
-    private readonly warranty: WarrantyService,
-    private readonly audit: AuditService,
-    private readonly outbox: OutboxService,
-    private readonly storage: BlobStorage,
-    private readonly clock: Clock,
-    @Inject(ENV) private readonly env: Env,
+    private readonly catalog: CatalogService,
+    private readonly files: FilesService,
+    private readonly units: UnitsService,
+    private readonly unitRows: UnitsRepository,
+    private readonly notifier: Notifier,
+    private readonly integrations: IntegrationLog,
   ) {}
 
-  toResponse(r: RegistrationRow): RegistrationResponse {
-    return {
-      id: r.id,
-      serialNumber: r.serialNumber,
-      sku: r.product.sku,
-      productName: r.product.name,
-      customerId: r.customerId,
-      customerName: r.customer.companyName ?? r.customer.contactName,
-      distributorId: r.distributorId,
-      policyId: r.policyId,
-      purchaseDate: formatIsoDate(r.purchaseDate),
-      warrantyStart: formatIsoDate(r.warrantyStart),
-      warrantyEnd: formatIsoDate(r.warrantyEnd),
-      status: computeWarrantyStatus({
-        status: r.status,
-        warrantyEnd: r.warrantyEnd,
-        today: this.clock.now(),
-        expiringSoonDays: this.env.EXPIRING_SOON_DAYS,
-      }),
-      replacesRegistrationId: r.replacesRegistrationId,
-      certificateReady: r.certificateKey !== null,
-      version: r.version,
-      createdAt: r.createdAt.toISOString(),
-    };
-  }
+  // ── Reads ──────────────────────────────────────────────────────────────────
 
-  async list(user: AuthUser, query: RegistrationListQueryDto): Promise<Paginated<RegistrationResponse>> {
+  async list(ctx: Ctx, query: RawQuery): Promise<Paginated<RegistrationView>> {
+    const list = listQuery(query);
+    const flag = queryEnum(query, "flag", REGISTRATION_FLAGS);
+    const q = list.q;
     const where: Prisma.RegistrationWhereInput = {
-      AND: [
-        registrationScope(user),
-        this.statusFilter(query.status),
-        query.customerId ? { customerId: query.customerId } : {},
-        query.sku ? { product: { sku: query.sku } } : {},
-        query.serial ? { serialNumber: { equals: query.serial, mode: "insensitive" } } : {},
-        query.q ? { serialNumber: { contains: query.q, mode: "insensitive" } } : {},
-      ],
+      ...scopeWhere(ctx.user),
+      status: queryEnum(query, "status", REGISTRATION_STATUSES),
+      channel: queryEnum(query, "channel", REGISTRATION_CHANNELS),
+      ...(flag ? { flags: { has: flag } } : {}),
+      ...(q
+        ? {
+            OR: [
+              { serial: { contains: q, mode: "insensitive" } },
+              { customerName: { contains: q, mode: "insensitive" } },
+              { modelCode: { contains: q, mode: "insensitive" } },
+              { dealer: { name: { contains: q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
     };
-    const orderBy = orderByFrom<Prisma.RegistrationOrderByWithRelationInput>(
-      query.sort,
+    const [total, rows] = await Promise.all([
+      this.prisma.registration.count({ where }),
+      this.prisma.registration.findMany({
+        where,
+        include: registrationInclude,
+        orderBy: [resolveSort(list.sort, SORTS, "-submittedAt"), { id: "asc" }],
+        ...pageArgs(list),
+      }),
+    ]);
+    return { items: await this.views(this.prisma, ctx, rows), total, page: list.page, pageSize: list.pageSize };
+  }
+
+  async get(ctx: Ctx, id: string, db: Db = this.prisma): Promise<RegistrationView> {
+    const row = await db.registration.findUnique({ where: { id }, include: registrationInclude });
+    if (!row || !canSee(ctx.user, row)) throw AppError.notFound("Registration");
+    const [view] = await this.views(db, ctx, [row]);
+    return view!;
+  }
+
+  private async views(db: Db, ctx: Pick<Ctx, "user" | "today">, rows: RegistrationRow[]): Promise<RegistrationView[]> {
+    const serials = ctx.user.role === "admin" ? rows.flatMap((r) => r.duplicateOfSerial ?? []) : [];
+    const duplicates = new Map((await this.unitRows.load(db, serials)).map((u) => [u.serial, u]));
+    return rows.map((r) => toRegistrationView(r, ctx, r.duplicateOfSerial ? duplicates.get(r.duplicateOfSerial) : null));
+  }
+
+  // ── Create (CU01, DL03) ────────────────────────────────────────────────────
+
+  async create(ctx: Ctx, rawBody: unknown): Promise<RegistrationView> {
+    const body = createBody(rawBody);
+    const { user } = ctx;
+    const id = await this.prisma.tx(async (tx) => {
+      await this.files.assertOwn(tx, user, body.attachmentIds);
+      return user.role === "customer" ? this.createByCustomer(tx, ctx, body) : this.createByDealer(tx, ctx, body);
+    });
+    return this.get(ctx, id);
+  }
+
+  /** CU01 (Portal): always Pending, for the admin to check against the invoice. */
+  private async createByCustomer(tx: Tx, ctx: Ctx, body: ReturnType<typeof createBody>): Promise<string> {
+    const { user } = ctx;
+    const serial = normalizeSerialValue(body.serial);
+    const modelCode = (body.modelCode ?? "").trim().toUpperCase();
+    const errors: Record<string, string> = {};
+    if (!serial) errors.serial = "validation.required";
+    if (!modelCode) errors.modelCode = "validation.required";
+    if (!isIsoDate(body.purchaseDate)) errors.purchaseDate = "validation.date";
+    else if (body.purchaseDate > ctx.today) errors.purchaseDate = "rowErrors.future_date";
+    if (!body.attachmentIds?.length) errors.attachmentIds = "validation.invoiceRequired";
+    if (Object.keys(errors).length) throw AppError.validation("Check the highlighted fields.", errors);
+
+    const unit = await tx.unit.findUnique({
+      where: { serial },
+      include: { model: true, _count: { select: { parts: true } } },
+    });
+    const customer = user.customerId ? await tx.customer.findUnique({ where: { id: user.customerId } }) : null;
+    const registered = !!unit && unit._count.parts > 0;
+    const flags: RegistrationFlag[] = [];
+    if (!unit) flags.push("EXCEPTION");
+    else if (registered) flags.push("DUPLICATE", "EXCEPTION");
+    if (unit && unit.model.code !== modelCode) flags.push("MODEL_MISMATCH");
+
+    const id = await this.insert(
+      tx,
       {
-        createdAt: (d) => ({ createdAt: d }),
-        purchaseDate: (d) => ({ purchaseDate: d }),
-        warrantyEnd: (d) => ({ warrantyEnd: d }),
-        serialNumber: (d) => ({ serialNumber: d }),
+        serial,
+        modelCode,
+        customer: {
+          name: customer?.name ?? user.name,
+          phone: customer?.phone || undefined,
+          email: customer?.email ?? user.email,
+          city: customer?.city || undefined,
+        },
+        customerId: user.customerId,
+        dealerId: unit?.dealerId ?? undefined,
+        purchaseDate: body.purchaseDate,
+        location: body.location?.trim() || undefined,
+        attachmentIds: body.attachmentIds ?? [],
+        duplicateOfSerial: registered ? serial : undefined,
       },
-      "-createdAt",
+      "PORTAL",
+      user,
+      ctx.now,
     );
-    const { skip, take } = pageArgs(query);
-    const { items, total } = await this.repo.list(this.prisma, where, skip, take, orderBy);
-    return { items: items.map((r) => this.toResponse(r)), page: query.page, pageSize: query.pageSize, total };
+    await this.sendToReview(tx, id, serial, flags, ctx.now);
+    return id;
   }
 
-  async get(user: AuthUser, id: string): Promise<RegistrationDetailResponse> {
-    const row = await this.repo.findScoped(this.prisma, id, registrationScope(user));
-    if (!row) throw AppError.notFound("Registration");
+  /** DL03: a clean registration is approved at once; a duplicate serial waits for the admin. */
+  private async createByDealer(tx: Tx, ctx: Ctx, body: ReturnType<typeof createBody>): Promise<string> {
+    const { user } = ctx;
+    requireRole(user, "admin", "dealer", "distributor");
+    const dealerId = dealerIdFor(user, body.dealerId, await this.catalog.dealerIds(tx));
+    const errors = validateRegistrationRow(body, await this.rowContext(tx, ctx.today, body.serial));
+    const fields = rowToFields(body);
+    const extra = {
+      dealerId,
+      purchaseDate: body.purchaseDate || fields.installDate,
+      location: body.location?.trim() || undefined,
+      attachmentIds: body.attachmentIds ?? [],
+    };
+    if (needsAdminReview(errors)) {
+      const id = await this.insert(tx, { ...fields, ...extra, duplicateOfSerial: fields.serial }, "DEALER", user, ctx.now);
+      await this.sendToReview(tx, id, fields.serial, ["DUPLICATE", "EXCEPTION"], ctx.now);
+      return id;
+    }
+    if (hasErrors(errors)) throw AppError.validation("Check the highlighted fields.", rowFieldErrors(errors));
+    if (extra.purchaseDate && (!isIsoDate(extra.purchaseDate) || extra.purchaseDate > ctx.today)) {
+      throw AppError.validation("Check the highlighted fields.", { purchaseDate: "validation.date" });
+    }
+
+    const customerId = await this.customerIdFor(tx, fields.customer, ctx.now);
+    const id = await this.insert(tx, { ...fields, ...extra, customerId }, "DEALER", user, ctx.now);
+    await this.approve(tx, ctx, id, "Auto-approved (dealer registration)");
+    return id;
+  }
+
+  // ── Admin decisions (A02, A03) ─────────────────────────────────────────────
+
+  async approveOne(ctx: Ctx, id: string): Promise<RegistrationView> {
+    requireRole(ctx.user, "admin");
+    await this.prisma.tx(async (tx) => {
+      const reg = await this.pending(tx, id);
+      if (reg.flags.includes("DUPLICATE")) throw duplicateSerial();
+      if (!reg.customerId) {
+        const customerId = await this.customerIdFor(tx, this.customerOf(reg), ctx.now);
+        await tx.registration.update({ where: { id }, data: { customerId } });
+      }
+      await this.approve(tx, ctx, id, ctx.user.name);
+    });
+    return this.get(ctx, id);
+  }
+
+  async reject(ctx: Ctx, id: string, rawReason: unknown): Promise<RegistrationView> {
+    requireRole(ctx.user, "admin");
+    await this.prisma.tx(async (tx) => {
+      const reg = await this.pending(tx, id);
+      const reason = typeof rawReason === "string" ? rawReason.trim().slice(0, 1000) : "";
+      if (!reason) throw AppError.validation("Give a reason.", { reason: "validation.reasonRequired" });
+      await tx.registration.update({
+        where: { id },
+        data: { status: "REJECTED", rejectReason: reason, reviewedByName: ctx.user.name, reviewedAt: ctx.now },
+      });
+      const followers = await this.notifier.followers(tx, reg, { includeDealer: false });
+      await this.notifier.notify(tx, [reg.submittedBy, ...followers], "registration_rejected", ctx.now, {
+        params: { serial: reg.serial, reason },
+      });
+    });
+    return this.get(ctx, id);
+  }
+
+  /** A duplicate of an existing unit: keep the existing record, add this submission's files to it. */
+  async merge(ctx: Ctx, id: string): Promise<RegistrationView> {
+    requireRole(ctx.user, "admin");
+    await this.prisma.tx(async (tx) => {
+      const reg = await this.pending(tx, id);
+      const serial = reg.duplicateOfSerial;
+      if (serial) await this.unitRows.lock(tx, serial);
+      const unit = serial ? await tx.unit.findUnique({ where: { serial } }) : null;
+      if (!unit) throw AppError.conflict("nothing_to_merge", "There's no existing record to merge into.");
+      await tx.unit.update({
+        where: { serial: unit.serial },
+        data: { attachmentIds: [...unit.attachmentIds, ...reg.attachmentIds] },
+      });
+      await this.units.addEvent(tx, unit.serial, {
+        at: ctx.now,
+        type: "note",
+        byName: ctx.user.name,
+        text: `Merged registration ${reg.id}`,
+        refId: reg.id,
+      });
+      await tx.registration.update({
+        where: { id },
+        data: { status: "APPROVED", reviewedByName: ctx.user.name, reviewedAt: ctx.now },
+      });
+    });
+    return this.get(ctx, id);
+  }
+
+  /** A02 bulk approve. Skips duplicates, decided rows and unknown models; each approval stands on its own. */
+  async bulkApprove(ctx: Ctx, rawIds: unknown): Promise<{ approved: number; skipped: number }> {
+    requireRole(ctx.user, "admin");
+    const ids = Array.isArray(rawIds) ? rawIds.filter((id): id is string => typeof id === "string").slice(0, 500) : [];
+    const modelCodes = await this.catalog.modelCodes();
+    let approved = 0;
+    let skipped = 0;
+    for (const id of ids) {
+      let done = false;
+      try {
+        done = await this.prisma.tx(async (tx) => {
+          const reg = await this.pending(tx, id);
+          if (reg.flags.includes("DUPLICATE") || !modelCodes.has(reg.modelCode)) return false;
+          if (!reg.customerId) {
+            const customerId = await this.customerIdFor(tx, this.customerOf(reg), ctx.now);
+            await tx.registration.update({ where: { id }, data: { customerId } });
+          }
+          await this.approve(tx, ctx, id, ctx.user.name);
+          return true;
+        });
+      } catch (err) {
+        // Missing, already decided, or registered meanwhile: skip it, keep going.
+        if (!(err instanceof AppError)) throw err;
+      }
+      if (done) approved += 1;
+      else skipped += 1;
+    }
+    return { approved, skipped };
+  }
+
+  // ── Shared with bulk import and the simulator ──────────────────────────────
+
+  /** Row check context: the product master and whether this serial is already registered. */
+  async rowContext(db: Db, today: IsoDate, serialInput: string | undefined, seenInFile?: ReadonlySet<string>): Promise<RowContext> {
+    const serial = normalizeSerialValue(serialInput);
+    const registered = serial
+      ? await db.unit.findFirst({ where: { serial, parts: { some: {} } }, select: { serial: true } })
+      : null;
     return {
-      ...this.toResponse(row),
-      proofOfPurchase: await this.attachments.forOwner(this.prisma, "registration", id),
-      claimCount: row._count.claims,
+      modelCodes: await this.catalog.modelCodes(db),
+      existingSerials: new Set(registered ? [registered.serial] : []),
+      seenInFile,
+      today,
     };
   }
 
-  /** Scoped lookup by serial, for claims ("pick a registered unit or enter its serial"). */
-  async findActiveBySerialScoped(tx: Tx, user: AuthUser, serial: string) {
-    return tx.registration.findFirst({
-      where: {
-        AND: [
-          registrationScope(user),
-          { status: "ACTIVE", serialNumber: { equals: serial, mode: "insensitive" } },
-        ],
+  async insert(db: Db, fields: NewRegistration, channel: RegistrationChannel, by: Submitter, now: Date): Promise<string> {
+    const id = await nextId(db, "REG");
+    await db.registration.create({
+      data: {
+        id,
+        channel,
+        status: "PENDING",
+        flags: [],
+        serial: fields.serial,
+        modelCode: fields.modelCode,
+        customerName: fields.customer.name,
+        customerPhone: fields.customer.phone,
+        customerEmail: fields.customer.email,
+        customerCity: fields.customer.city,
+        customerId: fields.customerId,
+        dealerId: fields.dealerId,
+        installDate: toDbDateOpt(fields.installDate),
+        purchaseDate: toDbDateOpt(fields.purchaseDate),
+        invoiceNumber: fields.invoiceNumber,
+        location: fields.location,
+        attachmentIds: fields.attachmentIds ?? [],
+        submittedBy: by.id,
+        submittedByName: by.name,
+        submittedAt: now,
+        duplicateOfSerial: fields.duplicateOfSerial,
+        batchId: fields.batchId,
       },
-      orderBy: { createdAt: "desc" },
+    });
+    return id;
+  }
+
+  /** Flags the registration and tells the admins it's waiting in the inbox. */
+  async sendToReview(db: Db, id: string, serial: string, flags: RegistrationFlag[], now: Date): Promise<void> {
+    await db.registration.update({ where: { id }, data: { flags } });
+    await this.notifier.notify(db, await this.notifier.adminIds(db), "registration_submitted", now, {
+      params: { serial },
+      link: `/registrations/${id}`,
     });
   }
 
-  async findScopedRaw(tx: Tx, user: AuthUser, id: string) {
-    return tx.registration.findFirst({ where: { AND: [{ id }, registrationScope(user)] } });
-  }
-
-  async create(ctx: RequestContext, input: CreateRegistrationInput): Promise<RegistrationResponse> {
-    const today = this.clock.now();
-    const purchaseDate = parseIsoDate(input.purchaseDate);
-    const product = await this.products.findBySku(this.prisma, input.sku);
-
-    const violation = checkRegistrationRules({ serial: input.serialNumber, purchaseDate, today, product });
-    if (violation)
-      throw AppError.unprocessable(violation.code, violation.message, {
-        [violation.field]: [violation.message],
-      });
-    if (!product) throw AppError.notFound("Product"); // unreachable: the rules report a missing product
-
-    try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        // Duplicate first: "already registered" is more useful than "missing receipt" (frontend 8.3).
-        await this.assertNotDuplicate(tx, ctx.user, product.id, input.serialNumber);
-        if (this.env.REQUIRE_PROOF_OF_PURCHASE && input.proofOfPurchaseIds.length === 0) {
-          throw AppError.unprocessable(
-            ErrorCode.PROOF_OF_PURCHASE_REQUIRED,
-            "Upload the receipt or invoice.",
-            {
-              proofOfPurchaseIds: ["Upload the receipt or invoice."],
-            },
-          );
-        }
-
-        const policy = await this.policies.policyFor(tx, product.id, purchaseDate);
-        if (!policy) {
-          throw AppError.unprocessable(
-            ErrorCode.POLICY_NOT_FOUND,
-            "No warranty policy covers this purchase date. Contact support.",
-          );
-        }
-        const { customer, distributorId } = await this.resolveCustomer(tx, ctx, input);
-        const warranty = computeWarranty({ purchaseDate, registeredAt: today, policy });
-
-        const row = await this.repo.create(tx, {
-          serialNumber: input.serialNumber,
-          productId: product.id,
-          customerId: customer.id,
-          distributorId,
-          policyId: policy.id,
-          purchaseDate,
-          warrantyStart: warranty.start,
-          warrantyEnd: warranty.end,
-          createdBy: ctx.user.id,
-        });
-        await this.attachments.link(tx, ctx.user, input.proofOfPurchaseIds, "registration", row.id);
-        await this.audit.record(tx, ctx, {
-          action: "registration.created",
-          entity: "registration",
-          entityId: row.id,
-          after: {
-            serialNumber: row.serialNumber,
-            sku: product.sku,
-            policyId: policy.id,
-            warrantyEnd: formatIsoDate(warranty.end),
-            bonusApplied: warranty.bonusApplied,
-          },
-        });
-        await this.outbox.add(tx, {
-          aggregate: "registration",
-          aggregateId: row.id,
-          type: "registration.created",
-          payload: { registrationId: row.id },
-        });
-        return row;
-      });
-      await this.warranty.invalidate(input.serialNumber);
-      return this.toResponse(created);
-    } catch (err) {
-      // Lost a race with a parallel request: the partial unique index did its job (Section 13.3).
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-        throw AppError.conflict(ErrorCode.REGISTRATION_DUPLICATE_SERIAL, "This unit is already registered.", {
-          ownedByYou: false,
-        });
-      }
-      throw err;
+  /** Matches an existing customer by phone (last 10 digits) or email, otherwise creates one. */
+  async customerIdFor(db: Db, customer: RegistrationCustomer, now: Date): Promise<string> {
+    const phone = phoneKey(customer.phone);
+    const email = emailKey(customer.email);
+    const or: Prisma.CustomerWhereInput[] = [];
+    if (phone) or.push({ phoneKey: phone });
+    if (email) or.push({ emailKey: email });
+    if (or.length) {
+      const existing = await db.customer.findFirst({ where: { OR: or }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+      if (existing) return existing.id;
     }
-  }
-
-  async void(
-    ctx: RequestContext,
-    id: string,
-    version: number,
-    reason: string,
-  ): Promise<RegistrationResponse> {
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const before = await this.repo.findScoped(tx, id, registrationScope(ctx.user));
-      if (!before) throw AppError.notFound("Registration");
-      if (before.status === "VOID") {
-        throw AppError.conflict(ErrorCode.CONFLICT, "This registration is already void.");
-      }
-      const { count } = await this.repo.updateVersioned(tx, id, version, { status: "VOID" });
-      if (count === 0) throw AppError.staleVersion();
-      await this.audit.record(tx, ctx, {
-        action: "registration.voided",
-        entity: "registration",
-        entityId: id,
-        before: { status: before.status },
-        after: { status: "VOID", reason },
-      });
-      await this.outbox.add(tx, {
-        aggregate: "registration",
-        aggregateId: id,
-        type: "registration.voided",
-        payload: { registrationId: id },
-      });
-      return (await this.repo.findScoped(tx, id, {}))!;
+    const id = await nextId(db, "CUS");
+    await db.customer.create({
+      data: {
+        id,
+        name: customer.name,
+        phone: customer.phone ?? "",
+        email: customer.email,
+        city: customer.city ?? "",
+        phoneKey: phone,
+        emailKey: email,
+        createdAt: now,
+      },
     });
-    await this.warranty.invalidate(updated.serialNumber);
-    return this.toResponse(updated);
-  }
-
-  async certificateUrl(user: AuthUser, id: string) {
-    const row = await this.repo.findScoped(this.prisma, id, registrationScope(user));
-    if (!row) throw AppError.notFound("Registration");
-    if (!row.certificateKey) {
-      throw AppError.conflict(
-        ErrorCode.CERTIFICATE_NOT_READY,
-        "The certificate is still being generated. Try again in a moment.",
-      );
-    }
-    const url = await this.storage.presignGet({
-      key: row.certificateKey,
-      expiresInSeconds: CERT_URL_TTL,
-      downloadName: `warranty-certificate-${row.serialNumber}.pdf`,
-    });
-    return { url, expiresAt: new Date(this.clock.now().getTime() + CERT_URL_TTL * 1000).toISOString() };
+    return id;
   }
 
   /**
-   * Replacement units (RMA "replace" outcome): voids the original and registers the new serial with the
-   * remaining term carried over. [CONFIRM] the replacement warranty rule (carry over vs new term).
+   * Creates or completes the unit, attaches the model's parts with their warranties, and approves. The warranty
+   * starts on the install date, else the purchase date, else today.
    */
-  async registerReplacement(tx: Tx, ctx: RequestContext, originalId: string, replacementSerial: string) {
-    const original = await tx.registration.findUnique({ where: { id: originalId } });
-    if (!original) throw AppError.notFound("Registration");
-    await this.assertNotDuplicate(tx, ctx.user, original.productId, replacementSerial);
-    await tx.registration.update({
-      where: { id: originalId },
-      data: { status: "VOID", version: { increment: 1 } },
+  async approve(
+    tx: Tx,
+    ctx: { today: IsoDate; now: Date },
+    id: string,
+    reviewer: string,
+    { notifyDealer = true }: { notifyDealer?: boolean } = {},
+  ): Promise<void> {
+    const reg = await tx.registration.findUniqueOrThrow({ where: { id } });
+    const model = await tx.model.findUnique({ where: { code: reg.modelCode }, include: modelInclude });
+    if (!model) throw AppError.conflict("unknown_model", "The model code isn't in the product master.");
+
+    await this.unitRows.lock(tx, reg.serial);
+    let unit = await tx.unit.findUnique({ where: { serial: reg.serial }, include: { model: { include: modelInclude } } });
+    if (unit && (await tx.unitPart.count({ where: { unitSerial: unit.serial } }))) throw duplicateSerial();
+    if (!unit) {
+      try {
+        // Savepoint-free: a concurrent insert of the same serial fails the whole transaction, reported as a duplicate.
+        await tx.unit.create({ data: { serial: reg.serial, modelId: model.id, brandId: model.brandId, attachmentIds: [] } });
+      } catch (err) {
+        if (isUniqueViolation(err)) throw duplicateSerial();
+        throw err;
+      }
+      unit = await tx.unit.findUniqueOrThrow({ where: { serial: reg.serial }, include: { model: { include: modelInclude } } });
+    }
+
+    const unitModel = toModelView(unit.model);
+    const installDate = reg.installDate ?? reg.purchaseDate;
+    const purchaseDate = reg.purchaseDate ?? reg.installDate;
+    const start: IsoDate = installDate ? installDate.toISOString().slice(0, 10) : ctx.today;
+    const suffix = reg.serial.slice(-6);
+    const parts = buildUnitParts(unitModel, start, {
+      idPrefix: reg.serial,
+      serials: { COMPRESSOR: `CP-${suffix}`, PCB: `PCB-${suffix}` },
     });
-    const today = startOfUtcDay(this.clock.now());
-    const replacement = await tx.registration.create({
+    await tx.unit.update({
+      where: { serial: unit.serial },
       data: {
-        serialNumber: replacementSerial,
-        productId: original.productId,
-        customerId: original.customerId,
-        distributorId: original.distributorId,
-        policyId: original.policyId,
-        purchaseDate: original.purchaseDate,
-        warrantyStart: today,
-        // Remaining term carries over; an already-expired unit (paid repair) ends today.
-        warrantyEnd: original.warrantyEnd < today ? today : original.warrantyEnd,
-        replacesRegistrationId: originalId,
-        createdBy: ctx.user.id,
+        dealerId: unit.dealerId ?? reg.dealerId,
+        customerId: reg.customerId,
+        installDate,
+        purchaseDate,
+        location: reg.location ?? unit.location,
+        registrationId: reg.id,
+        attachmentIds: [...unit.attachmentIds, ...reg.attachmentIds],
       },
     });
-    await this.audit.record(tx, ctx, {
-      action: "registration.replaced",
-      entity: "registration",
-      entityId: replacement.id,
-      after: { replaces: originalId, serialNumber: replacementSerial },
+    await tx.unitPart.createMany({
+      data: parts.map((p, position) => ({
+        id: p.id,
+        unitSerial: unit.serial,
+        position,
+        partType: p.partType,
+        serial: p.serial,
+        warrantyStart: toDbDate(p.warrantyStart),
+        warrantyEnd: toDbDate(p.warrantyEnd),
+        coversParts: p.coversParts,
+        coversLabour: p.coversLabour,
+      })),
     });
-    await this.outbox.add(tx, {
-      aggregate: "registration",
-      aggregateId: replacement.id,
-      type: "registration.created",
-      payload: { registrationId: replacement.id },
+    await this.units.addEvent(tx, unit.serial, { at: ctx.now, type: "registered", byName: reviewer, refId: reg.id });
+    await tx.registration.update({
+      where: { id },
+      data: { status: "APPROVED", reviewedByName: reviewer, reviewedAt: ctx.now },
     });
-    return replacement;
-  }
 
-  /** Data for emails and the certificate PDF (worker). */
-  findForDocument(id: string) {
-    return this.repo.findForDocument(this.prisma, id);
-  }
-
-  async setCertificateKey(id: string, key: string): Promise<void> {
-    await this.prisma.registration.update({ where: { id }, data: { certificateKey: key } });
-  }
-
-  invalidateLookup(serial: string): Promise<void> {
-    return this.warranty.invalidate(serial);
-  }
-
-  private async assertNotDuplicate(tx: Tx, user: AuthUser, productId: string, serial: string): Promise<void> {
-    const existing = await this.repo.findActiveDuplicate(tx, productId, serial);
-    if (!existing) return;
-    // Tell the caller whether THEY own it; never expose someone else's customer data (Section 8.2).
-    const ownedByYou =
-      existing.createdBy === user.id ||
-      existing.customer.userId === user.id ||
-      (user.has("distributor") &&
-        existing.distributorId !== null &&
-        existing.distributorId === user.organizationId);
-    throw AppError.conflict(ErrorCode.REGISTRATION_DUPLICATE_SERIAL, "This unit is already registered.", {
-      ownedByYou,
-      ...(ownedByYou ? { registrationId: existing.id } : {}),
-    });
-  }
-
-  private async resolveCustomer(
-    tx: Tx,
-    ctx: RequestContext,
-    input: CreateRegistrationInput,
-  ): Promise<{ customer: Customer; distributorId: string | null }> {
-    const { user } = ctx;
-    if (user.hasAny("claims_agent", "admin")) {
-      if (input.customerId) {
-        const customer = await this.customers.getScoped(tx, user, input.customerId);
-        return { customer, distributorId: input.distributorId ?? customer.distributorId };
-      }
-      if (!input.customer) throw this.customerRequired();
-      const distributorId = input.distributorId ?? null;
-      return {
-        customer: await this.customers.createForOrg(tx, ctx, input.customer, distributorId),
-        distributorId,
-      };
+    // W6: an emailed registration updates the customer record in CRM once approved.
+    if (reg.channel === "EMAIL") {
+      const customer = reg.customerId ? await tx.customer.findUnique({ where: { id: reg.customerId } }) : null;
+      await this.integrations.log(
+        tx,
+        {
+          system: "CRM",
+          direction: "OUT",
+          type: "crm_update",
+          refId: reg.id,
+          payload: {
+            action: "customer_product_registered",
+            customer: { id: customer?.id, name: customer?.name, email: customer?.email, phone: customer?.phone },
+            product: {
+              serial: reg.serial,
+              modelCode: reg.modelCode,
+              purchaseDate: purchaseDate?.toISOString().slice(0, 10),
+            },
+            registrationId: reg.id,
+            channel: reg.channel,
+          },
+        },
+        ctx.now,
+      );
     }
-    if (user.has("distributor")) {
-      if (!user.organizationId) throw AppError.forbidden("Your account isn't linked to a distributor.");
-      if (input.customerId) {
-        return {
-          customer: await this.customers.getScoped(tx, user, input.customerId),
-          distributorId: user.organizationId,
-        };
-      }
-      if (!input.customer) throw this.customerRequired();
-      return {
-        customer: await this.customers.createForOrg(tx, ctx, input.customer, user.organizationId),
-        distributorId: user.organizationId,
-      };
-    }
-    // Technician: registers units they own.
+    const recipients = await this.notifier.followers(tx, reg, { includeDealer: notifyDealer });
+    await this.notifier.notify(tx, recipients, "registration_approved", ctx.now, {
+      params: { serial: reg.serial },
+      link: `/units/${reg.serial}`,
+    });
+  }
+
+  /** Row check for one bulk-import row, as the shared rules see it. */
+  validateRow(values: RegistrationRowInput, context: RowContext) {
+    return validateRegistrationRow(values, context);
+  }
+
+  /** A pending registration, locked for this transaction. 404 if missing, 409 if already decided. */
+  private async pending(tx: Tx, id: string) {
+    await tx.$queryRaw`SELECT id FROM registrations WHERE id = ${id} FOR UPDATE`;
+    const reg = await tx.registration.findUnique({ where: { id } });
+    if (!reg) throw AppError.notFound("Registration");
+    if (reg.status !== "PENDING") throw AppError.conflict("not_pending", "This registration was already decided.");
+    return reg;
+  }
+
+  private customerOf(reg: { customerName: string; customerPhone: string | null; customerEmail: string | null; customerCity: string | null }): RegistrationCustomer {
     return {
-      customer: await this.customers.ensureSelfCustomer(tx, ctx, input.customer),
-      distributorId: null,
+      name: reg.customerName,
+      phone: reg.customerPhone ?? undefined,
+      email: reg.customerEmail ?? undefined,
+      city: reg.customerCity ?? undefined,
     };
   }
 
-  private customerRequired(): AppError {
-    return new AppError(
-      ErrorCode.CUSTOMER_REQUIRED,
-      HttpStatus.UNPROCESSABLE_ENTITY,
-      "Pick a customer or add the owner's details.",
-      {
-        customer: ["Required."],
-      },
-    );
-  }
-
-  /** Section 5.3 CASE expressed as a WHERE on warranty_end. */
-  private statusFilter(status: RegistrationListQueryDto["status"]): Prisma.RegistrationWhereInput {
-    if (!status) return {};
-    if (status === "VOID") return { status: "VOID" };
-    const today = startOfUtcDay(this.clock.now());
-    const soon = addUtcDays(today, this.env.EXPIRING_SOON_DAYS);
-    switch (status) {
-      case "EXPIRED":
-        return { status: "ACTIVE", warrantyEnd: { lt: today } };
-      case "EXPIRING_SOON":
-        return { status: "ACTIVE", warrantyEnd: { gte: today, lte: soon } };
-      case "ACTIVE":
-        return { status: "ACTIVE", warrantyEnd: { gt: soon } };
-    }
+  /** The actor as a submitter. */
+  static submitter(user: Actor): Submitter {
+    return { id: user.id, name: user.name };
   }
 }
