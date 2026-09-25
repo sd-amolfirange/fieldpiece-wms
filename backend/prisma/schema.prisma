@@ -1,0 +1,375 @@
+// Target design: build guide Section 5.2.
+// Objects Prisma can't express (partial / expression indexes, CHECK constraints, the policy exclusion
+// constraint, identity columns, audit partitioning, grants) are hand-written in the migration SQL.
+// When `prisma migrate dev` generates a new migration, REMOVE any DROP statements it adds for those.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DATABASE_MIGRATION_URL")
+  extensions = [pgcrypto, pg_trgm, citext, btree_gist, pg_stat_statements]
+}
+
+// ── Enums ─────────────────────────────────────────────────────────
+
+enum ProductFamily {
+  meters
+  gauges
+  vacuum
+  leak_detection
+  combustion
+  airflow
+  recovery
+  other
+
+  @@map("product_family")
+}
+
+/// EXPIRING_SOON / EXPIRED are computed at read time (Section 5.3).
+enum RegistrationStatus {
+  ACTIVE
+  VOID
+
+  @@map("registration_status")
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  NEEDS_INFO
+  APPROVED
+  REJECTED
+  RMA_ISSUED
+  IN_TRANSIT
+  RECEIVED
+  REPAIRED
+  REPLACED
+  CREDITED
+  CLOSED
+
+  @@map("claim_status")
+}
+
+// ── Reference data ────────────────────────────────────────────────
+
+model Product {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sku           String        @unique
+  name          String
+  family        ProductFamily
+  serialPattern String?       @map("serial_pattern") /// regex source [CONFIRM] per SKU
+  launchDate    DateTime?     @map("launch_date") @db.Date
+  /// Storage key of the product photo (products/<SKU>/<uuid>). Served by GET /products/{sku}/image.
+  imageKey      String?       @map("image_key")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  policies      WarrantyPolicy[]
+  registrations Registration[]
+
+  @@map("products")
+}
+
+model WarrantyPolicy {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId               String?   @map("product_id") @db.Uuid /// NULL = default policy for all products
+  baseMonths              Int       @map("base_months")
+  registrationBonusMonths Int       @default(0) @map("registration_bonus_months")
+  registrationWindowDays  Int?      @map("registration_window_days") /// bonus only if registered within N days [CONFIRM]
+  coverage                String[]  @default([])
+  exclusions              String[]  @default([])
+  effectiveFrom           DateTime  @map("effective_from") @db.Date
+  effectiveTo             DateTime? @map("effective_to") @db.Date
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product       Product?       @relation(fields: [productId], references: [id])
+  registrations Registration[]
+
+  @@index([productId, effectiveFrom])
+  @@map("warranty_policies")
+}
+
+model FailureCategory {
+  code          String  @id /// no_power, inaccurate_reading, display, ...
+  label         String
+  requiresPhoto Boolean @default(false) @map("requires_photo")
+  isActive      Boolean @default(true) @map("is_active")
+
+  claims Claim[]
+
+  @@map("failure_categories")
+}
+
+/// Business calendar for SLA maths (Section 8.4).
+model Holiday {
+  date      DateTime @id @db.Date
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("holidays")
+}
+
+// ── Parties ───────────────────────────────────────────────────────
+
+/// Distributors, service centers and Fieldpiece itself.
+model Organization {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        String /// fieldpiece | distributor | service_center (CHECK in SQL)
+  name        String
+  externalRef String?  @map("external_ref") /// ERP account number
+  currency    String   @default("USD") @db.Char(3)
+  address     Json? /// service centers: where RMAs ship to
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users         User[]
+  customers     Customer[]
+  registrations Registration[]
+  rmas          Rma[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idpSubject     String    @unique @map("idp_subject") /// "sub" claim from the OIDC provider
+  email          String    @unique @db.Citext
+  displayName    String    @map("display_name")
+  organizationId String?   @map("organization_id") @db.Uuid
+  roles          String[] /// CHECK against the five roles in SQL
+  isActive       Boolean   @default(true) @map("is_active")
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization         Organization?  @relation(fields: [organizationId], references: [id])
+  customer             Customer?
+  registrationsCreated Registration[]
+  claimsCreated        Claim[]        @relation("ClaimCreatedBy")
+  claimsAssigned       Claim[]        @relation("ClaimAssignedTo")
+  claimEvents          ClaimEvent[]
+  attachments          Attachment[]
+
+  @@map("users")
+}
+
+/// End owners; may or may not have a login.
+model Customer {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String?   @unique @map("user_id") @db.Uuid
+  distributorId String?   @map("distributor_id") @db.Uuid
+  companyName   String?   @map("company_name")
+  contactName   String    @map("contact_name")
+  email         String?   @db.Citext
+  phone         String?
+  address       Json /// {line1,line2,city,region,postalCode,country}
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user          User?          @relation(fields: [userId], references: [id])
+  distributor   Organization?  @relation(fields: [distributorId], references: [id])
+  registrations Registration[]
+
+  @@map("customers")
+}
+
+// ── Registrations ─────────────────────────────────────────────────
+
+model Registration {
+  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serialNumber           String             @map("serial_number")
+  productId              String             @map("product_id") @db.Uuid
+  customerId             String             @map("customer_id") @db.Uuid
+  distributorId          String?            @map("distributor_id") @db.Uuid
+  policyId               String             @map("policy_id") @db.Uuid /// snapshot of the policy used
+  purchaseDate           DateTime           @map("purchase_date") @db.Date
+  warrantyStart          DateTime           @map("warranty_start") @db.Date
+  warrantyEnd            DateTime           @map("warranty_end") @db.Date
+  status                 RegistrationStatus @default(ACTIVE)
+  replacesRegistrationId String?            @map("replaces_registration_id") @db.Uuid
+  certificateKey         String?            @map("certificate_key") /// storage key of the generated PDF
+  version                Int                @default(1)
+  createdBy              String             @map("created_by") @db.Uuid
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product     Product        @relation(fields: [productId], references: [id])
+  customer    Customer       @relation(fields: [customerId], references: [id])
+  distributor Organization?  @relation(fields: [distributorId], references: [id])
+  policy      WarrantyPolicy @relation(fields: [policyId], references: [id])
+  replaces    Registration?  @relation("Replacement", fields: [replacesRegistrationId], references: [id])
+  replacedBy  Registration[] @relation("Replacement")
+  creator     User           @relation(fields: [createdBy], references: [id])
+  claims      Claim[]
+
+  @@index([customerId], map: "registrations_customer_idx")
+  @@index([distributorId, warrantyEnd], map: "registrations_distributor_end_idx")
+  @@map("registrations")
+}
+
+// ── Claims ────────────────────────────────────────────────────────
+
+model Claim {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  displayNo           String      @unique @default(dbgenerated("('CLM-'::text || lpad((nextval('claim_display_seq'::regclass))::text, 6, '0'::text))")) @map("display_no")
+  registrationId      String      @map("registration_id") @db.Uuid
+  failureCategory     String      @map("failure_category")
+  description         String
+  failureDate         DateTime    @map("failure_date") @db.Date
+  inWarranty          Boolean     @map("in_warranty") /// evaluated at submit time and frozen
+  status              ClaimStatus @default(DRAFT)
+  preferredResolution String?     @map("preferred_resolution") /// customer's ask; `resolution` is the decision
+  resolution          String?
+  rejectionReason     String?     @map("rejection_reason")
+  returnAddress       Json?       @map("return_address")
+  assignedTo          String?     @map("assigned_to") @db.Uuid
+  slaDueAt            DateTime?   @map("sla_due_at") @db.Timestamptz(6)
+  slaBreachNotifiedAt DateTime?   @map("sla_breach_notified_at") @db.Timestamptz(6)
+  submittedAt         DateTime?   @map("submitted_at") @db.Timestamptz(6)
+  closedAt            DateTime?   @map("closed_at") @db.Timestamptz(6)
+  createdBy           String      @map("created_by") @db.Uuid
+  version             Int         @default(1)
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  registration Registration    @relation(fields: [registrationId], references: [id])
+  category     FailureCategory @relation(fields: [failureCategory], references: [code])
+  assignee     User?           @relation("ClaimAssignedTo", fields: [assignedTo], references: [id])
+  creator      User            @relation("ClaimCreatedBy", fields: [createdBy], references: [id])
+  events       ClaimEvent[]
+  rma          Rma?
+
+  @@index([assignedTo, status], map: "claims_assignee_idx")
+  @@index([registrationId], map: "claims_registration_idx")
+  @@index([createdBy, createdAt(sort: Desc)], map: "claims_created_by_idx")
+  @@index([createdAt], map: "claims_created_at_brin", type: Brin)
+  @@map("claims")
+}
+
+/// Append-only timeline.
+model ClaimEvent {
+  id         BigInt       @id @default(autoincrement())
+  claimId    String       @map("claim_id") @db.Uuid
+  actorId    String       @map("actor_id") @db.Uuid
+  type       String /// created | status_changed | comment | attachment_added | assigned
+  fromStatus ClaimStatus? @map("from_status")
+  toStatus   ClaimStatus? @map("to_status")
+  comment    String?
+  internal   Boolean      @default(false)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  claim Claim @relation(fields: [claimId], references: [id])
+  actor User  @relation(fields: [actorId], references: [id])
+
+  @@index([claimId, createdAt], map: "claim_events_claim_idx")
+  @@map("claim_events")
+}
+
+// ── RMA ───────────────────────────────────────────────────────────
+
+model Rma {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  displayNo         String    @unique @default(dbgenerated("('RMA-'::text || lpad((nextval('rma_display_seq'::regclass))::text, 6, '0'::text))")) @map("display_no")
+  claimId           String    @unique @map("claim_id") @db.Uuid /// one RMA per claim
+  type              String /// repair | replace | credit
+  status            String    @default("ISSUED") /// ISSUED | IN_TRANSIT | RECEIVED | INSPECTED | COMPLETED | CANCELLED
+  serviceCenterId   String?   @map("service_center_id") @db.Uuid
+  shipTo            Json      @map("ship_to")
+  inboundCarrier    String?   @map("inbound_carrier")
+  inboundTracking   String?   @map("inbound_tracking")
+  outboundCarrier   String?   @map("outbound_carrier")
+  outboundTracking  String?   @map("outbound_tracking")
+  inspectionNotes   String?   @map("inspection_notes")
+  rootCause         String?   @map("root_cause")
+  partsUsed         String[]  @default([]) @map("parts_used")
+  replacementSerial String?   @map("replacement_serial")
+  creditAmount      Decimal?  @map("credit_amount") @db.Decimal(12, 2)
+  creditCurrency    String?   @map("credit_currency") @db.Char(3)
+  completedAt       DateTime? @map("completed_at") @db.Timestamptz(6)
+  version           Int       @default(1)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  claim         Claim         @relation(fields: [claimId], references: [id])
+  serviceCenter Organization? @relation(fields: [serviceCenterId], references: [id])
+
+  @@index([serviceCenterId, status], map: "rmas_sc_status_idx")
+  @@map("rmas")
+}
+
+// ── Attachments ───────────────────────────────────────────────────
+
+model Attachment {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerType  String    @map("owner_type") /// registration | claim | rma | import
+  ownerId    String?   @map("owner_id") @db.Uuid /// NULL until linked after upload
+  storageKey String    @unique @map("storage_key")
+  fileName   String    @map("file_name")
+  mimeType   String    @map("mime_type")
+  sizeBytes  BigInt    @map("size_bytes")
+  sha256     String?
+  scanStatus String    @default("PENDING") @map("scan_status") /// PENDING | CLEAN | INFECTED | ERROR
+  uploadedBy String    @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime? @map("uploaded_at") @db.Timestamptz(6) /// set on confirm
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  uploader User @relation(fields: [uploadedBy], references: [id])
+
+  @@index([ownerType, ownerId], map: "attachments_owner_idx")
+  @@map("attachments")
+}
+
+// ── Platform tables ───────────────────────────────────────────────
+
+model OutboxEvent {
+  id          BigInt    @id @default(autoincrement())
+  aggregate   String
+  aggregateId String    @map("aggregate_id") @db.Uuid
+  type        String /// e.g. claim.approved
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  attempts    Int       @default(0)
+
+  @@map("outbox_events")
+}
+
+model IdempotencyKey {
+  key          String
+  userId       String   @map("user_id") @db.Uuid
+  requestHash  String   @map("request_hash")
+  responseCode Int?     @map("response_code")
+  responseBody Json?    @map("response_body")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([userId, key])
+  @@map("idempotency_keys")
+}
+
+/// Partitioned by month in SQL.
+model AuditLog {
+  id         BigInt   @default(autoincrement())
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorIp    String?  @map("actor_ip") @db.Inet
+  action     String /// e.g. claim.status_changed
+  entity     String
+  entityId   String?  @map("entity_id") @db.Uuid
+  before     Json?
+  after      Json?
+  requestId  String?  @map("request_id")
+
+  @@id([id, occurredAt])
+  @@index([entity, entityId, occurredAt])
+  @@map("audit_log")
+}
