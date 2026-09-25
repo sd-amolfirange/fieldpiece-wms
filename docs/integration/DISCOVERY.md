@@ -1,6 +1,7 @@
 # Phase 0 discovery: backend ⇄ frontend integration
 
-Status: **waiting for the developer's go-ahead** (INSTRUCTIONS.md §4 gate). Date: 2026-09-25. Branch: `demo-workflows`.
+Status: **decided.** The backend follows the frontend's contract (developer, 2026-09-25); see
+`docs/adr/ADR-011-api-contract-alignment.md` and `PROGRESS.md`. Date: 2026-09-25. Branch: `demo-workflows`.
 
 This file records what the code does today, not what the specs say. Paths are relative to the repo root.
 
