@@ -9,8 +9,9 @@ import { join } from "node:path";
 
 const backend = join(__dirname, "..", "..");
 const frontend = join(backend, "..", "frontend");
-const API_PORT = 4100;
-const WEB_PORT = 5174;
+// Own ports, so the suite runs next to a dev server (5173/5174) and API (4000) you already have open.
+const API_PORT = Number(process.env.UI_API_PORT ?? 4100);
+const WEB_PORT = Number(process.env.UI_WEB_PORT ?? 5175);
 
 const apiEnv = {
   NODE_ENV: "test",

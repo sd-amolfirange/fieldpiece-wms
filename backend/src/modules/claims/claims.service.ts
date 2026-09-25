@@ -132,7 +132,7 @@ export class ClaimsService {
     await this.prisma.tx(async (tx) => {
       const claim = await tx.claim.findUnique({ where: { id } });
       if (!claim) throw AppError.notFound("Claim");
-      await this.apply(tx, claim, approve ? "approve" : "reject", "system", "OEM (simulated)", { reason }, ctx.now);
+      await this.apply(tx, claim, approve ? "approve" : "reject", "system", "Manufacturer (OEM)", { reason }, ctx.now);
       await this.integrations.log(
         tx,
         {

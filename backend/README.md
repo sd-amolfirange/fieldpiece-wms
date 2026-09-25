@@ -34,11 +34,11 @@ Sign in with the "Sign in as" picker, or with any demo account and `DEMO_PASSWOR
 
 | Email                     | Role                                   |
 | ------------------------- | -------------------------------------- |
-| `admin@demo.wms`          | Admin (sees everything)                |
-| `dealer.coolair@demo.wms` | Dealer CoolAir Traders                 |
-| `dealer.breeze@demo.wms`  | Dealer Breeze Point                    |
-| `dist.northstar@demo.wms` | Distributor NorthStar (both dealers)   |
-| `customer.rk@demo.wms`    | Customer R. Kulkarni                   |
+| `admin@wms.local`          | Admin (sees everything)                |
+| `dealer.coolair@wms.local` | Dealer CoolAir Traders                 |
+| `dealer.breeze@wms.local`  | Dealer Breeze Point                    |
+| `dist.northstar@wms.local` | Distributor NorthStar (both dealers)   |
+| `customer.rk@wms.local`    | Customer R. Kulkarni                   |
 
 Postgres is on host port **5433** so it doesn't clash with a local install. If your Docker volume was created by
 an earlier version of this backend, the `wms_hvac*` databases don't exist yet: create them with the three

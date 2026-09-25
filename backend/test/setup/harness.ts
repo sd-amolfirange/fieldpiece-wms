@@ -14,12 +14,12 @@ import { E2E_DB_APP_URL, testEnv } from "./test-env";
 export const DEMO_PASSWORD = "Demo#2026";
 
 export const EMAILS = {
-  admin: "admin@demo.wms",
-  dealer: "dealer.coolair@demo.wms",
-  breeze: "dealer.breeze@demo.wms",
-  arctic: "dealer.arctic@demo.wms",
-  distributor: "dist.northstar@demo.wms",
-  customer: "customer.rk@demo.wms",
+  admin: "admin@wms.local",
+  dealer: "dealer.coolair@wms.local",
+  breeze: "dealer.breeze@wms.local",
+  arctic: "dealer.arctic@wms.local",
+  distributor: "dist.northstar@wms.local",
+  customer: "customer.rk@wms.local",
 } as const;
 export type Who = keyof typeof EMAILS;
 

@@ -29,11 +29,11 @@ import {
 
 /** Accounts offered on the sign-in page ("Sign in as"), in this order. */
 export const DEMO_ACCOUNTS = [
-  { email: "admin@demo.wms", label: "Admin: WMS office admin" },
-  { email: "dealer.coolair@demo.wms", label: "Dealer: CoolAir Traders, Pune" },
-  { email: "dist.northstar@demo.wms", label: "Distributor: NorthStar Distribution" },
-  { email: "customer.rk@demo.wms", label: "Customer: R. Kulkarni" },
-  { email: "dealer.breeze@demo.wms", label: "Dealer: Breeze Point, Nashik" },
+  { email: "admin@wms.local", label: "Admin: WMS office admin" },
+  { email: "dealer.coolair@wms.local", label: "Dealer: CoolAir Traders, Pune" },
+  { email: "dist.northstar@wms.local", label: "Distributor: NorthStar Distribution" },
+  { email: "customer.rk@wms.local", label: "Customer: R. Kulkarni" },
+  { email: "dealer.breeze@wms.local", label: "Dealer: Breeze Point, Nashik" },
 ] as const;
 
 export interface SeedState {
@@ -113,7 +113,7 @@ export function createSeed(today: IsoDate): SeedState {
       { id: "d-arctic", name: "Arctic Home Solutions", city: "Mumbai" },
     ],
     customers: [
-      { id: "c-rk", name: "R. Kulkarni", phone: "+91 90000 00101", email: "customer.rk@demo.wms", city: "Pune" },
+      { id: "c-rk", name: "R. Kulkarni", phone: "+91 90000 00101", email: "customer.rk@wms.local", city: "Pune" },
       { id: "c-aj", name: "A. Joshi", phone: "+91 90000 00102", city: "Pune" },
       { id: "c-sd", name: "S. Deshpande", phone: "+91 90000 00103", city: "Pune" },
       { id: "c-kk", name: "K. Kale", phone: "+91 90000 00104", city: "Pune" },
@@ -128,18 +128,18 @@ export function createSeed(today: IsoDate): SeedState {
       { id: "c-fk", name: "F. Khan", phone: "+91 90000 00113", city: "Mumbai" },
     ],
     users: [
-      { id: "u-admin", name: "WMS office admin", email: "admin@demo.wms", role: "admin" },
-      { id: "u-coolair", name: "CoolAir Traders", email: "dealer.coolair@demo.wms", role: "dealer", dealerId: "d-coolair" },
-      { id: "u-breeze", name: "Breeze Point", email: "dealer.breeze@demo.wms", role: "dealer", dealerId: "d-breeze" },
-      { id: "u-arctic", name: "Arctic Home Solutions", email: "dealer.arctic@demo.wms", role: "dealer", dealerId: "d-arctic" },
+      { id: "u-admin", name: "WMS office admin", email: "admin@wms.local", role: "admin" },
+      { id: "u-coolair", name: "CoolAir Traders", email: "dealer.coolair@wms.local", role: "dealer", dealerId: "d-coolair" },
+      { id: "u-breeze", name: "Breeze Point", email: "dealer.breeze@wms.local", role: "dealer", dealerId: "d-breeze" },
+      { id: "u-arctic", name: "Arctic Home Solutions", email: "dealer.arctic@wms.local", role: "dealer", dealerId: "d-arctic" },
       {
         id: "u-northstar",
         name: "NorthStar Distribution",
-        email: "dist.northstar@demo.wms",
+        email: "dist.northstar@wms.local",
         role: "distributor",
         distributorId: "dist-northstar",
       },
-      { id: "u-rk", name: "R. Kulkarni", email: "customer.rk@demo.wms", role: "customer", customerId: "c-rk" },
+      { id: "u-rk", name: "R. Kulkarni", email: "customer.rk@wms.local", role: "customer", customerId: "c-rk" },
     ],
     units: [],
     registrations: [],

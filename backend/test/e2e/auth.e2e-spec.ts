@@ -8,13 +8,13 @@ describe("auth and sessions", () => {
   afterAll(() => h.close());
 
   it("signs in with email and password, returns the session user and sets an httpOnly refresh cookie", async () => {
-    const res = await h.request({ method: "POST", url: "/auth/login", body: { email: " Dealer.CoolAir@demo.wms ", password: DEMO_PASSWORD } });
+    const res = await h.request({ method: "POST", url: "/auth/login", body: { email: " Dealer.CoolAir@wms.local ", password: DEMO_PASSWORD } });
     expect(res.status).toBe(200);
     expect(typeof res.body.accessToken).toBe("string");
     expect(res.body.user).toEqual({
       id: "u-coolair",
       name: "CoolAir Traders",
-      email: "dealer.coolair@demo.wms",
+      email: "dealer.coolair@wms.local",
       role: "dealer",
       dealerId: "d-coolair",
       orgName: "CoolAir Traders",
@@ -29,8 +29,8 @@ describe("auth and sessions", () => {
 
   it("answers invalid_credentials for a wrong password or an unknown email", async () => {
     for (const body of [
-      { email: "admin@demo.wms", password: "wrong" },
-      { email: "nobody@demo.wms", password: DEMO_PASSWORD },
+      { email: "admin@wms.local", password: "wrong" },
+      { email: "nobody@wms.local", password: DEMO_PASSWORD },
       {},
     ]) {
       const res = await h.request({ method: "POST", url: "/auth/login", body });
@@ -83,7 +83,7 @@ describe("auth and sessions", () => {
     const res = await h.request({ method: "GET", url: "/auth/demo-accounts" });
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(5);
-    expect(res.body[0]).toEqual({ email: "admin@demo.wms", label: "Admin: WMS office admin", password: DEMO_PASSWORD });
+    expect(res.body[0]).toEqual({ email: "admin@wms.local", label: "Admin: WMS office admin", password: DEMO_PASSWORD });
 
     const off = await createHarness({ env: { DEMO_FEATURES_ENABLED: "false" } });
     try {
