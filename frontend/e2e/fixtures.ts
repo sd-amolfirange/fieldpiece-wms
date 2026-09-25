@@ -50,13 +50,13 @@ export async function rolePage(browser: Browser, account: Account, baseURL: stri
   return page;
 }
 
-/** Pre-demo checklist step 1: Admin -> Simulate -> Reset demo data. */
+/** Pre-demo checklist step 1: Admin -> System events -> Reset data. */
 export async function resetDemoData(browser: Browser, baseURL: string) {
   const admin = await rolePage(browser, "admin", baseURL);
   await admin.goto("/admin/simulate");
-  await admin.getByRole("button", { name: "Reset demo data" }).click();
-  await admin.getByRole("dialog").getByRole("button", { name: "Reset demo data" }).click();
-  await expect(admin.getByText("Demo data reset").first()).toBeVisible();
+  await admin.getByRole("button", { name: "Reset data" }).click();
+  await admin.getByRole("dialog").getByRole("button", { name: "Reset data" }).click();
+  await expect(admin.getByText("Data has been reset").first()).toBeVisible();
   await admin.context().close();
 }
 

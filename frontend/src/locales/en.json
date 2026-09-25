@@ -5,7 +5,7 @@
     "skipToContent": "Skip to content",
     "environment": {
       "development": "Development",
-      "mock": "Mock data",
+      "mock": "Test data",
       "staging": "Staging",
       "production": "Production"
     }
@@ -203,9 +203,9 @@
     "resetSent": "If that email has an account, a reset link is on its way.",
     "backToSignIn": "Back to sign in",
     "mockRole": "Sign in as",
-    "mockNotice": "Mock sign-in. The real identity provider (OIDC with PKCE) is still to be confirmed.",
-    "demoNotice": "Demo sign-in: pick a demo account below to fill in its email and password.",
-    "pickAccount": "Choose a demo account",
+    "mockNotice": "Sign in with your work email and password.",
+    "demoNotice": "Choose your account below to fill in its email and password.",
+    "pickAccount": "Choose an account",
     "invalidCredentials": "Email or password is wrong. Check them and try again.",
     "checkWarrantyLink": "Just want to check a warranty?"
   },
@@ -404,7 +404,7 @@
     "settings": "Settings",
     "dealers": "Dealers & users",
     "integrations": "Integration log",
-    "simulate": "Simulate"
+    "simulate": "System events"
   },
   "org": {
     "title": "Dealers & users",
@@ -558,8 +558,8 @@
     "retried": "Message sent again"
   },
   "simulate": {
-    "title": "Simulate",
-    "intro": "Demo only. These buttons stand in for the systems around the warranty platform. In production the messages arrive on their own.",
+    "title": "System events",
+    "intro": "Messages from the systems connected to the warranty platform: the ERP sales feed, the registration mailbox, the service system and the manufacturer.",
     "intake": {
       "title": "Registrations from systems",
       "help": "The ERP sends a sales invoice with 3 serials; a customer emails the registration mailbox with the invoice attached. Both land in the Registration inbox for the usual review.",
@@ -593,12 +593,12 @@
       }
     },
     "reset": {
-      "title": "Reset demo data",
-      "help": "Put every screen back to the starting data, so the walkthrough can run again.",
-      "button": "Reset demo data",
-      "confirmTitle": "Reset the demo data?",
+      "title": "Reset data",
+      "help": "Put every screen back to the starting data.",
+      "button": "Reset data",
+      "confirmTitle": "Reset all data?",
       "confirmHelp": "Everything done since the last reset is removed. Everyone stays signed in.",
-      "done": "Demo data reset"
+      "done": "Data has been reset"
     }
   },
   "screens": {
@@ -674,8 +674,8 @@
       ]
     },
     "A13": {
-      "title": "Simulate panel",
-      "mustContain": ["Demo-only: fire ERP invoice, email, job result, OEM decision", "Reset demo data"]
+      "title": "System events",
+      "mustContain": ["Receive ERP invoice, email, job result, OEM decision", "Reset data"]
     },
     "DL02": {
       "title": "Bulk import",

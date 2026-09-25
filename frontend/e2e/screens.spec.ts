@@ -159,7 +159,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     await admin.goto("/admin/dealers");
     await expect(heading(admin, "Distributors and their dealers")).toBeVisible();
     await expect(heading(admin, "NorthStar Distribution")).toBeVisible();
-    await expect(admin.getByText("dealer.coolair@demo.wms").first()).toBeVisible();
+    await expect(admin.getByText(/^dealer\.coolair@/).first()).toBeVisible();
   });
 
   await test.step("A12 Integration log", async () => {
@@ -176,14 +176,14 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     await admin.keyboard.press("Escape");
   });
 
-  await test.step("A13 Simulate panel", async () => {
+  await test.step("A13 System events", async () => {
     await admin.goto("/admin/simulate");
     for (const b of [
       "ERP sales invoice (3 serials)",
       "Registration email with invoice",
       "Send job result",
       "Approve claim",
-      "Reset demo data",
+      "Reset data",
     ]) {
       await expect(admin.getByRole("button", { name: b })).toBeVisible();
     }
