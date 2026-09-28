@@ -31,6 +31,8 @@ COPY --from=prod-deps --chown=node:node /app/backend/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/backend/dist ./dist
 COPY --from=build --chown=node:node /app/backend/prisma ./prisma
 COPY --from=build --chown=node:node /app/backend/package.json ./
+# Uploads with STORAGE_DRIVER=local (mount a volume here); owned by the non-root user so a fresh volume is writable.
+RUN mkdir -p /home/node/storage && chown node:node /home/node/storage
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/'+(process.env.API_PREFIX||'api')+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

@@ -1,0 +1,100 @@
+# The whole application: database, cache, migrations, API and web app. Driven by ../run.sh and ../down.sh with an env
+# file per target (deploy/env/local.env, deploy/env/cloud.env), so a laptop and a cloud VM run exactly the same stack.
+#
+# Profiles:
+#   db    bundled Postgres (leave it off in the cloud when DATABASE_URL points at a managed database)
+#   seed  one-shot job that loads the starting data into an empty database
+
+name: ${COMPOSE_PROJECT_NAME:-hvac-wms}
+
+x-images:
+  api: &api-image ${IMAGE_REGISTRY:-hvac-wms}/api:${IMAGE_TAG:-local}
+  tools: &tools-image ${IMAGE_REGISTRY:-hvac-wms}/api-tools:${IMAGE_TAG:-local}
+
+x-app-env: &app-env
+  env_file:
+    - path: ${STACK_ENV_FILE:?run the stack through run.sh}
+  environment:
+    DATABASE_URL: ${DATABASE_URL:-postgresql://wms_app:${APP_DB_PASSWORD:-localdev}@postgres:5432/wms_hvac}
+    DATABASE_MIGRATION_URL: ${DATABASE_MIGRATION_URL:-postgresql://wms_owner:${DB_OWNER_PASSWORD:-localdev}@postgres:5432/wms_hvac}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    PORT: "4000"
+    API_PREFIX: api
+    STORAGE_LOCAL_DIR: /home/node/storage
+
+services:
+  postgres:
+    profiles: ["db"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wms_hvac
+      POSTGRES_USER: wms_owner
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:-localdev}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-localdev} # read by init/01-app-role.sh
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wms_owner -d wms_hvac"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  # Applies database migrations, then exits. The API starts only after it succeeded.
+  migrate:
+    image: *tools-image
+    build: { context: .., dockerfile: backend/Dockerfile, target: migrate }
+    <<: *app-env
+    depends_on:
+      postgres: { condition: service_healthy, required: false }
+
+  # Loads the starting data, only into an empty database (never overwrites existing data).
+  seed:
+    profiles: ["seed"]
+    image: *tools-image
+    <<: *app-env
+    command: ["npx", "tsx", "prisma/seed.ts", "--if-empty"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  api:
+    image: *api-image
+    build: { context: .., dockerfile: backend/Dockerfile, target: runtime }
+    restart: unless-stopped
+    <<: *app-env
+    volumes: [apistorage:/home/node/storage]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  web:
+    image: ${IMAGE_REGISTRY:-hvac-wms}/web:${IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        # The sign-in page's account picker only works while the API's demo features are on.
+        VITE_DEMO_MODE: ${DEMO_FEATURES_ENABLED:-false}
+    restart: unless-stopped
+    ports: ["${WEB_PORT:-8088}:80"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 10s
+      retries: 10
+
+volumes:
+  pgdata: {}
+  redisdata: {}
+  apistorage: {}

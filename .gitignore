@@ -8,3 +8,6 @@ backend/demo-server/data/
 frontend/test-results/
 frontend/playwright-report/
 frontend/e2e/demo-data/
+
+# Cloud deployment settings (secrets). Only the template is committed.
+deploy/env/cloud.env

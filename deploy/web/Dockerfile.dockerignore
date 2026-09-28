@@ -1,0 +1,18 @@
+# Build context is the repository root (see Dockerfile).
+.git
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!frontend/.env.example
+frontend/e2e
+frontend/test-results
+frontend/playwright-report
+backend/src
+backend/test
+backend/var
+backend/prisma
+backend/demo-server/data
+demo-assets
+docs
