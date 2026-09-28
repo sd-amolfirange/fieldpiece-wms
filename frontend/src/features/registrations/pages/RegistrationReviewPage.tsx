@@ -11,6 +11,7 @@ import {
   Card,
   ChannelBadge,
   MonoId,
+  ProductThumb,
   RegistrationFlagBadge,
   RegistrationStatusBadge,
   WarrantyStatusBadge,
@@ -164,6 +165,12 @@ export default function RegistrationReviewPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card title={t("review.submitted")}>
+            <div className="mb-4 flex gap-4">
+              <ProductThumb imageUrl={r.modelImageUrl} />
+              <div className="min-w-0 flex-1">
+                <p className="text-body font-medium">{r.modelCode}</p>
+              </div>
+            </div>
             <dl className="grid gap-4 sm:grid-cols-2">
               <Field label={t("review.fields.serial")}>
                 <MonoId>{r.serial}</MonoId>
@@ -211,6 +218,12 @@ export default function RegistrationReviewPage() {
                 </Link>
               }
             >
+              <div className="mb-4 flex gap-4">
+                <ProductThumb imageUrl={r.duplicateOf.modelImageUrl} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-body font-medium">{r.duplicateOf.modelCode}</p>
+                </div>
+              </div>
               <dl className="grid gap-4 sm:grid-cols-2">
                 <Field label={t("review.fields.serial")}>
                   <MonoId>{r.duplicateOf.serial}</MonoId>

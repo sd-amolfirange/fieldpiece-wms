@@ -21,6 +21,7 @@ import {
   Input,
   MonoId,
   NativeSelect,
+  ProductThumb,
   RegistrationFlagBadge,
   RegistrationStatusBadge,
 } from "@/components/ui";
@@ -72,7 +73,15 @@ export default function RegistrationsListPage() {
         header: t("inbox.columns.batch"),
         cell: (i) => (i.getValue() ? <MonoId>{i.getValue()}</MonoId> : "—"),
       }),
-      col.accessor("modelCode", { header: t("inbox.columns.model") }),
+      col.accessor("modelCode", {
+        header: t("inbox.columns.model"),
+        cell: (i) => (
+          <span className="flex items-center gap-2">
+            <ProductThumb imageUrl={i.row.original.modelImageUrl} size="sm" />
+            {i.getValue()}
+          </span>
+        ),
+      }),
       col.accessor((r) => r.customer.name, {
         id: "customer",
         header: t("inbox.columns.customer"),

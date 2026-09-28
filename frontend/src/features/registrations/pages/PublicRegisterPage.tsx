@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, QrCode as QrIcon, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
@@ -14,12 +14,14 @@ import {
   Input,
   MonoId,
   NativeSelect,
+  ProductThumb,
   RegistrationStatusBadge,
   SerialHelpLink,
   SerialNumberInput,
   type UploadItem,
 } from "@/components/ui";
 import { dropHeic } from "@/features/files";
+import { QrScannerModal, type QrPayload } from "@/features/qr";
 import { applyFieldErrors, toApiError } from "@/lib/api-error";
 import { toIsoDate } from "@/lib/format";
 import { useFieldError } from "@/lib/use-field-error";
@@ -28,7 +30,8 @@ import { publicRegisterSchema, type PublicRegisterForm } from "../schemas";
 
 // Public product registration (website form, channel WEB): anyone who bought a Fieldpiece product registers it
 // without an account, with a photo or PDF of the receipt. The warranty desk reviews it; the warranty then runs from
-// the purchase date. The link can carry serial, model and batch (?serial=&model=&batch=), like the QR label.
+// the purchase date. The link can carry serial, model and batch (?serial=&model=&batch=), like the QR label — the
+// same fields the Scan QR label button fills in, so visitors can scan the product instead of typing them.
 
 export default function PublicRegisterPage() {
   const { t } = useTranslation();
@@ -38,6 +41,7 @@ export default function PublicRegisterPage() {
   const submit = usePublicRegister();
   const [files, setFiles] = useState<UploadItem[]>([]);
   const [done, setDone] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const {
     register,
@@ -66,6 +70,17 @@ export default function PublicRegisterPage() {
     [files, setValue],
   );
   const serial = watch("serial");
+  const modelCode = watch("modelCode");
+  const model = models.data?.find((m) => m.code === modelCode);
+
+  const onScan = useCallback(
+    (payload: QrPayload) => {
+      setValue("serial", payload.serial, { shouldValidate: true });
+      if (payload.modelCode) setValue("modelCode", payload.modelCode, { shouldValidate: true });
+      setValue("batchNumber", payload.batchNumber ?? "");
+    },
+    [setValue],
+  );
 
   const onSubmit = handleSubmit(async ({ invoiceCount: _count, ...fields }) => {
     const proof = files[0]?.file;
@@ -127,6 +142,10 @@ export default function PublicRegisterPage() {
         <p className="mb-6 mt-2 text-body text-text-muted">{t("publicRegister.intro")}</p>
         <form noValidate onSubmit={onSubmit} className="space-y-4">
           <h2 className="text-h3">{t("publicRegister.product")}</h2>
+          <Button variant="secondary" icon={QrIcon} onClick={() => setScanning(true)}>
+            {t("selfRegister.scan")}
+          </Button>
+          <p className="text-sm text-text-muted">{t("publicRegister.orManual")}</p>
           <FormField label={t("selfRegister.model")} error={fieldError(errors.modelCode?.message)} required>
             <NativeSelect {...register("modelCode")} disabled={models.isLoading}>
               <option value="">—</option>
@@ -137,6 +156,14 @@ export default function PublicRegisterPage() {
               ))}
             </NativeSelect>
           </FormField>
+          {model ? (
+            <div className="flex items-center gap-3 rounded bg-ink-50 p-3">
+              <ProductThumb imageUrl={model.imageUrl} size="sm" />
+              <p className="text-sm">
+                {model.name} <MonoId>{model.code}</MonoId>
+              </p>
+            </div>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField
               label={t("fields.serialNumber")}
@@ -244,6 +271,7 @@ export default function PublicRegisterPage() {
           </div>
         </form>
       </Card>
+      <QrScannerModal open={scanning} onOpenChange={setScanning} onResult={onScan} />
     </AuthLayout>
   );
 }

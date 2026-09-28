@@ -300,6 +300,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     const visitor = await context.newPage();
     await visitor.goto("/register-product");
     await expect(visitor.getByRole("heading", { name: "Register your Fieldpiece product" })).toBeVisible();
+    await expect(visitor.getByRole("button", { name: "Scan QR label" })).toBeVisible();
     for (const label of ["Model", "Serial number", "Batch number", "Purchase date", "Customer email"])
       await expect(visitor.getByLabel(new RegExp(label)).first()).toBeVisible();
     await context.close();

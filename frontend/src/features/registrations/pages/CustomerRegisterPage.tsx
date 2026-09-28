@@ -16,6 +16,7 @@ import {
   Input,
   MonoId,
   NativeSelect,
+  ProductThumb,
   RegistrationStatusBadge,
   SerialHelpLink,
   SerialNumberInput,
@@ -162,6 +163,11 @@ export default function CustomerRegisterPage() {
           {prefilled && serial ? (
             <div className="space-y-2">
               <p className="rounded bg-info-bg p-3 text-sm text-info">{t("selfRegister.fromQr")}</p>
+              {model?.imageUrl ? (
+                <div className="flex justify-center">
+                  <ProductThumb imageUrl={model.imageUrl} size="lg" className="max-w-xs" />
+                </div>
+              ) : null}
               <dl className="grid gap-4 sm:grid-cols-2">
                 <Field label={t("fields.serialNumber")}>
                   <MonoId>{serial}</MonoId>
@@ -213,6 +219,14 @@ export default function CustomerRegisterPage() {
                   ))}
                 </NativeSelect>
               </FormField>
+              {model ? (
+                <div className="flex items-center gap-3 rounded bg-ink-50 p-3">
+                  <ProductThumb imageUrl={model.imageUrl} size="sm" />
+                  <p className="text-sm">
+                    {model.name} <MonoId>{model.code}</MonoId>
+                  </p>
+                </div>
+              ) : null}
             </>
           )}
 

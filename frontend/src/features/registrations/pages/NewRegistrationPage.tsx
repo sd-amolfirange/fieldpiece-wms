@@ -16,6 +16,7 @@ import {
   Input,
   MonoId,
   NativeSelect,
+  ProductThumb,
   RegistrationStatusBadge,
   SerialHelpLink,
   SerialNumberInput,
@@ -208,6 +209,14 @@ export default function NewRegistrationPage() {
                   ))}
                 </NativeSelect>
               </FormField>
+              {model ? (
+                <div className="flex items-center gap-3 rounded bg-ink-50 p-3">
+                  <ProductThumb imageUrl={model.imageUrl} size="sm" />
+                  <p className="text-sm">
+                    {model.name} <MonoId>{model.code}</MonoId>
+                  </p>
+                </div>
+              ) : null}
               {needsDealer ? (
                 <FormField
                   label={t("registerUnit.dealer")}

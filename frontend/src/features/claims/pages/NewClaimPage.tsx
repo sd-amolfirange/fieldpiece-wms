@@ -12,7 +12,9 @@ import {
   Card,
   FileDropzone,
   FormField,
+  MonoId,
   NativeSelect,
+  ProductThumb,
   Textarea,
   type UploadItem,
 } from "@/components/ui";
@@ -103,6 +105,14 @@ export default function NewClaimPage() {
                 ))}
               </NativeSelect>
             </FormField>
+            {unit ? (
+              <div className="flex items-center gap-3 rounded bg-ink-50 p-3">
+                <ProductThumb imageUrl={unit.modelImageUrl} size="sm" />
+                <p className="text-sm">
+                  {unit.modelName} <MonoId>{unit.modelCode}</MonoId>
+                </p>
+              </div>
+            ) : null}
             <FormField
               label={t("claims.fields.issue")}
               error={fieldError(errors.issueType?.message)}

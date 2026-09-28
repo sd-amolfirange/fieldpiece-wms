@@ -34,6 +34,8 @@ export interface Model {
   name: string;
   /** One-line description, e.g. "600A AC/DC swivel head clamp meter with Job Link". */
   description: string;
+  /** Product photo, served from local storage (the file is Fieldpiece's own, kept for internal demo use). */
+  imageUrl?: string;
   /** Warranty from the date of purchase. */
   warrantyMonths: number;
   /** Regular expression every serial number of this model must match. */

@@ -85,6 +85,7 @@ export const toModelView = (row: ModelRow): ModelView => ({
   categoryId: row.categoryId,
   name: row.name,
   description: row.description,
+  imageUrl: row.imageUrl ?? undefined,
   warrantyMonths: row.warrantyMonths,
   serialPattern: row.serialPattern,
   batchPattern: row.batchPattern,
@@ -172,6 +173,7 @@ export function toUnitView(row: UnitRow, today: IsoDate): UnitView {
     modelCode: row.model.code,
     modelName: row.model.name,
     modelDescription: row.model.description,
+    modelImageUrl: opt(row.model.imageUrl),
     categoryName: row.model.category.name,
     dealerName: opt(row.dealer?.name),
     customerName: opt(row.customer?.name),
@@ -190,6 +192,7 @@ export function toRegistrationView(
   row: RegistrationRow,
   vc: Pick<ViewCtx, "user" | "today">,
   duplicateOf?: UnitRow | null,
+  modelImages?: ReadonlyMap<string, string | undefined>,
 ): RegistrationView {
   return {
     id: row.id,
@@ -199,6 +202,7 @@ export function toRegistrationView(
     serial: row.serial,
     batchNumber: opt(row.batchNumber),
     modelCode: row.modelCode,
+    modelImageUrl: modelImages?.get(row.modelCode),
     customer: {
       name: row.customerName,
       phone: opt(row.customerPhone),
@@ -317,6 +321,7 @@ export function toClaimView(
     batchNumber: opt(row.unit.batchNumber),
     modelCode: row.unit.model.code,
     modelName: row.unit.model.name,
+    modelImageUrl: opt(row.unit.model.imageUrl),
     categoryName: row.unit.model.category.name,
     dealerName: opt(row.dealer?.name),
     customerName: opt(row.customer?.name),

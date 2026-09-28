@@ -11,6 +11,7 @@ export * from "./Modal";
 export * from "./MonoId";
 export * from "./NativeSelect";
 export * from "./Popover";
+export * from "./ProductThumb";
 export * from "./Select";
 export * from "./SerialNumberInput";
 export * from "./Spinner";

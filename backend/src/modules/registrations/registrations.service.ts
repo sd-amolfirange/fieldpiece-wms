@@ -177,9 +177,18 @@ export class RegistrationsService {
     rows: RegistrationRow[],
   ): Promise<RegistrationView[]> {
     const serials = ctx.user.role === "admin" ? rows.flatMap((r) => r.duplicateOfSerial ?? []) : [];
-    const duplicates = new Map((await this.unitRows.load(db, serials)).map((u) => [u.serial, u]));
+    const [duplicateRows, modelImages] = await Promise.all([
+      this.unitRows.load(db, serials),
+      this.catalog.modelImages(db),
+    ]);
+    const duplicates = new Map(duplicateRows.map((u) => [u.serial, u]));
     return rows.map((r) =>
-      toRegistrationView(r, ctx, r.duplicateOfSerial ? duplicates.get(r.duplicateOfSerial) : null),
+      toRegistrationView(
+        r,
+        ctx,
+        r.duplicateOfSerial ? duplicates.get(r.duplicateOfSerial) : null,
+        modelImages,
+      ),
     );
   }
 

@@ -11,6 +11,7 @@ import {
   ClaimSourceBadge,
   ClaimStatusBadge,
   MonoId,
+  ProductThumb,
   Timeline,
   WarrantyStatusBadge,
   type TimelineItem,
@@ -209,6 +210,15 @@ export default function ClaimDetailPage() {
 
   const product = (
     <Card title={t("claims.product")}>
+      <div className="mb-4 flex gap-4">
+        <ProductThumb imageUrl={c.modelImageUrl} />
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-medium">
+            {c.modelName} <MonoId>{c.modelCode}</MonoId>
+          </p>
+          <p className="text-sm text-text-muted">{c.categoryName}</p>
+        </div>
+      </div>
       <dl className="grid gap-4 sm:grid-cols-2">
         <Field label={t("claims.fields.serial")}>
           <Link to={`/units/${c.unitSerial}`} className="underline-offset-2 hover:underline">

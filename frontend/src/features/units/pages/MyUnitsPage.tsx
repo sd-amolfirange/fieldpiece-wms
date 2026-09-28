@@ -1,9 +1,16 @@
-import { Boxes, Package, ShieldCheck } from "lucide-react";
+import { Boxes, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { EmptyState, ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
-import { buttonVariants, Card, MonoId, RegistrationStatusBadge, WarrantyStatusBadge } from "@/components/ui";
+import {
+  buttonVariants,
+  Card,
+  MonoId,
+  ProductThumb,
+  RegistrationStatusBadge,
+  WarrantyStatusBadge,
+} from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { useCurrentUser } from "@/lib/session";
 import { useMyPendingRegistrations, useUnits } from "../hooks";
@@ -44,9 +51,7 @@ export default function MyUnitsPage() {
           {pending.data?.items.map((r) => (
             <li key={r.id}>
               <Card as="article" className="flex gap-4">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-ink-50">
-                  <Package size={24} strokeWidth={1.75} className="text-ink-400" aria-hidden />
-                </div>
+                <ProductThumb imageUrl={r.modelImageUrl} />
                 <div className="min-w-0 flex-1">
                   <h3 className="text-h3">{r.modelCode}</h3>
                   <MonoId>{r.serial}</MonoId>
@@ -68,9 +73,7 @@ export default function MyUnitsPage() {
                 className="block rounded-lg hover:ring-2 hover:ring-ink-1000"
               >
                 <Card as="article" className="flex gap-4">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-ink-50">
-                    <Package size={24} strokeWidth={1.75} className="text-ink-400" aria-hidden />
-                  </div>
+                  <ProductThumb imageUrl={unit.modelImageUrl} />
                   <div className="min-w-0 flex-1">
                     <h3 className="text-h3">{unit.modelName}</h3>
                     <MonoId>{unit.serial}</MonoId>

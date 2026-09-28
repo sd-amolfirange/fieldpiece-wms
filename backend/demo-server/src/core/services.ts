@@ -229,6 +229,7 @@ export function toUnitView(state: DemoState, unit: Unit, today: IsoDate): UnitVi
     modelCode: model?.code ?? unit.modelId,
     modelName: model?.name ?? "",
     modelDescription: model?.description ?? "",
+    modelImageUrl: model?.imageUrl,
     categoryName: model?.categoryName ?? "",
     dealerName: dealerName(state, unit.dealerId),
     customerName: customerName(state, unit.customerId),
@@ -245,6 +246,7 @@ export function toRegistrationView(ctx: Ctx, r: Registration): RegistrationView 
       : undefined;
   return {
     ...r,
+    modelImageUrl: ctx.state.models.find((m) => m.code === r.modelCode)?.imageUrl,
     dealerName: dealerName(ctx.state, r.dealerId),
     duplicateOf: duplicate ? toUnitView(ctx.state, duplicate, ctx.today) : undefined,
   };
@@ -261,6 +263,7 @@ export function toClaimView(state: DemoState, c: WarrantyClaim, today: IsoDate):
     batchNumber: unit?.batchNumber,
     modelCode: model?.code ?? "",
     modelName: model?.name ?? "",
+    modelImageUrl: model?.imageUrl,
     categoryName: model?.categoryName ?? "",
     dealerName: dealerName(state, c.dealerId),
     customerName: customerName(state, c.customerId),

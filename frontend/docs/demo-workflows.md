@@ -94,9 +94,9 @@ All signed-in roles: Notifications (bell), Profile / sign out. Each role sees on
 
 ### Visitor (no account)
 
-| Code | Screen                | Must contain                                                                                      |
-| ---- | --------------------- | ------------------------------------------------------------------------------------------------- |
-| WEB  | Register your product | Model, serial, batch, purchase date, where bought, receipt, name, email, state, ZIP; confirmation |
+| Code | Screen                | Must contain                                                                                                                      |
+| ---- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| WEB  | Register your product | Scan QR label or enter model, serial, batch manually; purchase date, where bought, receipt, name, email, state, ZIP; confirmation |
 
 ## Workflows
 
@@ -177,15 +177,15 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 **Duration:** 5 min · **Roles:** Admin, Visitor  
 **Goal:** Registrations arrive from people and systems through one inbox; every exchange is logged.
 
-| #   | Role    | Screen                    | Action                                                                                        | Expected result                                                           |
-| --- | ------- | ------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 1   | Admin   | A13 System events         | Distributor ERP invoice (3 serials), registration email with receipt, marketplace orders (2). | ERP and email wait for review; marketplace orders are registered at once. |
-| 2   | Visitor | WEB Register your product | Open `/register-product` (no account); fill in; attach receipt; submit.                       | Confirmation; the registration waits for review.                          |
-| 3   | Admin   | A02 Registration inbox    | Pending: Email, Web form, Distributor ERP badges; channel filter Marketplace.                 | One inbox for every channel.                                              |
-| 4   | Admin   | A03 Registration review   | Approve the emailed registration (receipt read from the email).                               | CRM update sent.                                                          |
-| 5   | Admin   | HUB Registration channels | Mailbox address, website form link and QR, partner API; add a partner system.                 | API key shown once; a registration sent with it is registered at once.    |
-| 6   | Admin   | A12 Integration log       | Inbound ERP, email, partner; outbound CRM.                                                    | Payload view, retry.                                                      |
-| 7   | Admin   | A01 Admin dashboard       | Channel chart.                                                                                | Email +1, Marketplace +2.                                                 |
+| #   | Role    | Screen                    | Action                                                                                                | Expected result                                                           |
+| --- | ------- | ------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1   | Admin   | A13 System events         | Distributor ERP invoice (3 serials), registration email with receipt, marketplace orders (2).         | ERP and email wait for review; marketplace orders are registered at once. |
+| 2   | Visitor | WEB Register your product | Open `/register-product` (no account); scan the QR label or fill in manually; attach receipt; submit. | Confirmation; the registration waits for review.                          |
+| 3   | Admin   | A02 Registration inbox    | Pending: Email, Web form, Distributor ERP badges; channel filter Marketplace.                         | One inbox for every channel.                                              |
+| 4   | Admin   | A03 Registration review   | Approve the emailed registration (receipt read from the email).                                       | CRM update sent.                                                          |
+| 5   | Admin   | HUB Registration channels | Mailbox address, website form link and QR, partner API; add a partner system.                         | API key shown once; a registration sent with it is registered at once.    |
+| 6   | Admin   | A12 Integration log       | Inbound ERP, email, partner; outbound CRM.                                                            | Payload view, retry.                                                      |
+| 7   | Admin   | A01 Admin dashboard       | Channel chart.                                                                                        | Email +1, Marketplace +2.                                                 |
 
 ### W7 – Distributor oversight
 

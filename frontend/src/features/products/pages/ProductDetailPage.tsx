@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
-import { Card, MonoId } from "@/components/ui";
+import { Card, MonoId, ProductThumb } from "@/components/ui";
 import { useModels } from "@/features/catalog";
 
 // A06 product detail: the model's warranty terms and the serial / batch label format every registration of it
@@ -47,6 +47,9 @@ export default function ProductDetailPage() {
       />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <ProductThumb imageUrl={model.imageUrl} size="lg" />
+          </Card>
           <Card title={t("models.warranty")}>
             <dl className="grid gap-4 sm:grid-cols-2">
               <Field label={t("models.term")}>

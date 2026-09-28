@@ -5,7 +5,15 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/layout";
-import { buttonVariants, DataTable, Input, MonoId, NativeSelect, WarrantyStatusBadge } from "@/components/ui";
+import {
+  buttonVariants,
+  DataTable,
+  Input,
+  MonoId,
+  NativeSelect,
+  ProductThumb,
+  WarrantyStatusBadge,
+} from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { useDealers } from "@/features/catalog";
 import { useCurrentRole } from "@/lib/session";
@@ -54,9 +62,12 @@ export default function UnitsListPage() {
       col.accessor("modelCode", {
         header: t("units.columns.model"),
         cell: (i) => (
-          <span>
-            <span className="font-semibold">{i.getValue()}</span>
-            <span className="block text-xs text-text-muted">{i.row.original.categoryName}</span>
+          <span className="flex items-center gap-2">
+            <ProductThumb imageUrl={i.row.original.modelImageUrl} size="sm" />
+            <span>
+              <span className="font-semibold">{i.getValue()}</span>
+              <span className="block text-xs text-text-muted">{i.row.original.categoryName}</span>
+            </span>
           </span>
         ),
       }),

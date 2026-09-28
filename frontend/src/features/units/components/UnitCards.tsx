@@ -13,7 +13,15 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/feedback";
-import { Button, Card, MonoId, Timeline, WarrantyStatusBadge, type TimelineItem } from "@/components/ui";
+import {
+  Button,
+  Card,
+  MonoId,
+  ProductThumb,
+  Timeline,
+  WarrantyStatusBadge,
+  type TimelineItem,
+} from "@/components/ui";
 import { printQrLabel, QrCode, registerUrl } from "@/features/qr";
 import { toApiError } from "@/lib/api-error";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -33,11 +41,16 @@ export function UnitFactsCard({ unit, showOwner = true }: { unit: UnitView; show
   const { t, i18n } = useTranslation();
   return (
     <Card title={t("units.facts")}>
+      <div className="mb-4 flex gap-4">
+        <ProductThumb imageUrl={unit.modelImageUrl} />
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-medium">
+            {unit.modelName} <MonoId>{unit.modelCode}</MonoId>
+          </p>
+          <p className="text-sm text-text-muted">{unit.modelDescription}</p>
+        </div>
+      </div>
       <dl className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("units.fields.model")} className="sm:col-span-2">
-          {unit.modelName} <MonoId>{unit.modelCode}</MonoId>
-          <span className="block text-sm text-text-muted">{unit.modelDescription}</span>
-        </Field>
         <Field label={t("units.fields.category")}>{unit.categoryName}</Field>
         <Field label={t("units.fields.batch")}>
           {unit.batchNumber ? <MonoId>{unit.batchNumber}</MonoId> : "—"}

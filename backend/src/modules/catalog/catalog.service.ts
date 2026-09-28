@@ -80,6 +80,12 @@ export class CatalogService {
     return new Map(rows.map((m) => [m.code, modelFormat(m)]));
   }
 
+  /** Model code -> its product photo, for any screen that shows a registration or claim by model code alone. */
+  async modelImages(db: Db = this.prisma): Promise<Map<string, string | undefined>> {
+    const rows = await db.model.findMany({ select: { code: true, imageUrl: true } });
+    return new Map(rows.map((m) => [m.code, m.imageUrl ?? undefined]));
+  }
+
   async dealerIds(db: Db = this.prisma): Promise<string[]> {
     return (await db.dealer.findMany({ select: { id: true } })).map((d) => d.id);
   }

@@ -45,6 +45,8 @@ export interface UnitView extends Unit {
   modelCode: string;
   modelName: string;
   modelDescription: string;
+  /** The model's product photo, for anywhere this product is shown. */
+  modelImageUrl?: string;
   categoryName: string;
   dealerName?: string;
   customerName?: string;
@@ -53,6 +55,8 @@ export interface UnitView extends Unit {
 }
 
 export interface RegistrationView extends Registration {
+  /** The model's product photo, for anywhere this registration is shown. */
+  modelImageUrl?: string;
   dealerName?: string;
   /** Existing product with the same serial, for the duplicate comparison. */
   duplicateOf?: UnitView;
@@ -62,6 +66,8 @@ export interface WarrantyClaimView extends WarrantyClaim {
   batchNumber?: string;
   modelCode: string;
   modelName: string;
+  /** The model's product photo, for anywhere this claim is shown. */
+  modelImageUrl?: string;
   categoryName: string;
   dealerName?: string;
   customerName?: string;

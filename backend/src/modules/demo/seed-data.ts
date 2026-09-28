@@ -71,12 +71,34 @@ export interface SeedState {
 
 const ts = (date: IsoDate, time = "10:00:00") => `${date}T${time}.000Z`;
 
+// Model codes with a real product photo saved to frontend/public/products/<code>.png (Fieldpiece's own image,
+// kept for internal demo use — see demo-assets/product-images/SOURCES.md for provenance). A code left out here
+// shows a placeholder icon instead of a broken image.
+const PRODUCT_IMAGES = new Set<string>([
+  "SC680",
+  "SC480",
+  "SC260",
+  "SM482V",
+  "SM382V",
+  "JL3KH6",
+  "VP87",
+  "MR45",
+  "MG44",
+  "DR82",
+  "SRS1",
+  "STA2",
+]);
+
+// Product photos are Fieldpiece's own, saved under frontend/public/products/<code>.png for local demo use
+// (see demo-assets/product-images/SOURCES.md for where each came from). A model with no image on disk falls
+// back to a placeholder icon in the UI.
 const model = (code: string, categoryId: string, name: string, description: string): Model => ({
   id: `m-${code.toLowerCase()}`,
   code,
   categoryId,
   name,
   description,
+  imageUrl: PRODUCT_IMAGES.has(code) ? `/products/${code}.png` : undefined,
   warrantyMonths: 12,
   serialPattern: DEFAULT_SERIAL_PATTERN,
   batchPattern: DEFAULT_BATCH_PATTERN,

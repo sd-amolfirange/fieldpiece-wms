@@ -22,6 +22,7 @@ import {
   KpiTile,
   MonoId,
   NativeSelect,
+  ProductThumb,
 } from "@/components/ui";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { useCurrentRole, useCurrentUser } from "@/lib/session";
@@ -85,11 +86,14 @@ export default function ClaimsListPage() {
       col.accessor("unitSerial", {
         header: t("claims.columns.product"),
         cell: (i) => (
-          <span>
-            <MonoId>{i.getValue()}</MonoId>
-            <span className="block text-xs text-text-muted">
-              {i.row.original.modelCode}
-              {i.row.original.batchNumber ? ` · ${i.row.original.batchNumber}` : ""}
+          <span className="flex items-center gap-2">
+            <ProductThumb imageUrl={i.row.original.modelImageUrl} size="sm" />
+            <span>
+              <MonoId>{i.getValue()}</MonoId>
+              <span className="block text-xs text-text-muted">
+                {i.row.original.modelCode}
+                {i.row.original.batchNumber ? ` · ${i.row.original.batchNumber}` : ""}
+              </span>
             </span>
           </span>
         ),

@@ -36,6 +36,8 @@ model Model {
   categoryId     String          @map("category_id")
   name           String
   description    String
+  /// Product photo, served from local storage. Null shows a placeholder icon.
+  imageUrl       String?         @map("image_url")
   /// Warranty from the date of purchase.
   warrantyMonths Int             @map("warranty_months")
   /// Regular expressions the serial and batch numbers of this model must match. [CONFIRM real label formats]
