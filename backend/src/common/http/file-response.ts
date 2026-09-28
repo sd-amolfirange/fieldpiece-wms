@@ -11,7 +11,12 @@ export function contentDisposition(kind: "inline" | "attachment", fileName: stri
  * never sniffed as another type, and never run script. PDFs skip the CSP sandbox, which would stop the browser's
  * PDF viewer.
  */
-export function fileHeaders(reply: FastifyReply, mime: string, disposition: string, frameAncestors: string[]): void {
+export function fileHeaders(
+  reply: FastifyReply,
+  mime: string,
+  disposition: string,
+  frameAncestors: string[],
+): void {
   const ancestors = ["'self'", ...frameAncestors].join(" ");
   void reply
     .header("Content-Type", mime)

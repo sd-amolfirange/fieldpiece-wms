@@ -117,11 +117,17 @@ export class AuthController {
   @HttpCode(204)
   @ApiOperation({ summary: "Sign out", description: "Ends the session (refresh cookie and access token)." })
   @ApiNoContentResponse({ description: "Signed out" })
-  async logout(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply): Promise<void> {
+  async logout(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<void> {
     const now = this.clock.now();
     const bearer = request.headers.authorization?.replace(/^Bearer /i, "");
     const fromBearer = bearer ? await this.sessions.actorFromAccessToken(bearer, now) : null;
-    await this.sessions.revoke({ token: request.cookies?.[REFRESH_COOKIE], sessionId: fromBearer?.sessionId }, now);
+    await this.sessions.revoke(
+      { token: request.cookies?.[REFRESH_COOKIE], sessionId: fromBearer?.sessionId },
+      now,
+    );
     void reply.clearCookie(REFRESH_COOKIE, { path: `/${this.env.API_PREFIX}` });
   }
 }

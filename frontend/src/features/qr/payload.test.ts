@@ -1,22 +1,30 @@
 import { parseQrPayload, registerUrl } from "./payload";
 
 describe("QR label payload", () => {
-  it("encodes the customer registration page with serial and model", () => {
-    const url = registerUrl("https://demo.example", "AER-SPL15-240917", "AER-SPL15");
-    expect(url).toBe("https://demo.example/register?serial=AER-SPL15-240917&model=AER-SPL15");
+  it("encodes the registration page with serial, model and batch", () => {
+    const url = registerUrl("https://wms.example", "261804517", "SM482V", "2618-L02");
+    expect(url).toBe("https://wms.example/register?serial=261804517&model=SM482V&batch=2618-L02");
   });
 
   it("reads back the label URL (from any host)", () => {
     expect(
-      parseQrPayload("https://x.trycloudflare.com/register?serial=aer-spl15-240917&model=aer-spl15"),
+      parseQrPayload("https://x.trycloudflare.com/register?serial=261804517&model=sm482v&batch=2618-l02"),
     ).toEqual({
-      serial: "AER-SPL15-240917",
-      modelCode: "AER-SPL15",
+      serial: "261804517",
+      modelCode: "SM482V",
+      batchNumber: "2618-L02",
+    });
+  });
+
+  it("reads labels printed without a batch", () => {
+    expect(parseQrPayload("https://wms.example/register?serial=261804517&model=SM482V")).toEqual({
+      serial: "261804517",
+      modelCode: "SM482V",
     });
   });
 
   it("accepts a bare serial number", () => {
-    expect(parseQrPayload(" aer-spl15-210311 ")).toEqual({ serial: "AER-SPL15-210311" });
+    expect(parseQrPayload(" 2618 04517 ")).toEqual({ serial: "261804517" });
   });
 
   it("ignores unrelated codes", () => {

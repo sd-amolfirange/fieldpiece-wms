@@ -1,6 +1,9 @@
 import type {
   BulkImportView,
+  IntakeInfo,
+  ModelView,
   Paginated,
+  PartnerClientView,
   RegistrationChannel,
   RegistrationFlag,
   RegistrationRowInput,
@@ -19,10 +22,22 @@ export interface RegistrationFilters extends PageParams {
 
 /** Body for POST /registrations: dealer form (DL03), admin manual add, or customer self-registration (CU01). */
 export interface NewRegistration extends RegistrationRowInput {
-  purchaseDate?: string;
-  location?: string;
+  placeOfPurchase?: string;
   dealerId?: string;
   attachmentIds: string[];
+}
+
+/** The public web form (no account): the fields plus the proof of purchase, sent as one multipart request. */
+export interface PublicRegistration extends RegistrationRowInput {
+  placeOfPurchase?: string;
+  /** Honeypot: hidden from people, filled in by spam bots. */
+  website?: string;
+}
+
+export interface NewPartnerClient {
+  name: string;
+  channel: PartnerClientView["channel"];
+  dealerId?: string;
 }
 
 export const registrationsApi = {
@@ -63,4 +78,29 @@ export const bulkImportsApi = {
     http.put<BulkImportView>(`/bulk-imports/${encodeURIComponent(id)}/rows`, { rows }).then((r) => r.data),
   /** Plain links: the templates need no sign-in. */
   templateUrl: (kind: "xlsx" | "csv") => `${env.apiBaseUrl}/bulk-imports/template.${kind}`,
+};
+
+/** Registration channels (hub page), the public web form and partner API keys. */
+export const intakeApi = {
+  info: () => http.get<IntakeInfo>("/intake").then((r) => r.data),
+  publicModels: () => http.get<ModelView[]>("/public/models").then((r) => r.data),
+  publicRegister: (fields: PublicRegistration, proof: File) => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) if (typeof value === "string") form.append(key, value);
+    form.append("file", proof, proof.name);
+    return http
+      .post<{ registrationId: string; status: "PENDING" }>("/public/registrations", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+  partnerClients: () => http.get<PartnerClientView[]>("/admin/partner-clients").then((r) => r.data),
+  createPartnerClient: (body: NewPartnerClient) =>
+    http
+      .post<{ client: PartnerClientView; apiKey: string }>("/admin/partner-clients", body)
+      .then((r) => r.data),
+  setPartnerActive: (id: string, active: boolean) =>
+    http
+      .patch<PartnerClientView>(`/admin/partner-clients/${encodeURIComponent(id)}`, { active })
+      .then((r) => r.data),
 };

@@ -1,20 +1,21 @@
 import type { Page } from "@playwright/test";
 import { appUrl, expectNoA11yViolations, resetDemoData, rolePage, test } from "./fixtures";
 
-// WCAG 2.2 AA (axe) on every demo screen, with the login and viewport that uses it.
+// WCAG 2.2 AA (axe) on every screen, with the login and viewport that uses it.
 
 const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]> = {
   admin: [
     "/",
     "/registrations",
     "/registrations/REG-1001",
+    "/registrations/channels",
     "/units",
-    "/units/AER-SPL15-210311",
+    "/units/251406233",
     "/models",
-    "/complaints",
-    "/complaints/CMP-1001",
+    "/models/m-sc680",
     "/claims",
     "/claims/CLM-1001",
+    "/claims/new",
     "/admin/dealers",
     "/admin/integrations",
     "/admin/simulate",
@@ -23,23 +24,17 @@ const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]>
     "/",
     "/registrations/new",
     "/registrations/bulk",
+    "/registrations/channels",
     "/units",
-    "/units/AER-SPL18-251120",
-    "/complaints",
-    "/complaints/new",
+    "/units/252811902",
+    "/claims",
+    "/claims/new",
   ],
-  distributor: ["/", "/units"],
-  customer: [
-    "/",
-    "/register",
-    "/units/AER-SPL15-210311",
-    "/complaints",
-    "/complaints/new",
-    "/complaints/CMP-1001",
-  ],
+  distributor: ["/", "/units", "/claims"],
+  customer: ["/", "/register", "/units/251406233", "/claims", "/claims/new"],
 };
 
-test("a11y: no WCAG 2.2 AA violations on any demo screen", async ({ browser, baseURL }) => {
+test("a11y: no WCAG 2.2 AA violations on any screen", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));
   for (const [account, paths] of Object.entries(SCREENS)) {
     const page: Page = await rolePage(browser, account as keyof typeof SCREENS, appUrl(baseURL));
@@ -52,4 +47,12 @@ test("a11y: no WCAG 2.2 AA violations on any demo screen", async ({ browser, bas
     }
     await page.context().close();
   }
+  await test.step("visitor /register-product", async () => {
+    const context = await browser.newContext({ baseURL: appUrl(baseURL) });
+    const page = await context.newPage();
+    await page.goto("/register-product");
+    await page.waitForLoadState("networkidle");
+    await expectNoA11yViolations(page);
+    await context.close();
+  });
 });

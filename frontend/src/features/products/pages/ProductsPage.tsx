@@ -6,13 +6,13 @@ import { PageHeader } from "@/components/layout";
 import { Card, MonoId } from "@/components/ui";
 import { useModels } from "@/features/catalog";
 
-// A06 Models & parts: models grouped by brand. Each model is a template whose parts and warranty periods are
-// attached to every unit registered with it.
+// A06 Product catalog: Fieldpiece models grouped by category, with the warranty each one carries from the date
+// of purchase.
 
 export default function ProductsPage() {
   const { t } = useTranslation();
   const query = useModels();
-  const brands = [...new Set(query.data?.map((m) => m.brandName))].sort();
+  const categories = [...new Set(query.data?.map((m) => m.categoryName))];
 
   return (
     <>
@@ -32,14 +32,14 @@ export default function ProductsPage() {
         <EmptyState icon={Package} message={t("models.empty")} />
       ) : (
         <div className="space-y-6">
-          {brands.map((brand) => (
-            <section key={brand} aria-labelledby={`brand-${brand}`}>
-              <h2 id={`brand-${brand}`} className="mb-4 text-h3">
-                {brand}
+          {categories.map((category, index) => (
+            <section key={category} aria-labelledby={`category-${index}`}>
+              <h2 id={`category-${index}`} className="mb-4 text-h3">
+                {category}
               </h2>
               <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {query.data
-                  .filter((m) => m.brandName === brand)
+                  .filter((m) => m.categoryName === category)
                   .map((m) => (
                     <li key={m.id}>
                       <Link
@@ -55,8 +55,9 @@ export default function ProductsPage() {
                           <div>
                             <h3 className="text-h3">{m.name}</h3>
                             <MonoId>{m.code}</MonoId>
-                            <p className="mt-1 text-sm text-text-muted">
-                              {m.capacity} · {m.type} · {t("models.partCount", { count: m.parts.length })}
+                            <p className="mt-1 text-sm text-text-muted">{m.description}</p>
+                            <p className="mt-1 text-sm">
+                              {t("models.warrantyMonths", { count: m.warrantyMonths })}
                             </p>
                           </div>
                         </Card>

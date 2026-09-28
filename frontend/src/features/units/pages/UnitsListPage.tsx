@@ -47,7 +47,19 @@ export default function UnitsListPage() {
           </Link>
         ),
       }),
-      col.accessor("modelCode", { header: t("units.columns.model") }),
+      col.accessor("batchNumber", {
+        header: t("units.columns.batch"),
+        cell: (i) => (i.getValue() ? <MonoId>{i.getValue()}</MonoId> : "—"),
+      }),
+      col.accessor("modelCode", {
+        header: t("units.columns.model"),
+        cell: (i) => (
+          <span>
+            <span className="font-semibold">{i.getValue()}</span>
+            <span className="block text-xs text-text-muted">{i.row.original.categoryName}</span>
+          </span>
+        ),
+      }),
       col.accessor("customerName", { header: t("units.columns.customer"), cell: (i) => i.getValue() ?? "—" }),
       ...(showDealer
         ? [
@@ -57,8 +69,12 @@ export default function UnitsListPage() {
             }),
           ]
         : []),
-      col.accessor("installDate", {
-        header: t("units.columns.installed"),
+      col.accessor("purchaseDate", {
+        header: t("units.columns.purchased"),
+        cell: (i) => formatDate(i.getValue(), i18n.language) || "—",
+      }),
+      col.accessor("warrantyEnd", {
+        header: t("units.columns.warrantyEnd"),
         cell: (i) => formatDate(i.getValue(), i18n.language) || "—",
       }),
       col.accessor("status", {

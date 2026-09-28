@@ -1,2 +1,2 @@
-// Public API of the catalog feature: product master (models, brands) and dealers.
-export { useBrands, useDealers, useModels } from "./hooks";
+// Public API of the catalog feature: product catalog (models, categories) and dealers.
+export { useCategories, useDealers, useModels } from "./hooks";

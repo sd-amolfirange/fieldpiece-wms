@@ -80,9 +80,22 @@ export const EnvSchema = z
      * Calendar used for "today" (warranty status, future-date checks, "this month"). Warranty dates have no time
      * zone; this decides when a day starts. [CONFIRM] with the business.
      */
-    APP_TIMEZONE: z.string().default("Asia/Kolkata").refine(isTimeZone, "Unknown IANA time zone"),
-    /** SessionUser.currency. [CONFIRM] per organisation once more than one market is live. */
-    APP_CURRENCY: z.string().length(3).default("INR"),
+    APP_TIMEZONE: z.string().default("America/Los_Angeles").refine(isTimeZone, "Unknown IANA time zone"),
+    /** SessionUser.currency (ISO 4217). [CONFIRM] per organisation once more than one market is live. */
+    APP_CURRENCY: z.string().length(3).default("USD"),
+
+    // Registration entry points besides the signed-in screens.
+    /** Public registration form (no account): submissions per IP per hour. */
+    PUBLIC_FORM_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(20),
+    /** Mailbox customers and dealers forward invoices to; shown on the registration hub. [CONFIRM] */
+    INBOUND_EMAIL_ADDRESS: z.string().email().default("registrations@wms.local"),
+    /**
+     * Shared secret the mail provider's inbound webhook sends in X-Inbound-Secret. Empty = email intake off
+     * (POST /inbound/email answers 404).
+     */
+    INBOUND_EMAIL_SECRET: z.string().min(24).optional(),
+    /** Partner API calls per caller per minute. */
+    PARTNER_API_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
 
     /**
      * Demo-only endpoints: the "Sign in as" account list (GET /auth/demo-accounts) and the A13 simulator
@@ -110,7 +123,11 @@ export const EnvSchema = z
       ctx.addIssue({ code: "custom", path: ["STORAGE_ACCESS_KEY"], message: "Required for s3 / minio" });
     }
     if (env.NODE_ENV === "production" && env.CORS_ORIGINS.some((o) => o === "*")) {
-      ctx.addIssue({ code: "custom", path: ["CORS_ORIGINS"], message: "List the allowed origins explicitly" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["CORS_ORIGINS"],
+        message: "List the allowed origins explicitly",
+      });
     }
   });
 

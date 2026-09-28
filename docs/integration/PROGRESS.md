@@ -1,5 +1,40 @@
 # Integration progress
 
+## 2026-09-28: warranty core for the US Fieldpiece deployment
+
+**Decision** (developer, on Fieldpiece's review feedback): focus on the warranty core with US data. Recorded in
+`docs/adr/ADR-012-warranty-core.md`. Feedback addressed: US data and USD; real-looking serial numbers; the product
+list verified against fieldpiece.com; RMA removed; warranty core instead of service jobs; multiple registration entry
+points; a batch number with the serial.
+
+### Done
+
+- `shared/wms-domain`: product categories and Fieldpiece models with per-model serial and batch formats; one
+  product-level warranty (1 year from the date of purchase); coverage instead of part-wise entitlement; one warranty
+  claim (`SUBMITTED` → `IN_REVIEW` → `APPROVED` with `REPAIR` / `REPLACE` / `CREDIT` → `CLOSED`, or `REJECTED`);
+  channels `DEALER`, `BULK`, `PORTAL`, `WEB`, `EMAIL`, `ERP`, `API`, `RETAIL`.
+- `backend/`: complaints, service jobs, RMA, OEM claims, part templates and brands removed. New modules and routes:
+  `/categories`, `/units/:serial/coverage`, `/claims` (file and decide), and the registration hub: `/intake`, the public
+  form (`/public/models`, `/public/registrations` with honeypot and per-IP limit), the partner API
+  (`/partner/v1/registrations`, `X-Api-Key`, keys stored as SHA-256), email intake (`/inbound/email`, provider webhook
+  with `X-Inbound-Secret`) and `/admin/partner-clients`. Simulator: `reset`, `erp-invoice`, `registration-email`,
+  `marketplace-order`.
+- Migration `20260928000000_warranty_core`: truncates the demo data, drops the old tables, creates the new ones;
+  `npm run db:seed` reloads fictional US starting data (555-01xx phones, example.com emails) with real Fieldpiece
+  products.
+- New settings: `APP_TIMEZONE` (`America/Los_Angeles`), `APP_CURRENCY` (`USD`), `PUBLIC_FORM_LIMIT_PER_HOUR`,
+  `INBOUND_EMAIL_ADDRESS`, `INBOUND_EMAIL_SECRET`, `PARTNER_API_LIMIT_PER_MINUTE`.
+- Docs: `frontend/docs/api-contract.md` rewritten for the new API; `backend/README.md` (accounts, sample file
+  `demo-assets/lonestar_sales_week38.xlsx`, settings); ADR-012.
+
+### Open questions [CONFIRM]
+
+1. Fieldpiece's real serial and batch label format. Assumed: 9-digit serial (`yy` + `ww` + 5-digit sequence), batch
+   `yyww-Lnn`.
+2. Replacement warranty: the replacement currently carries the rest of the original warranty. Or a new year?
+3. Business time zone (`America/Los_Angeles` assumed) and the real inbound email address and mail provider.
+4. `backend/openapi.json` still describes the previous API; regenerate it with `npm run openapi:export`.
+
 ## 2026-09-25: real backend built to the frontend's contract
 
 **Decision** (developer): follow the frontend's implementation, change only the backend. Recorded in

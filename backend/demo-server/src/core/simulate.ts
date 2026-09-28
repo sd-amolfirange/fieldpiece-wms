@@ -1,66 +1,77 @@
-import { addDaysIso, type Registration, type RegistrationView } from "@wms/domain";
-import { logMessage } from "./complaints";
-import { getRegistration, notify, requireRole, type Ctx } from "./services";
-import { nextId, type DemoState } from "./state";
+import { addDaysIso, type IsoDate, type RegistrationView } from "@wms/domain";
+import { conflict, notFound } from "./errors";
+import { inboundEmail, INBOUND_EMAIL_ADDRESS, partnerRegistrations } from "./intake";
+import { simplePdf } from "./pdf";
+import { getRegistration, submitForReview } from "./registrations";
+import { adminIds, logMessage, notify, requireRole, type Ctx } from "./services";
+import { nextCounter, type DemoState } from "./state";
 
-// A13 stand-ins for the systems that send registrations in (W6). Mock API: minimal rules.
-// - ERP sales invoice: one invoice, three serials, three Pending registrations with channel ERP.
-// - Registration email: one Pending registration with channel EMAIL and the invoice attached.
-// Both are logged in the integration log and wait in the A02 inbox for the same review as any other channel.
+// The System events page (A13), as backend/src/modules/demo/demo.service.ts: the messages the connected systems would
+// send. The email and the marketplace order go through the same intake code as the real webhook and partner API.
+// - ERP sales invoice: one invoice, three new serials, three Pending registrations with channel ERP.
+// - Registration email: one Pending registration with channel EMAIL and the invoice (a PDF) attached.
+// - Marketplace order: two orders through the partner API (channel RETAIL), registered at once.
 
-const adminIds = (state: DemoState) => state.users.filter((u) => u.role === "admin").map((u) => u.id);
+/** Batch for products built about four weeks before `today`: yyww-L + line. */
+function batchFor(today: IsoDate, line: number): string {
+  const built = new Date(`${addDaysIso(today, -28)}T00:00:00Z`);
+  const start = Date.UTC(built.getUTCFullYear(), 0, 1);
+  const week = Math.min(52, Math.floor((built.getTime() - start) / (7 * 86_400_000)) + 1);
+  return `${String(built.getUTCFullYear()).slice(2)}${String(week).padStart(2, "0")}-L${String(line).padStart(2, "0")}`;
+}
 
-/** A serial nobody has used yet, in the seed's "<model>-<yymm><nn>" style. */
-function freeSerial(ctx: Ctx, modelCode: string): string {
-  const taken = new Set([...ctx.state.units.map((u) => u.serial), ...ctx.state.registrations.map((r) => r.serial)]);
-  const yymm = ctx.today.slice(2, 7).replace("-", "");
-  for (let n = 1; ; n += 1) {
-    const serial = `${modelCode}-${yymm}${String(n).padStart(2, "0")}`;
-    if (!taken.has(serial)) return serial;
+/** A serial nobody has used yet, in the label format: the batch's yyww + a 5-digit sequence. */
+function freeSerial(state: DemoState, today: IsoDate, taken: ReadonlySet<string> = new Set()): string {
+  const used = new Set([
+    ...taken,
+    ...state.units.map((u) => u.serial),
+    ...state.registrations.map((r) => r.serial),
+  ]);
+  const prefix = batchFor(today, 1).slice(0, 4);
+  for (let n = 30001; ; n += 1) {
+    const serial = `${prefix}${String(n).padStart(5, "0")}`;
+    if (!used.has(serial)) return serial;
   }
 }
 
-function pending(ctx: Ctx, fields: Omit<Registration, "id" | "status" | "flags" | "submittedBy" | "submittedAt">) {
-  const reg: Registration = {
-    id: nextId(ctx.state, "REG"),
-    status: "PENDING",
-    flags: [],
-    submittedBy: ctx.user.id,
-    submittedAt: ctx.now,
-    ...fields,
-  };
-  ctx.state.registrations.push(reg);
-  return reg;
-}
-
+/** A distributor ERP invoice with three new serials: three Pending registrations, channel ERP. */
 export function simulateErpInvoice(ctx: Ctx): RegistrationView[] {
   requireRole(ctx, "admin");
-  const invoiceNumber = `BP-INV-${ctx.today.replace(/-/g, "")}-${String((ctx.state.counters.ERPINV ?? 0) + 1).padStart(2, "0")}`;
-  ctx.state.counters.ERPINV = (ctx.state.counters.ERPINV ?? 0) + 1;
+  const { state, today } = ctx;
+  const invoiceNumber = `GS-${today.replace(/-/g, "").slice(2)}-${String(nextCounter(state, "ERPINV")).padStart(2, "0")}`;
   const customer = {
-    name: "Sunrise Dental Clinic",
-    phone: "+91 90000 00301",
-    email: "accounts@sunrise-dental.example",
-    city: "Pune",
+    name: "Northside Heating & Air",
+    phone: "(214) 555-0133",
+    email: "office@northside-hvac.example.com",
+    city: "Richardson",
+    state: "TX",
+    zip: "75080",
   };
+  const dealerId = state.dealers.find((d) => d.id === "d-bayou")?.id;
+  const lines = [
+    { model: "SC480", batch: batchFor(today, 1) },
+    { model: "SM482V", batch: batchFor(today, 2) },
+    { model: "MG44", batch: batchFor(today, 1) },
+  ];
   // One registration per invoice line; each is saved before the next serial is picked, so serials never repeat.
-  const regs: Registration[] = [];
-  for (const modelCode of ["AER-SPL15", "AER-SPL18", "AER-SPL18"]) {
-    regs.push(
-      pending(ctx, {
-        channel: "ERP",
-        serial: freeSerial(ctx, modelCode),
-        modelCode,
+  const created = lines.map((line) => {
+    const serial = freeSerial(state, today);
+    const id = submitForReview(
+      ctx,
+      {
+        serial,
+        batchNumber: line.batch,
+        modelCode: line.model,
         customer,
-        dealerId: "d-breeze",
-        purchaseDate: ctx.today,
+        dealerId,
+        purchaseDate: today,
         invoiceNumber,
-        location: "Aundh, Pune: clinic",
-        attachmentIds: [],
-        submittedByName: "ERP sales feed",
-      }),
+      },
+      "ERP",
+      { id: "system", name: "ERP sales feed" },
     );
-  }
+    return { id, serial, modelCode: line.model, batchNumber: line.batch };
+  });
   logMessage(ctx, {
     system: "ERP",
     direction: "IN",
@@ -68,88 +79,106 @@ export function simulateErpInvoice(ctx: Ctx): RegistrationView[] {
     refId: invoiceNumber,
     payload: {
       invoiceNumber,
-      invoiceDate: ctx.today,
-      dealer: "Breeze Point",
+      invoiceDate: today,
+      dealer: "Bayou Air Parts",
       customer,
-      lines: regs.map((r) => ({ serial: r.serial, modelCode: r.modelCode, registrationId: r.id })),
+      lines: created.map((r) => ({
+        serial: r.serial,
+        batchNumber: r.batchNumber,
+        model: r.modelCode,
+        registrationId: r.id,
+      })),
     },
   });
-  notify(ctx.state, adminIds(ctx.state), "erp_invoice_received", ctx.now, {
-    params: { invoice: invoiceNumber, count: regs.length },
+  notify(state, adminIds(state), "erp_invoice_received", ctx.now, {
+    params: { invoice: invoiceNumber, count: created.length },
     link: "/registrations?channel=ERP",
   });
-  return regs.map((r) => getRegistration(ctx, r.id));
+  return created.map((r) => getRegistration(ctx, r.id));
 }
 
-/** The emailed invoice, drawn as an image so A03 can show it next to the data. */
-export function invoiceSvg(lines: [string, string][]): string {
-  const esc = (s: string) =>
-    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c);
-  const rows = lines
-    .map(
-      ([k, v], i) =>
-        `<text x="48" y="${170 + i * 44}" font-family="sans-serif" font-size="22" fill="#5e5e5c">${esc(k)}</text>` +
-        `<text x="300" y="${170 + i * 44}" font-family="monospace" font-size="22" fill="#12130d">${esc(v)}</text>`,
-    )
-    .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
-<rect width="640" height="480" fill="#ffffff"/><rect x="0" y="0" width="640" height="96" fill="#e8e8e9"/>
-<text x="48" y="60" font-family="sans-serif" font-size="32" font-weight="bold" fill="#12130d">TAX INVOICE</text>${rows}</svg>`;
-}
-
-/**
- * A customer emails the registration mailbox with the invoice attached. `store` saves the invoice file and returns
- * its attachment id (the Express server writes it to disk; the test adapter keeps it in memory).
- */
-export function simulateRegistrationEmail(
-  ctx: Ctx,
-  store: (file: { name: string; mime: string; content: string }) => string,
-): RegistrationView {
+/** A customer emails the registration mailbox with the invoice attached (the real email intake path). */
+export function simulateRegistrationEmail(ctx: Ctx): RegistrationView {
   requireRole(ctx, "admin");
-  const serial = freeSerial(ctx, "POL-SPL12");
-  const purchaseDate = addDaysIso(ctx.today, -3);
-  const invoiceNumber = `CA/${ctx.today.slice(0, 4)}/${String(900 + (ctx.state.counters.REG ?? 0)).padStart(4, "0")}`;
-  const from = "m.iyer@example.com";
-  const attachmentId = store({
-    name: `invoice-${invoiceNumber.replace(/\//g, "-")}.svg`,
-    mime: "image/svg+xml",
-    content: invoiceSvg([
-      ["Invoice", invoiceNumber],
-      ["Date", purchaseDate],
-      ["Sold by", "CoolAir Traders, Pune"],
-      ["Customer", "M. Iyer"],
-      ["Model", "POL-SPL12"],
-      ["Serial", serial],
-    ]),
+  const { today } = ctx;
+  const serial = freeSerial(ctx.state, today);
+  const batch = batchFor(today, 3);
+  const [y, m, d] = addDaysIso(today, -3).split("-");
+  const invoiceNumber = `LS-${today.slice(0, 4)}-${serial.slice(-4)}`;
+  const invoice = simplePdf("INVOICE", [
+    ["Invoice", invoiceNumber],
+    ["Date", `${m}/${d}/${y}`],
+    ["Sold by", "Lone Star Refrigeration Supply, Houston TX"],
+    ["Item", "Fieldpiece SC680 Swivel Head Wireless Clamp Meter"],
+    ["Serial", serial],
+    ["Batch", batch],
+  ]);
+  const result = inboundEmail(ctx, {
+    from: "Samantha Ortiz <sam.ortiz@example.com>",
+    to: INBOUND_EMAIL_ADDRESS,
+    subject: "Warranty registration for my new clamp meter",
+    text: [
+      "Hi, please register my new Fieldpiece meter. Invoice attached.",
+      "Model: SC680",
+      `Serial number: ${serial}`,
+      `Batch: ${batch}`,
+      `Purchased: ${m}/${d}/${y}`,
+      "Phone: (713) 555-0186",
+      "City: Pasadena",
+      "State: TX",
+      "ZIP: 77502",
+    ].join("\n"),
+    attachments: [
+      {
+        filename: `invoice-${invoiceNumber}.pdf`,
+        contentType: "application/pdf",
+        contentBase64: btoa(invoice),
+      },
+    ],
   });
-  const reg = pending(ctx, {
-    channel: "EMAIL",
+  if (!result.registrationId) throw conflict("invalid_transition", "The sample email couldn't be read.");
+  return getRegistration(ctx, result.registrationId);
+}
+
+/** An online marketplace sends two orders through the partner API (channel RETAIL): registered at once. */
+export function simulateMarketplaceOrder(ctx: Ctx): RegistrationView[] {
+  requireRole(ctx, "admin");
+  const { state, today } = ctx;
+  const client = state.partnerClients.find((p) => p.id === "pc-marketplace");
+  if (!client?.active) throw notFound("Active marketplace partner");
+  const first = freeSerial(state, today);
+  const second = freeSerial(state, today, new Set([first]));
+  const order = (serial: string, line: number, modelCode: string, customer: Record<string, string>) => ({
     serial,
-    modelCode: "POL-SPL12",
-    customer: { name: "M. Iyer", phone: "+91 90000 00302", email: from, city: "Pune" },
-    dealerId: "d-coolair",
-    purchaseDate,
-    invoiceNumber,
-    location: "Wakad, Pune",
-    attachmentIds: [attachmentId],
-    submittedByName: `Email from ${from}`,
+    batchNumber: batchFor(today, line),
+    modelCode,
+    purchaseDate: addDaysIso(today, -1),
+    orderNumber: `MKT-${serial.slice(-6)}`,
+    customer,
   });
-  logMessage(ctx, {
-    system: "EMAIL",
-    direction: "IN",
-    type: "registration_email",
-    refId: reg.id,
-    payload: {
-      from,
-      to: "register@warranty.example",
-      subject: `Warranty registration ${serial}`,
-      attachments: [`invoice-${invoiceNumber}.svg`],
-      read: { serial, modelCode: "POL-SPL12", purchaseDate, invoiceNumber },
+  const { results } = partnerRegistrations(
+    ctx,
+    { ...client, channel: "RETAIL" },
+    {
+      registrations: [
+        order(first, 1, "VP87", {
+          name: "Tyler Brooks",
+          email: "tyler.brooks@example.com",
+          phone: "(303) 555-0114",
+          city: "Denver",
+          state: "CO",
+          zip: "80205",
+        }),
+        order(second, 2, "SM482V", {
+          name: "Nina Patel",
+          email: "nina.patel@example.com",
+          phone: "(404) 555-0167",
+          city: "Atlanta",
+          state: "GA",
+          zip: "30309",
+        }),
+      ],
     },
-  });
-  notify(ctx.state, adminIds(ctx.state), "registration_email_received", ctx.now, {
-    params: { serial },
-    link: `/registrations/${reg.id}`,
-  });
-  return getRegistration(ctx, reg.id);
+  );
+  return results.flatMap((r) => (r.registrationId ? [getRegistration(ctx, r.registrationId)] : []));
 }

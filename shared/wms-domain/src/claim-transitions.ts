@@ -1,55 +1,62 @@
 import type { ClaimStatus, Role } from "./types";
 
-// Manufacturer claim state machine: the ONE place that decides which claim actions exist.
+// Warranty claim state machine: the ONE place that decides which claim actions exist.
 //
-//   DRAFT ─submit→ SUBMITTED ─approve→ APPROVED ─mark_paid→ PAID
-//                      └──────reject→ REJECTED
+//   SUBMITTED -start_review-> IN_REVIEW -approve-> APPROVED -close-> CLOSED
+//        └──────────────reject──────┴──────reject-> REJECTED
 //
-// Only the admin acts on claims. Dealers and distributors see status only; customers don't see claims.
-// "approve" and "reject" are also fired by the OEM decision in the simulator (actor "system").
+// Customers and dealers file and follow claims; only the Fieldpiece warranty desk (admin) decides them.
 
-export type ClaimActionName = "submit" | "approve" | "reject" | "mark_paid";
-export type ClaimActor = Role | "system";
+export type ClaimActionName = "start_review" | "approve" | "reject" | "close";
+export type ClaimActor = Role;
+
+/** Extra input the UI must collect before the action. */
+export type ClaimInputField =
+  | "resolution"
+  | "creditAmount"
+  | "reason"
+  | "replacementSerial";
 
 export interface ClaimTransitionDef {
   action: ClaimActionName;
-  from: ClaimStatus;
+  from: readonly ClaimStatus[];
   to: ClaimStatus;
   actors: readonly ClaimActor[];
-  /** Extra input the UI must collect first. */
-  requires?: readonly ("rmaNumber" | "amount" | "reason")[];
+  requires?: readonly ClaimInputField[];
   tone: "primary" | "secondary" | "danger";
 }
 
 export const CLAIM_TRANSITION_DEFS: readonly ClaimTransitionDef[] = [
   {
-    action: "submit",
-    from: "DRAFT",
-    to: "SUBMITTED",
+    action: "start_review",
+    from: ["SUBMITTED"],
+    to: "IN_REVIEW",
     actors: ["admin"],
-    requires: ["amount"],
     tone: "primary",
   },
   {
     action: "approve",
-    from: "SUBMITTED",
+    from: ["IN_REVIEW"],
     to: "APPROVED",
-    actors: ["admin", "system"],
+    actors: ["admin"],
+    // creditAmount only for a CREDIT resolution (checked by the server).
+    requires: ["resolution"],
     tone: "primary",
   },
   {
     action: "reject",
-    from: "SUBMITTED",
+    from: ["SUBMITTED", "IN_REVIEW"],
     to: "REJECTED",
-    actors: ["admin", "system"],
+    actors: ["admin"],
     requires: ["reason"],
     tone: "danger",
   },
   {
-    action: "mark_paid",
-    from: "APPROVED",
-    to: "PAID",
+    action: "close",
+    from: ["APPROVED"],
+    to: "CLOSED",
     actors: ["admin"],
+    // replacementSerial only for a REPLACE resolution (checked by the server).
     tone: "primary",
   },
 ];
@@ -60,7 +67,7 @@ export function claimActionsFor(
 ): ClaimTransitionDef[] {
   if (!actor) return [];
   return CLAIM_TRANSITION_DEFS.filter(
-    (t) => t.from === status && t.actors.includes(actor),
+    (t) => t.from.includes(status) && t.actors.includes(actor),
   );
 }
 
@@ -74,6 +81,6 @@ export function nextClaimStatus(
   );
 }
 
-/** Counted as "open" on dashboards: raised but not yet paid or rejected. */
+/** Counted as "open" on dashboards: filed and not yet decided or closed. */
 export const isOpenClaim = (status: ClaimStatus) =>
-  status === "DRAFT" || status === "SUBMITTED" || status === "APPROVED";
+  status === "SUBMITTED" || status === "IN_REVIEW" || status === "APPROVED";

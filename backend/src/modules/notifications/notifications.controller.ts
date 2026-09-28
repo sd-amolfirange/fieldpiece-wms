@@ -19,7 +19,10 @@ export class NotificationsController {
 
   @Post("read")
   @HttpCode(200)
-  @ApiOperation({ summary: "Mark notifications read", description: "No ids = all of the caller's notifications." })
+  @ApiOperation({
+    summary: "Mark notifications read",
+    description: "No ids = all of the caller's notifications.",
+  })
   @ApiBody({ schema: { type: "object", properties: { ids: { type: "array", items: { type: "string" } } } } })
   @ApiOkResponse({ description: "`{ ok: true }`" })
   async markRead(@Ctx() ctx: RequestCtx, @Body() body: unknown): Promise<{ ok: true }> {

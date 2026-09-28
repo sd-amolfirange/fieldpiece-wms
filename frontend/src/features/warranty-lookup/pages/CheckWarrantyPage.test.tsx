@@ -24,7 +24,7 @@ describe("CheckWarrantyPage", () => {
     const { user } = renderWithProviders(<CheckWarrantyPage />, { route: "/check" });
     await user.type(screen.getByLabelText(/serial number/i), "ZZZ-999999");
     await user.click(screen.getByRole("button", { name: "Check warranty" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/check the label on the back of the unit/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/check the label on the back of the product/i);
   });
 
   it("shows a friendly message when rate-limited", async () => {

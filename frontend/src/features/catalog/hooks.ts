@@ -9,8 +9,8 @@ export function useModels() {
   return useQuery({ queryKey: ["models"], queryFn: catalogApi.models, staleTime: STALE });
 }
 
-export function useBrands() {
-  return useQuery({ queryKey: ["brands"], queryFn: catalogApi.brands, staleTime: STALE });
+export function useCategories() {
+  return useQuery({ queryKey: ["categories"], queryFn: catalogApi.categories, staleTime: STALE });
 }
 
 export function useDealers() {

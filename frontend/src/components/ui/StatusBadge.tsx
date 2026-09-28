@@ -2,34 +2,28 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import type {
   BulkRowStatus,
-  ComplaintSource,
-  ComplaintStatus,
-  Coverage,
-  FinancePostingStatus,
+  ClaimSource,
   IntegrationDirection,
   IntegrationStatus,
   RegistrationChannel,
   RegistrationFlag,
   RegistrationStatus,
 } from "@wms/domain";
-import type { RmaStatus } from "@/types";
 import { Badge } from "./Badge";
 import {
   bulkRowStatusStyle,
   channelStyle,
+  claimSourceStyle,
   claimStatusStyle,
-  complaintSourceStyle,
-  complaintStatusStyle,
-  coverageStyle,
-  financePostingStyle,
   integrationDirectionStyle,
   integrationStatusStyle,
+  partnerKeyStyle,
   registrationFlagStyle,
   registrationStatusStyle,
-  rmaStatusStyle,
   warrantyStatusStyle,
   type AnyClaimStatus,
   type AnyWarrantyStatus,
+  type PartnerKeyStatus,
 } from "./status-styles";
 
 // Status is never shown by colour alone: every badge carries its label (Section 3.2).
@@ -51,11 +45,6 @@ export function WarrantyStatusBadge({ status, className }: StatusBadgeProps<AnyW
   );
 }
 
-export function RmaStatusBadge({ status, className }: StatusBadgeProps<RmaStatus>) {
-  const { t } = useTranslation();
-  return <Badge className={cn(rmaStatusStyle[status], className)}>{t(`status.rma.${status}`)}</Badge>;
-}
-
 export function RegistrationStatusBadge({ status, className }: StatusBadgeProps<RegistrationStatus>) {
   const { t } = useTranslation();
   return (
@@ -65,7 +54,7 @@ export function RegistrationStatusBadge({ status, className }: StatusBadgeProps<
   );
 }
 
-/** Where a registration came from: Dealer, Portal, Email, ERP, Bulk. */
+/** Where a registration came from: Dealer, Bulk, Portal, Web form, Email, ERP, Partner API, Marketplace. */
 export function ChannelBadge({ status, className }: StatusBadgeProps<RegistrationChannel>) {
   const { t } = useTranslation();
   return <Badge className={cn(channelStyle[status], className)}>{t(`status.channel.${status}`)}</Badge>;
@@ -81,31 +70,10 @@ export function BulkRowStatusBadge({ status, className }: StatusBadgeProps<BulkR
   return <Badge className={cn(bulkRowStatusStyle[status], className)}>{t(`status.bulkRow.${status}`)}</Badge>;
 }
 
-export function CoverageBadge({ status, className }: StatusBadgeProps<Coverage>) {
+/** Who filed a warranty claim: Customer, Dealer or Warranty desk. */
+export function ClaimSourceBadge({ status, className }: StatusBadgeProps<ClaimSource>) {
   const { t } = useTranslation();
-  return <Badge className={cn(coverageStyle[status], className)}>{t(`status.coverage.${status}`)}</Badge>;
-}
-
-export function ComplaintStatusBadge({ status, className }: StatusBadgeProps<ComplaintStatus>) {
-  const { t } = useTranslation();
-  return (
-    <Badge className={cn(complaintStatusStyle[status], className)}>{t(`status.complaint.${status}`)}</Badge>
-  );
-}
-
-/** Who raised a complaint: Customer, Dealer or Admin. */
-export function ComplaintSourceBadge({ status, className }: StatusBadgeProps<ComplaintSource>) {
-  const { t } = useTranslation();
-  return (
-    <Badge className={cn(complaintSourceStyle[status], className)}>{t(`status.source.${status}`)}</Badge>
-  );
-}
-
-export function FinancePostingBadge({ status, className }: StatusBadgeProps<FinancePostingStatus>) {
-  const { t } = useTranslation();
-  return (
-    <Badge className={cn(financePostingStyle[status], className)}>{t(`status.finance.${status}`)}</Badge>
-  );
+  return <Badge className={cn(claimSourceStyle[status], className)}>{t(`status.source.${status}`)}</Badge>;
 }
 
 export function IntegrationStatusBadge({ status, className }: StatusBadgeProps<IntegrationStatus>) {
@@ -124,4 +92,10 @@ export function IntegrationDirectionBadge({ status, className }: StatusBadgeProp
       {t(`status.direction.${status}`)}
     </Badge>
   );
+}
+
+/** Whether a partner system's API key is accepted. */
+export function PartnerKeyBadge({ status, className }: StatusBadgeProps<PartnerKeyStatus>) {
+  const { t } = useTranslation();
+  return <Badge className={cn(partnerKeyStyle[status], className)}>{t(`status.partnerKey.${status}`)}</Badge>;
 }

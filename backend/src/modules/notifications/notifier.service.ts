@@ -38,11 +38,20 @@ export class Notifier {
     });
   }
 
-  async notify(db: Db, userIds: readonly string[], key: string, now: Date, extra: NotifyExtra = {}): Promise<void> {
+  async notify(
+    db: Db,
+    userIds: readonly string[],
+    key: string,
+    now: Date,
+    extra: NotifyExtra = {},
+  ): Promise<void> {
     let unique = [...new Set(userIds)];
     if (!unique.length) return;
     // Some submitters aren't logins (e.g. "system" for ERP and email intake); only real users get notifications.
-    const existing = await db.user.findMany({ where: { id: { in: unique }, isActive: true }, select: { id: true } });
+    const existing = await db.user.findMany({
+      where: { id: { in: unique }, isActive: true },
+      select: { id: true },
+    });
     const ids = new Set(existing.map((u) => u.id));
     unique = unique.filter((id) => ids.has(id));
     const rows: Prisma.NotificationCreateManyInput[] = [];
@@ -78,7 +87,10 @@ export class Notifier {
     if (record.customerId) or.push({ customerId: record.customerId });
     if (includeDealer && record.dealerId) {
       or.push({ dealerId: record.dealerId });
-      const dealer = await db.dealer.findUnique({ where: { id: record.dealerId }, select: { distributorId: true } });
+      const dealer = await db.dealer.findUnique({
+        where: { id: record.dealerId },
+        select: { distributorId: true },
+      });
       if (dealer?.distributorId) or.push({ distributorId: dealer.distributorId });
     }
     if (!or.length) return [];

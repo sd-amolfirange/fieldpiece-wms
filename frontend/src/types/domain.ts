@@ -1,4 +1,4 @@
-// LEGACY types from the original scaffold. Only the screens that are now unreachable (RMA, customers,
+// LEGACY types from the original scaffold. Only the screens that are now unreachable (customers,
 // reports, policies, settings, public check) and pages awaiting their rebuild still use them.
 // New code imports the HVAC demo model from "@wms/domain" (shared/wms-domain).
 
@@ -54,7 +54,6 @@ export type ClaimStatus =
   | "NEEDS_INFO"
   | "APPROVED"
   | "REJECTED"
-  | "RMA_ISSUED"
   | "IN_TRANSIT"
   | "RECEIVED"
   | "REPAIRED"
@@ -94,20 +93,6 @@ export interface ClaimEvent {
   to?: ClaimStatus;
   comment?: string;
   internal?: boolean; // internal notes are never shown to technician/distributor
-}
-
-export type RmaStatus = "ISSUED" | "IN_TRANSIT" | "RECEIVED" | "INSPECTED" | "COMPLETED" | "CANCELLED";
-
-export interface Rma {
-  id: string; // RMA-000045
-  claimId: string;
-  type: "repair" | "replace" | "credit";
-  shipTo: Address;
-  inboundTracking?: string;
-  outboundTracking?: string;
-  inspectionNotes?: string;
-  replacementSerial?: string;
-  status: RmaStatus;
 }
 
 export interface Customer {

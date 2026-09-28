@@ -13,24 +13,35 @@ describe("bulk sheets", () => {
   it("matches columns by header name in any order and skips blank rows", () => {
     expect(
       rowsFromMatrix([
-        ["Install date", "Serial number", "Unknown", "Model code"],
-        ["2026-09-01", " AER-1 ", "x", "AER-SPL15"],
-        ["", "", "", ""],
+        ["Purchase date", "Serial number", "Unknown", "Model", "Lot number"],
+        ["2026-09-01", " 251406233 ", "x", "SC680", "2514-L01"],
+        ["", "", "", "", ""],
       ]),
-    ).toEqual([{ installDate: "2026-09-01", serial: "AER-1", modelCode: "AER-SPL15" }]);
+    ).toEqual([
+      { purchaseDate: "2026-09-01", serial: "251406233", modelCode: "SC680", batchNumber: "2514-L01" },
+    ]);
   });
 
   it("reads back its own templates", async () => {
     const fromCsv = rowsFromMatrix(await readSheet("t.csv", Buffer.from(templateCsv())));
     const fromXlsx = rowsFromMatrix(await readSheet("t.xlsx", await templateXlsx()));
     expect(fromCsv).toEqual(fromXlsx);
-    expect(fromCsv[0]).toMatchObject({ serial: "AER-SPL15-260999", installDate: "2026-09-15", customerEmail: "" });
+    expect(fromCsv[0]).toMatchObject({
+      serial: "243500101",
+      batchNumber: "2435-L02",
+      modelCode: "SC680",
+      purchaseDate: "2026-09-15",
+      state: "TX",
+      zip: "77002",
+      customerEmail: "",
+    });
   });
 
-  it("reads the W1 demo file: 25 rows", async () => {
-    const file = join(__dirname, "../../../../demo-assets/coolair_sales_week38.xlsx");
-    const rows = rowsFromMatrix(await readSheet("coolair_sales_week38.xlsx", readFileSync(file)));
+  it("reads the W1 sample file: 25 rows, one without a purchase date", async () => {
+    const file = join(__dirname, "../../../../demo-assets/lonestar_sales_week38.xlsx");
+    const rows = rowsFromMatrix(await readSheet("lonestar_sales_week38.xlsx", readFileSync(file)));
     expect(rows).toHaveLength(25);
-    expect(rows.filter((r) => !r.installDate)).toHaveLength(1);
+    expect(rows.filter((r) => !r.purchaseDate)).toHaveLength(1);
+    expect(rows.every((r) => /^\d{4}-L0\d$/.test(r.batchNumber ?? ""))).toBe(true);
   });
 });

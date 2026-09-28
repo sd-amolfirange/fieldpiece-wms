@@ -1,28 +1,13 @@
 import { http, HttpResponse } from "msw";
-import {
-  addAttachment,
-  contextFor,
-  createBulkImport,
-  dispatch,
-  getAttachment,
-  jobPhotoSvg,
-  jobSerials,
-  parseCsv,
-  rowsFromMatrix,
-  ServiceError,
-  simulateJobResult,
-  simulateRegistrationEmail,
-  userFromToken,
-  type DemoResponse,
-} from "@demo-core";
-import { env } from "@/lib/env";
-import { mockDb, mockFiles, mockSessions } from "./db";
+import { dispatch, parseCsv, type DemoFile, type DemoRequest, type DemoResponse } from "@demo-core";
+import { basePath, mockDb, mockSessions } from "./db";
 import { legacyHandlers } from "./legacy-handlers";
 
-// TEST-ONLY MSW adapter over the backend's demo API (backend/demo-server/src/core via `@demo-core`), so unit
-// tests hit the same endpoints, scoping and errors as the real demo server. Only transport details live here.
+// TEST-ONLY MSW adapter over the mock API core (backend/demo-server/src/core via `@demo-core`), which mirrors the real
+// backend's API, so unit tests hit the same endpoints, scoping and errors. Only transport details live here: JSON and
+// multipart bodies (uploads, the public registration form, bulk sheets), headers, the refresh "cookie" and file
+// answers. Every request goes through the core's dispatch().
 
-const basePath = new URL(env.apiBaseUrl, "http://localhost").pathname.replace(/\/$/, "");
 const api = (path: string) => `*${basePath}${path}`;
 
 // Stands in for the httpOnly refresh cookie.
@@ -43,169 +28,98 @@ const writeSession = (userId: string | null) => {
   }
 };
 
-const bearer = (request: Request) =>
-  request.headers.get("Authorization")?.replace(/^Bearer /, "") || undefined;
+/** Routes where the backend reads the refresh cookie: refresh, logout and file downloads (<img src>, links). */
+const COOKIE_ROUTES =
+  /^\/(auth\/(refresh|logout)|files\/|units\/[^/]+\/certificate\.pdf$|bulk-imports\/template\.)/;
 
-const errorJson = (e: ServiceError) =>
-  HttpResponse.json({ code: e.code, message: e.message, fieldErrors: e.fieldErrors }, { status: e.status });
+const bearer = (request: Request) =>
+  request.headers.get("Authorization")?.replace(/^Bearer /i, "") || undefined;
+
+// Duck-typed: in tests the parsed file comes from a different realm than jsdom's File class.
+const isFile = (entry: unknown): entry is File =>
+  typeof entry === "object" && !!entry && "arrayBuffer" in entry && "name" in entry;
+
+/** JSON body, or a multipart form's text fields plus its `file` part. */
+async function readBody(request: Request): Promise<Pick<DemoRequest, "body" | "file">> {
+  if (request.method === "GET" || request.method === "HEAD") return {};
+  if (request.headers.get("Content-Type")?.startsWith("multipart/form-data")) {
+    const form = await request.formData();
+    const fields: Record<string, string> = {};
+    let file: DemoFile | undefined;
+    form.forEach((value, key) => {
+      if (typeof value === "string") fields[key] = value;
+    });
+    const entry = form.get("file");
+    if (isFile(entry)) {
+      const data = new Uint8Array(await entry.arrayBuffer());
+      file = {
+        name: entry.name || "upload",
+        mime: entry.type || "application/octet-stream",
+        size: data.length,
+        data,
+      };
+    }
+    return { body: fields, file };
+  }
+  const text = await request.text();
+  return { body: text ? (JSON.parse(text) as unknown) : undefined };
+}
+
+/** POST /bulk-imports: the sheet as a string matrix. Tests upload CSV; .xlsx can't be read here (no exceljs). */
+function readSheet(body: unknown, file: DemoFile | undefined): string[][] | null | undefined {
+  if (!file) return undefined;
+  const fields = (body ?? {}) as Record<string, string | undefined>;
+  const name = fields.name?.trim() || file.name;
+  if (!/\.csv$/i.test(name)) return null;
+  const data = file.data ?? "";
+  return parseCsv(typeof data === "string" ? data : new TextDecoder().decode(data));
+}
 
 function toHttp(res: DemoResponse) {
+  if (res.download) {
+    const { download } = res;
+    return new HttpResponse(download.data, {
+      status: 200,
+      headers: {
+        "Content-Type": download.mime,
+        "Content-Disposition": `${download.disposition}; filename="${download.name}"`,
+      },
+    });
+  }
   return res.status === 204 || res.body === undefined
     ? new HttpResponse(null, { status: res.status })
     : HttpResponse.json(res.body as Record<string, unknown>, { status: res.status });
 }
 
-async function readBody(request: Request): Promise<unknown> {
-  if (request.method === "GET" || request.method === "HEAD") return undefined;
-  const text = await request.text();
-  return text ? (JSON.parse(text) as unknown) : undefined;
-}
-
 export const handlers = [
   ...legacyHandlers(api),
 
-  // Multipart upload: stores the file and returns its Attachment.
-  http.post(api("/uploads"), async ({ request }) => {
-    const user = userFromToken(mockDb, mockSessions, bearer(request));
-    if (!user)
-      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
-    // Duck-typed: in tests the parsed file comes from a different realm than jsdom's Blob class.
-    const form = await request.formData();
-    const entry = form.get("file");
-    const file = typeof entry === "object" && entry && "arrayBuffer" in entry ? (entry as File) : null;
-    if (!file) {
-      return HttpResponse.json(
-        { code: "validation_error", message: "Choose a file to upload." },
-        { status: 422 },
-      );
-    }
-    try {
-      const fieldName = form.get("name");
-      const name = (typeof fieldName === "string" && fieldName) || file.name || "upload";
-      const attachment = addAttachment(
-        contextFor(mockDb, user),
-        { name, mime: file.type || "application/octet-stream", size: file.size },
-        (id) => `${basePath}/files/${id}`,
-      );
-      mockFiles.set(attachment.id, file);
-      return HttpResponse.json(attachment, { status: 201 });
-    } catch (e) {
-      if (e instanceof ServiceError) return errorJson(e);
-      throw e;
-    }
-  }),
-
-  // Bulk upload (CSV only in tests; the server also reads .xlsx).
-  http.post(api("/bulk-imports"), async ({ request }) => {
-    const user = userFromToken(mockDb, mockSessions, bearer(request));
-    if (!user)
-      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
-    const form = await request.formData();
-    const entry = form.get("file");
-    const file = typeof entry === "object" && entry && "text" in entry ? (entry as File) : null;
-    if (!file)
-      return HttpResponse.json({ code: "validation_error", message: "Choose a file." }, { status: 422 });
-    const name = form.get("name");
-    const dealerId = form.get("dealerId");
-    try {
-      const batch = createBulkImport(contextFor(mockDb, user), {
-        fileName: typeof name === "string" && name ? name : "upload.csv",
-        dealerId: typeof dealerId === "string" ? dealerId : undefined,
-        rows: rowsFromMatrix(parseCsv(await file.text())),
-      });
-      return HttpResponse.json(batch, { status: 201 });
-    } catch (e) {
-      if (e instanceof ServiceError) return errorJson(e);
-      throw e;
-    }
-  }),
-
-  // File download. Browsers load these from <img src>, which can't carry the bearer token, so the mock
-  // session (the refresh "cookie") also authenticates.
-  http.get(api("/files/:id"), ({ request, params }) => {
-    const userId = readSession();
-    const user =
-      userFromToken(mockDb, mockSessions, bearer(request)) ?? mockDb.state.users.find((u) => u.id === userId);
-    if (!user) return new HttpResponse(null, { status: 401 });
-    try {
-      const attachment = getAttachment(contextFor(mockDb, user), String(params.id));
-      const blob = mockFiles.get(attachment.id);
-      if (!blob) return new HttpResponse(null, { status: 404 });
-      return new HttpResponse(blob, { headers: { "Content-Type": attachment.mime } });
-    } catch (e) {
-      if (e instanceof ServiceError) return errorJson(e);
-      throw e;
-    }
-  }),
-
-  // Simulator: the service system returns a job result with two job photos (same as the Express route).
-  http.post(api("/simulate/job-result"), async ({ request }) => {
-    const user = userFromToken(mockDb, mockSessions, bearer(request));
-    if (!user)
-      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
-    try {
-      const ctx = contextFor(mockDb, user);
-      const body = ((await readBody(request)) ?? {}) as Parameters<typeof simulateJobResult>[1];
-      const serials = jobSerials(ctx, body.complaintId ?? "", body.partType);
-      const photos = [
-        [`Removed ${serials.partType.toLowerCase()}`, serials.oldSerial ?? "-"],
-        [`New ${serials.partType.toLowerCase()} fitted`, serials.newSerial],
-      ].map(([caption = "photo", serial = ""]) => {
-        const svg = jobPhotoSvg(caption, serial);
-        const attachment = addAttachment(
-          ctx,
-          {
-            name: `${caption.replace(/\s+/g, "-").toLowerCase()}.svg`,
-            mime: "image/svg+xml",
-            size: svg.length,
-          },
-          (id) => `${basePath}/files/${id}`,
-        );
-        mockFiles.set(attachment.id, new Blob([svg], { type: "image/svg+xml" }));
-        return attachment.id;
-      });
-      return HttpResponse.json(simulateJobResult(ctx, body, photos));
-    } catch (e) {
-      if (e instanceof ServiceError) return errorJson(e);
-      throw e;
-    }
-  }),
-
-  // Simulator: a registration email with the invoice attached (same as the Express route).
-  http.post(api("/simulate/registration-email"), ({ request }) => {
-    const user = userFromToken(mockDb, mockSessions, bearer(request));
-    if (!user)
-      return HttpResponse.json({ code: "unauthenticated", message: "Session expired." }, { status: 401 });
-    try {
-      const ctx = contextFor(mockDb, user);
-      const registration = simulateRegistrationEmail(ctx, (file) => {
-        const attachment = addAttachment(
-          ctx,
-          { name: file.name, mime: file.mime, size: file.content.length },
-          (id) => `${basePath}/files/${id}`,
-        );
-        mockFiles.set(attachment.id, new Blob([file.content], { type: file.mime }));
-        return attachment.id;
-      });
-      return HttpResponse.json(registration);
-    } catch (e) {
-      if (e instanceof ServiceError) return errorJson(e);
-      throw e;
-    }
-  }),
-
-  // Everything else goes through the shared dispatcher.
   http.all(api("/*"), async ({ request }) => {
     const url = new URL(request.url);
     const path = url.pathname.slice(url.pathname.indexOf(basePath) + basePath.length) || "/";
+    let read: Pick<DemoRequest, "body" | "file">;
+    try {
+      read = await readBody(request);
+    } catch {
+      return HttpResponse.json(
+        { code: "bad_request", message: "The request couldn't be read. Check the format." },
+        { status: 400 },
+      );
+    }
     const storedUser = readSession();
     const res = dispatch(mockDb, mockSessions, {
       method: request.method,
       path,
       query: Object.fromEntries(url.searchParams),
-      body: await readBody(request),
+      ...read,
+      headers: {
+        "x-api-key": request.headers.get("X-Api-Key") ?? undefined,
+        "x-inbound-secret": request.headers.get("X-Inbound-Secret") ?? undefined,
+      },
+      sheet:
+        request.method === "POST" && path === "/bulk-imports" ? readSheet(read.body, read.file) : undefined,
       accessToken: bearer(request),
-      refreshToken: path === "/auth/refresh" && storedUser ? mockSessions.create(storedUser) : undefined,
+      refreshToken: storedUser && COOKIE_ROUTES.test(path) ? mockSessions.create(storedUser) : undefined,
     });
     if (res.setRefreshToken) writeSession(mockSessions.get(res.setRefreshToken) ?? null);
     if (res.clearRefreshToken) writeSession(null);

@@ -6,20 +6,29 @@ import type { RegistrationRowInput } from "@wms/domain";
 
 export const TEMPLATE_HEADERS = [
   "Serial number",
-  "Model code",
+  "Batch number",
+  "Model",
+  "Purchase date",
   "Customer name",
   "Customer phone",
   "Customer email",
   "City",
-  "Install date",
+  "State",
+  "ZIP",
   "Invoice number",
 ] as const;
 
 const FIELD_BY_HEADER: Record<string, keyof RegistrationRowInput> = {
   "serial number": "serial",
   serial: "serial",
-  "model code": "modelCode",
+  "batch number": "batchNumber",
+  batch: "batchNumber",
+  "lot number": "batchNumber",
   model: "modelCode",
+  "model number": "modelCode",
+  "model code": "modelCode",
+  "purchase date": "purchaseDate",
+  "date of purchase": "purchaseDate",
   "customer name": "customerName",
   customer: "customerName",
   "customer phone": "customerPhone",
@@ -27,13 +36,26 @@ const FIELD_BY_HEADER: Record<string, keyof RegistrationRowInput> = {
   "customer email": "customerEmail",
   email: "customerEmail",
   city: "city",
-  "install date": "installDate",
-  "installation date": "installDate",
+  state: "state",
+  zip: "zip",
+  "zip code": "zip",
   "invoice number": "invoiceNumber",
   invoice: "invoiceNumber",
 };
 
-const SAMPLE_ROW = ["AER-SPL15-260999", "AER-SPL15", "A. Sample", "+91 90000 00000", "", "Pune", "2026-09-15", "INV-0001"];
+const SAMPLE_ROW = [
+  "243500101",
+  "2435-L02",
+  "SC680",
+  "2026-09-15",
+  "Alex Rivera",
+  "(713) 555-0100",
+  "",
+  "Houston",
+  "TX",
+  "77002",
+  "INV-10001",
+];
 
 /** Rows from a string matrix (header row first). Blank rows are skipped. */
 export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
@@ -120,7 +142,9 @@ export async function templateXlsx(): Promise<Buffer> {
   const sheet = workbook.addWorksheet("Registrations");
   sheet.columns = TEMPLATE_HEADERS.map((header) => ({ header, width: 20 }));
   sheet.getRow(1).font = { bold: true };
-  sheet.addRow([...SAMPLE_ROW.slice(0, 6), new Date(`${SAMPLE_ROW[6]}T00:00:00Z`), SAMPLE_ROW[7]]);
-  sheet.getColumn(7).numFmt = "yyyy-mm-dd";
+  sheet.addRow([...SAMPLE_ROW.slice(0, 3), new Date(`${SAMPLE_ROW[3]}T00:00:00Z`), ...SAMPLE_ROW.slice(4)]);
+  sheet.getColumn(4).numFmt = "yyyy-mm-dd";
+  // Serial numbers and ZIP codes are text: keep Excel from dropping leading zeros.
+  for (const column of [1, 10]) sheet.getColumn(column).numFmt = "@";
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }

@@ -32,14 +32,14 @@ import { useFieldError } from "@/lib/use-field-error";
 import { useCreateRegistration } from "../hooks";
 import { unitRegisterSchema, type UnitRegisterForm } from "../schemas";
 
-// DL03 Register a unit (dealer / distributor; admin "Manual add"): single form or QR scan.
-// Unit -> Installation and invoice -> Customer and review. Clean registrations are approved at once and the
-// model's parts get their warranties; a duplicate serial goes to admin review.
+// DL03 Register a product (dealer / distributor; admin "Manual add"): single form or QR scan.
+// Product -> Purchase and invoice -> Customer and review. Clean registrations are approved at once and the
+// warranty starts on the purchase date; a duplicate serial goes to the warranty desk.
 
 const STEP_FIELDS: FieldPath<UnitRegisterForm>[][] = [
-  ["serial", "modelCode", "dealerId"],
-  ["installDate", "location", "invoiceNumber"],
-  ["customerName", "customerPhone", "customerEmail", "city"],
+  ["serial", "batchNumber", "modelCode", "dealerId"],
+  ["purchaseDate", "invoiceNumber"],
+  ["customerName", "customerPhone", "customerEmail", "city", "state", "zip"],
 ];
 
 export default function NewRegistrationPage() {
@@ -71,9 +71,10 @@ export default function NewRegistrationPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       serial: "",
+      batchNumber: "",
       modelCode: "",
       dealerId: "",
-      installDate: "",
+      purchaseDate: "",
       customerName: "",
       customerPhone: "",
     },
@@ -89,6 +90,7 @@ export default function NewRegistrationPage() {
     (payload: QrPayload) => {
       setValue("serial", payload.serial, { shouldValidate: true });
       if (payload.modelCode) setValue("modelCode", payload.modelCode, { shouldValidate: true });
+      if (payload.batchNumber) setValue("batchNumber", payload.batchNumber, { shouldValidate: true });
     },
     [setValue],
   );
@@ -104,14 +106,14 @@ export default function NewRegistrationPage() {
       const registration = await create.mutateAsync({
         ...values,
         dealerId: needsDealer ? values.dealerId : undefined,
-        purchaseDate: values.installDate,
         attachmentIds,
       });
       setResult(registration);
     } catch (error) {
       const api = toApiError(error);
-      if (api.fieldErrors?.serial || api.fieldErrors?.modelCode || api.fieldErrors?.dealerId) setStep(0);
-      else if (api.fieldErrors?.installDate) setStep(1);
+      const fields = api.fieldErrors ?? {};
+      if (fields.serial || fields.batchNumber || fields.modelCode || fields.dealerId) setStep(0);
+      else if (fields.purchaseDate) setStep(1);
       if (!applyFieldErrors(error, setError)) toast.error(api.message);
     } finally {
       setSubmitting(false);
@@ -160,7 +162,7 @@ export default function NewRegistrationPage() {
     );
   }
 
-  const steps = [t("registerUnit.stepUnit"), t("registerUnit.stepInstall"), t("registerUnit.stepCustomer")];
+  const steps = [t("registerUnit.stepUnit"), t("registerUnit.stepPurchase"), t("registerUnit.stepCustomer")];
 
   return (
     <>
@@ -183,6 +185,14 @@ export default function NewRegistrationPage() {
                 labelAction={<SerialHelpLink />}
               >
                 <SerialNumberInput {...register("serial")} />
+              </FormField>
+              <FormField
+                label={t("fields.batchNumber")}
+                helper={t("fields.batchHelp")}
+                error={fieldError(errors.batchNumber?.message)}
+                required
+              >
+                <Input className="font-mono" autoComplete="off" {...register("batchNumber")} />
               </FormField>
               <FormField
                 label={t("registerUnit.model")}
@@ -220,14 +230,12 @@ export default function NewRegistrationPage() {
           {step === 1 ? (
             <>
               <FormField
-                label={t("registerUnit.installDate")}
-                error={fieldError(errors.installDate?.message)}
+                label={t("fields.purchaseDate")}
+                helper={t("registerUnit.purchaseDateHelp")}
+                error={fieldError(errors.purchaseDate?.message)}
                 required
               >
-                <Input type="date" max={toIsoDate(new Date())} {...register("installDate")} />
-              </FormField>
-              <FormField label={t("registerUnit.location")} helper={t("common.optional")}>
-                <Input autoComplete="street-address" {...register("location")} />
+                <Input type="date" max={toIsoDate(new Date())} {...register("purchaseDate")} />
               </FormField>
               <FormField label={t("registerUnit.invoiceNumber")} helper={t("common.optional")}>
                 <Input {...register("invoiceNumber")} />
@@ -273,22 +281,22 @@ export default function NewRegistrationPage() {
               <FormField label={t("registerUnit.city")} helper={t("common.optional")}>
                 <Input autoComplete="address-level2" {...register("city")} />
               </FormField>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  label={t("fields.state")}
+                  helper={t("fields.stateHelp")}
+                  error={fieldError(errors.state?.message)}
+                >
+                  <Input autoComplete="address-level1" maxLength={2} {...register("state")} />
+                </FormField>
+                <FormField label={t("fields.zip")} error={fieldError(errors.zip?.message)}>
+                  <Input inputMode="numeric" autoComplete="postal-code" {...register("zip")} />
+                </FormField>
+              </div>
               {model ? (
                 <p className="flex items-center gap-2 rounded bg-success-bg p-3 text-body text-success">
                   <ShieldCheck size={20} strokeWidth={1.75} aria-hidden />
-                  {t("registerUnit.partsPreview", {
-                    parts: model.parts
-                      .map((p) =>
-                        t("registerUnit.partPeriod", {
-                          part: t(`parts.type.${p.partType}`),
-                          period:
-                            p.warrantyMonths % 12 === 0
-                              ? t("parts.years", { count: p.warrantyMonths / 12 })
-                              : t("parts.months", { count: p.warrantyMonths }),
-                        }),
-                      )
-                      .join(", "),
-                  })}
+                  {t("registerUnit.warrantyPreview", { count: model.warrantyMonths })}
                 </p>
               ) : null}
             </>

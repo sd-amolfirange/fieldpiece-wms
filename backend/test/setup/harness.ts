@@ -8,18 +8,18 @@ import { hashPassword } from "../../src/modules/auth";
 import { writeSeed } from "../../src/modules/demo";
 import { E2E_DB_APP_URL, testEnv } from "./test-env";
 
-// e2e harness: the real app (same middleware as production) over app.inject(), the demo seed in the e2e
+// e2e harness: the real app (same middleware as production) over app.inject(), the starting data in the e2e
 // database, and a fixed clock so warranty status is deterministic. Suites share the database: run serially.
 
 export const DEMO_PASSWORD = "Demo#2026";
 
 export const EMAILS = {
   admin: "admin@wms.local",
-  dealer: "dealer.coolair@wms.local",
-  breeze: "dealer.breeze@wms.local",
-  arctic: "dealer.arctic@wms.local",
-  distributor: "dist.northstar@wms.local",
-  customer: "customer.rk@wms.local",
+  dealer: "dealer.lonestar@wms.local",
+  bayou: "dealer.bayou@wms.local",
+  desertpeak: "dealer.desertpeak@wms.local",
+  distributor: "dist.gulfstates@wms.local",
+  customer: "customer.mreed@wms.local",
 } as const;
 export type Who = keyof typeof EMAILS;
 
@@ -53,7 +53,13 @@ export interface Harness {
     body?: unknown;
     headers?: Record<string, string>;
   }): Promise<Response>;
-  upload(as: Session, url: string, file: { name: string; mime: string; content: Buffer }, fields?: Record<string, string>): Promise<Response>;
+  /** Multipart POST; `as: null` for the public (signed-out) form. */
+  upload(
+    as: Session | null,
+    url: string,
+    file: { name: string; mime: string; content: Buffer },
+    fields?: Record<string, string>,
+  ): Promise<Response>;
   close(): Promise<void>;
 }
 
@@ -67,13 +73,17 @@ function multipart(file: { name: string; mime: string; content: Buffer }, fields
     Buffer.from("\r\n"),
   ];
   for (const [name, value] of Object.entries(fields)) {
-    chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
+    chunks.push(
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`),
+    );
   }
   chunks.push(Buffer.from(`--${boundary}--\r\n`));
   return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
-export async function createHarness(options: { now?: Date; env?: Partial<Record<string, string>> } = {}): Promise<Harness> {
+export async function createHarness(
+  options: { now?: Date; env?: Partial<Record<string, string>> } = {},
+): Promise<Harness> {
   const clock = new FixedClock(options.now ?? new Date());
   const env = testEnv(options.env);
   const db = new PrismaClient({ datasourceUrl: E2E_DB_APP_URL });
@@ -91,7 +101,10 @@ export async function createHarness(options: { now?: Date; env?: Partial<Record<
 
   const toResponse = (res: Awaited<ReturnType<typeof app.inject>>): Response => ({
     status: res.statusCode,
-    body: String(res.headers["content-type"] ?? "").includes("json") && res.body ? JSON.parse(res.body) : res.body,
+    body:
+      String(res.headers["content-type"] ?? "").includes("json") && res.body
+        ? JSON.parse(res.body)
+        : res.body,
     headers: res.headers,
     raw: res.rawPayload,
   });
@@ -118,7 +131,11 @@ export async function createHarness(options: { now?: Date; env?: Partial<Record<
     reseed,
     request,
     async login(who) {
-      const res = await request({ method: "POST", url: "/auth/login", body: { email: EMAILS[who], password: DEMO_PASSWORD } });
+      const res = await request({
+        method: "POST",
+        url: "/auth/login",
+        body: { email: EMAILS[who], password: DEMO_PASSWORD },
+      });
       if (res.status !== 200) throw new Error(`Login failed for ${who}: ${JSON.stringify(res.body)}`);
       const setCookie = res.headers["set-cookie"];
       const cookie = String(Array.isArray(setCookie) ? setCookie[0] : setCookie).split(";")[0]!;
@@ -130,7 +147,10 @@ export async function createHarness(options: { now?: Date; env?: Partial<Record<
         await app.inject({
           method: "POST",
           url: `/api${url}`,
-          headers: { authorization: `Bearer ${as.token}`, "content-type": form.contentType },
+          headers: {
+            ...(as ? { authorization: `Bearer ${as.token}` } : {}),
+            "content-type": form.contentType,
+          },
           payload: form.body,
         }),
       );

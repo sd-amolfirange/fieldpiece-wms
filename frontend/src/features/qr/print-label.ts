@@ -1,7 +1,7 @@
 import { qrSvgMarkup } from "./svg";
 
 // Prints just the QR label (not the page) through a hidden frame. The label is a plain print document:
-// QR code, serial and model, sized for a small sticker.
+// QR code, serial, batch and model, sized for a small sticker.
 
 const escapeHtml = (text: string) =>
   text.replace(
@@ -12,11 +12,13 @@ const escapeHtml = (text: string) =>
 export function printQrLabel({
   url,
   serial,
+  batchNumber,
   model,
   title,
 }: {
   url: string;
   serial: string;
+  batchNumber?: string;
   model: string;
   title: string;
 }) {
@@ -40,6 +42,7 @@ export function printQrLabel({
 </style></head><body>
 ${qrSvgMarkup(url, 400)}
 <div class="serial">${escapeHtml(serial)}</div>
+${batchNumber ? `<div class="model">${escapeHtml(batchNumber)}</div>` : ""}
 <div class="model">${escapeHtml(model)}</div>
 </body></html>`);
   doc.close();

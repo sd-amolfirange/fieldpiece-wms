@@ -15,7 +15,8 @@ export class DashboardController {
   @Roles("admin", "dealer", "distributor", "customer")
   @ApiOperation({
     summary: "Dashboard numbers for the caller's role (A01, DL01, customer home)",
-    description: "A union by `role`. `dealerId` (distributors only) narrows every number to one of its dealers.",
+    description:
+      "A union by `role`. `dealerId` (distributors only) narrows every number to one of its dealers.",
   })
   @ApiQuery({ name: "dealerId", required: false })
   @ApiOkResponse({ description: "DashboardSummary" })

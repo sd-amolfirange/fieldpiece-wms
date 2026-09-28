@@ -1,5 +1,5 @@
 import type { Actor } from "../common/auth/context";
-import { canSee, canSeeClaim, dealerIdFor, scopeWhere } from "./scope";
+import { canSee, dealerIdFor, scopeWhere } from "./scope";
 
 const actor = (overrides: Partial<Actor>): Actor => ({
   id: "u",
@@ -38,9 +38,10 @@ describe("canSee", () => {
     expect(canSee(actor({ role: "customer", visibleDealerIds: [] }), { customerId: undefined })).toBe(false);
   });
 
-  it("never shows claims to customers", () => {
-    expect(canSeeClaim(customer, row)).toBe(false);
-    expect(canSeeClaim(dealer, row)).toBe(true);
+  it("shows a warranty claim to its customer and dealer only", () => {
+    expect(canSee(customer, row)).toBe(true);
+    expect(canSee(dealer, row)).toBe(true);
+    expect(canSee(customer, { ...row, customerId: "c-other" })).toBe(false);
   });
 });
 

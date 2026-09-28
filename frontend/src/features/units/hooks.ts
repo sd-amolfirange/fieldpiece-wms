@@ -8,6 +8,7 @@ export const unitKeys = {
   all: ["units"] as const,
   list: (filters: UnitFilters) => ["units", filters] as const,
   detail: (serial: string) => ["unit", serial] as const,
+  coverage: (serial: string) => ["unit", serial, "coverage"] as const,
 };
 
 export function useUnits(filters: UnitFilters) {
@@ -25,6 +26,14 @@ export function useUnit(serial: string | undefined) {
     queryFn: () => unitsApi.get(serial ?? ""),
     enabled: !!serial,
     refetchInterval: LIVE_REFRESH_MS,
+  });
+}
+
+export function useCoverage(serial: string | undefined) {
+  return useQuery({
+    queryKey: unitKeys.coverage(serial ?? ""),
+    queryFn: () => unitsApi.coverage(serial ?? ""),
+    enabled: !!serial,
   });
 }
 

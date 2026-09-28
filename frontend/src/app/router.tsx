@@ -7,8 +7,8 @@ import { RootLayout } from "./RootLayout";
 import { RouteError } from "./RouteError";
 
 // Route table for the demo (docs/implementation-plan.md, section 2). Keep in sync with
-// components/layout/nav-items.ts. Screens a later phase builds render ScreenPlaceholderPage.
-// The out-of-scope screens (RMA, customers, reports, policies, settings, public check) keep their code
+// components/layout/nav-items.ts.
+// The out-of-scope screens (customers, reports, policies, settings, public check) keep their code
 // but are not routed.
 
 const LoginPage = lazy(() => import("@/features/auth/pages/LoginPage"));
@@ -19,14 +19,14 @@ const RegistrationReviewPage = lazy(() => import("@/features/registrations/pages
 const NewRegistrationPage = lazy(() => import("@/features/registrations/pages/NewRegistrationPage"));
 const BulkRegistrationPage = lazy(() => import("@/features/registrations/pages/BulkRegistrationPage"));
 const CustomerRegisterPage = lazy(() => import("@/features/registrations/pages/CustomerRegisterPage"));
+const RegistrationHubPage = lazy(() => import("@/features/registrations/pages/RegistrationHubPage"));
+const PublicRegisterPage = lazy(() => import("@/features/registrations/pages/PublicRegisterPage"));
 const UnitsListPage = lazy(() => import("@/features/units/pages/UnitsListPage"));
 const UnitDetailPage = lazy(() => import("@/features/units/pages/UnitDetailPage"));
 const ModelsPage = lazy(() => import("@/features/products/pages/ProductsPage"));
 const ModelDetailPage = lazy(() => import("@/features/products/pages/ProductDetailPage"));
-const ComplaintsListPage = lazy(() => import("@/features/complaints/pages/ComplaintsListPage"));
-const NewComplaintPage = lazy(() => import("@/features/complaints/pages/NewComplaintPage"));
-const ComplaintDetailPage = lazy(() => import("@/features/complaints/pages/ComplaintDetailPage"));
 const ClaimsListPage = lazy(() => import("@/features/claims/pages/ClaimsListPage"));
+const NewClaimPage = lazy(() => import("@/features/claims/pages/NewClaimPage"));
 const ClaimDetailPage = lazy(() => import("@/features/claims/pages/ClaimDetailPage"));
 const DealersUsersPage = lazy(() => import("@/features/admin/pages/DealersUsersPage"));
 const IntegrationLogPage = lazy(() => import("@/features/admin/pages/IntegrationLogPage"));
@@ -48,6 +48,8 @@ export const routes: RouteObject[] = [
       // Public
       { path: "/login", element: <LoginPage /> },
       { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      // Product registration form for the website (no account needed)
+      { path: "/register-product", element: <PublicRegisterPage /> },
 
       // Authenticated
       guarded(undefined, [
@@ -65,8 +67,6 @@ export const routes: RouteObject[] = [
                 { path: "registrations/:id", element: <RegistrationReviewPage /> }, // A03
                 { path: "models", element: <ModelsPage /> }, // A06
                 { path: "models/:id", element: <ModelDetailPage /> }, // A06
-                { path: "claims", element: <ClaimsListPage /> }, // A09
-                { path: "claims/:id", element: <ClaimDetailPage /> }, // A10
                 { path: "admin/dealers", element: <DealersUsersPage /> }, // A11
                 { path: "admin/integrations", element: <IntegrationLogPage /> }, // A12
                 { path: "admin/simulate", element: <SimulatePage /> }, // A13
@@ -77,6 +77,7 @@ export const routes: RouteObject[] = [
               [
                 { path: "registrations/new", element: <NewRegistrationPage /> }, // DL03 (admin: manual add)
                 { path: "registrations/bulk", element: <BulkRegistrationPage /> }, // DL02
+                { path: "registrations/channels", element: <RegistrationHubPage /> }, // registration hub
                 { path: "units", element: <UnitsListPage /> }, // A04 / DL04
               ],
             ),
@@ -84,9 +85,9 @@ export const routes: RouteObject[] = [
 
             // Shared screens: the demo server decides which rows each role gets.
             { path: "units/:serial", element: <UnitDetailPage /> }, // A05 / DL05 / CU03
-            { path: "complaints", element: <ComplaintsListPage /> }, // A07 / DL07 / My complaints
-            { path: "complaints/new", element: <NewComplaintPage /> }, // CU04 / DL06 (admin: on a customer's behalf)
-            { path: "complaints/:id", element: <ComplaintDetailPage /> }, // A08 / DL07 / CU05
+            { path: "claims", element: <ClaimsListPage /> }, // A09 / DL07 / My claims
+            { path: "claims/new", element: <NewClaimPage /> }, // CU04 / DL06 (admin: on a customer's behalf)
+            { path: "claims/:id", element: <ClaimDetailPage /> }, // A10 / DL07 / CU05
 
             { path: "*", element: <NotFoundPage /> },
           ],

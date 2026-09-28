@@ -41,7 +41,11 @@ export class SessionService {
   }
 
   /** Starts a session and returns the refresh token for the cookie (never stored in clear). */
-  async create(userId: string, now: Date, userAgent: string | undefined): Promise<{ id: string; token: string }> {
+  async create(
+    userId: string,
+    now: Date,
+    userAgent: string | undefined,
+  ): Promise<{ id: string; token: string }> {
     const token = randomBytes(32).toString("base64url");
     const id = randomUUID();
     await this.prisma.authSession.create({
@@ -125,11 +129,17 @@ export class SessionService {
     if (where.token) or.push({ tokenHash: sha256(where.token) });
     if (where.sessionId) or.push({ id: where.sessionId });
     if (!or.length) return;
-    await this.prisma.authSession.updateMany({ where: { OR: or, revokedAt: null }, data: { revokedAt: now } });
+    await this.prisma.authSession.updateMany({
+      where: { OR: or, revokedAt: null },
+      data: { revokedAt: now },
+    });
   }
 
   async findUserForLogin(email: string): Promise<UserRow | null> {
-    return this.prisma.user.findUnique({ where: { email: email.trim().toLowerCase() }, include: userInclude });
+    return this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      include: userInclude,
+    });
   }
 
   async recordLogin(userId: string, now: Date): Promise<void> {
@@ -150,7 +160,10 @@ export class SessionService {
     };
   }
 
-  private isLive(session: { revokedAt: Date | null; expiresAt: Date; user: { isActive: boolean } }, now: Date) {
+  private isLive(
+    session: { revokedAt: Date | null; expiresAt: Date; user: { isActive: boolean } },
+    now: Date,
+  ) {
     return !session.revokedAt && session.expiresAt > now && session.user.isActive;
   }
 
@@ -167,7 +180,10 @@ export class SessionService {
         break;
       case "distributor":
         visibleDealerIds = (
-          await db.dealer.findMany({ where: { distributorId: user.distributorId ?? "\u0000" }, select: { id: true } })
+          await db.dealer.findMany({
+            where: { distributorId: user.distributorId ?? "\u0000" },
+            select: { id: true },
+          })
         ).map((d) => d.id);
         break;
       case "dealer":

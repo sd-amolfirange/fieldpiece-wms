@@ -11,7 +11,9 @@
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    // src/seed-parity.test.ts type-checks the backend's seed, which imports @wms/domain through backend/tsconfig paths.
+    "paths": { "@wms/domain": ["./node_modules/@wms/domain/src/index.ts"] }
   },
   "include": ["src", "scripts", "vitest.config.ts"]
 }

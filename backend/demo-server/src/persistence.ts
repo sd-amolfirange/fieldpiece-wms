@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { createSeed, type DemoState, type SessionStore } from "./core/index";
 
@@ -37,27 +31,22 @@ function writeJson(path: string, value: unknown) {
   }
 }
 
-const emptyCollections = (): Pick<DemoState, "bulkImports"> => ({
-  bulkImports: [],
-});
-
-export function loadState(path: string): DemoState {
+/** The saved state, or the seed when there's none (or it was saved by an older mock with another shape). */
+export function loadState(path: string, today?: string): DemoState {
   if (existsSync(path)) {
     try {
       const state = JSON.parse(readFileSync(path, "utf8")) as DemoState;
-      // Collections added after the file was saved start empty.
-      if (state.version === 1) return { ...emptyCollections(), ...state };
+      if (state.version === 2) return state;
     } catch {
       // unreadable file: start from the seed again
     }
   }
-  const seed = createSeed();
+  const seed = createSeed(today);
   writeJson(path, seed);
   return seed;
 }
 
-export const saveState = (path: string, state: DemoState) =>
-  writeJson(path, state);
+export const saveState = (path: string, state: DemoState) => writeJson(path, state);
 
 export function createFileSessionStore(path: string): SessionStore {
   const sessions = new Map<string, string>();

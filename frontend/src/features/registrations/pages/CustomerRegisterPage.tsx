@@ -30,8 +30,9 @@ import { useFieldError } from "@/lib/use-field-error";
 import { useCreateRegistration } from "../hooks";
 import { selfRegisterSchema, type SelfRegisterForm } from "../schemas";
 
-// CU01 Register a product (customer, phone layout). Opens from the QR label with serial and model filled in;
-// the customer adds the purchase date and a photo of the invoice. An admin approves it before the warranty starts.
+// CU01 Register a product (customer, phone layout). Opens from the QR label with serial, model and batch filled
+// in; the customer adds the purchase date and a photo of the receipt. The warranty desk approves it, and the
+// warranty then runs from the purchase date.
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -68,6 +69,7 @@ export default function CustomerRegisterPage() {
     defaultValues: {
       serial: searchParams.get("serial") ?? "",
       modelCode: (searchParams.get("model") ?? "").toUpperCase(),
+      batchNumber: (searchParams.get("batch") ?? "").toUpperCase(),
       purchaseDate: "",
       invoiceCount: 0,
     },
@@ -79,6 +81,7 @@ export default function CustomerRegisterPage() {
   );
 
   const serial = watch("serial");
+  const batchNumber = watch("batchNumber");
   const modelCode = watch("modelCode");
   const model = models.data?.find((m) => m.code === modelCode);
   const [prefilled, setPrefilled] = useState(fromQr);
@@ -87,6 +90,7 @@ export default function CustomerRegisterPage() {
     (payload: QrPayload) => {
       setValue("serial", payload.serial, { shouldValidate: true });
       if (payload.modelCode) setValue("modelCode", payload.modelCode, { shouldValidate: true });
+      setValue("batchNumber", payload.batchNumber ?? "");
       setPrefilled(!!payload.modelCode);
     },
     [setValue],
@@ -99,8 +103,9 @@ export default function CustomerRegisterPage() {
       await create.mutateAsync({
         serial: values.serial,
         modelCode: values.modelCode,
+        batchNumber: values.batchNumber || undefined,
         purchaseDate: values.purchaseDate,
-        location: values.location,
+        placeOfPurchase: values.placeOfPurchase,
         attachmentIds,
       });
       setDone(true);
@@ -135,7 +140,7 @@ export default function CustomerRegisterPage() {
                 setFiles([]);
                 uploaded.current.clear();
                 setPrefilled(false);
-                reset({ serial: "", modelCode: "", purchaseDate: "", invoiceCount: 0 });
+                reset({ serial: "", modelCode: "", batchNumber: "", purchaseDate: "", invoiceCount: 0 });
               }}
             >
               {t("selfRegister.registerAnother")}
@@ -164,6 +169,11 @@ export default function CustomerRegisterPage() {
                 <Field label={t("selfRegister.model")}>
                   {model ? `${model.name} (${model.code})` : modelCode}
                 </Field>
+                {batchNumber ? (
+                  <Field label={t("fields.batchNumber")}>
+                    <MonoId>{batchNumber}</MonoId>
+                  </Field>
+                ) : null}
               </dl>
               <Button variant="ghost" size="sm" icon={QrIcon} onClick={() => setScanning(true)}>
                 {t("selfRegister.scanAgain")}
@@ -181,6 +191,13 @@ export default function CustomerRegisterPage() {
                 labelAction={<SerialHelpLink />}
               >
                 <SerialNumberInput {...register("serial")} />
+              </FormField>
+              <FormField
+                label={t("fields.batchNumber")}
+                helper={t("fields.batchHelp")}
+                error={fieldError(errors.batchNumber?.message)}
+              >
+                <Input className="font-mono" autoComplete="off" {...register("batchNumber")} />
               </FormField>
               <FormField
                 label={t("selfRegister.model")}
@@ -206,8 +223,8 @@ export default function CustomerRegisterPage() {
           >
             <Input type="date" max={toIsoDate(new Date())} {...register("purchaseDate")} />
           </FormField>
-          <FormField label={t("selfRegister.location")} helper={t("common.optional")}>
-            <Input autoComplete="street-address" {...register("location")} />
+          <FormField label={t("selfRegister.placeOfPurchase")} helper={t("selfRegister.placeOfPurchaseHelp")}>
+            <Input {...register("placeOfPurchase")} />
           </FormField>
           <FormField
             label={t("selfRegister.invoice")}

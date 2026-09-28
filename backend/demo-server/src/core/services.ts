@@ -1,143 +1,191 @@
 import {
+  CLAIM_STATUSES,
+  INTEGRATION_STATUSES,
+  INTEGRATION_SYSTEMS,
+  coverageFor,
   isOpenClaim,
-  partWarranty,
   unitWarranty,
+  VOID_REASONS,
+  WARRANTY_STATUSES,
   type Attachment,
-  type BrandCount,
   type ChannelCount,
-  type Claim,
   type ClaimStatus,
-  type ClaimView,
-  type Complaint,
-  type ComplaintSource,
-  type ComplaintStatus,
-  type ComplaintView,
+  type Coverage,
   type DashboardSummary,
   type DealerStats,
   type DealerView,
+  type IntegrationDirection,
   type IntegrationMessage,
+  type IntegrationStatus,
+  type IntegrationSystem,
   type IsoDate,
-  type JobResult,
-  type JobResultView,
   type ModelView,
   type Notification,
   type OrgStructure,
   type Paginated,
+  type ProductCategory,
   type Registration,
-  type RegistrationChannel,
-  type RegistrationFlag,
-  type RegistrationStatus,
   type RegistrationView,
   type Role,
   type SessionUser,
   type Unit,
+  type UnitEvent,
   type UnitView,
   type User,
+  type VoidReason,
+  type WarrantyClaim,
+  type WarrantyClaimView,
   type WarrantyStatus,
 } from "@wms/domain";
-import { canSee, canSeeClaim, visibleDealerIds } from "./scope";
+import { conflict, forbidden, notFound, ServiceError, validation } from "./errors";
+import { canSee, visibleDealerIds, type Scoped } from "./scope";
 import { DEMO_PASSWORD } from "./seed";
 import { nextId, type DemoState } from "./state";
 
-// Scoped read services behind every demo endpoint (server-side only). The Express adapter (and the
-// frontend's test-only MSW adapter) only parse the request, call one of these and serialise the result.
+// Services behind every mock endpoint (server-side only), mirroring the real backend's modules. The Express adapter
+// and the frontend's test-only MSW adapter only parse the request, call dispatch() and serialise the result.
 
-export class ServiceError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    readonly fieldErrors?: Record<string, string>,
-  ) {
-    super(message);
-  }
+/** File bytes as the adapters keep them. */
+export type DemoFileData = Uint8Array | string;
+
+/** Where the adapter keeps uploaded bytes (the server: on disk; the test adapter: in memory). */
+export interface FileStore {
+  /** Public URL of a stored file, as Attachment.url. */
+  url(id: string): string;
+  save(attachment: Attachment, data: DemoFileData): void;
+  load(id: string): DemoFileData | undefined;
 }
 
-export interface Ctx {
+/** Context for work without a signed-in user (public form, partner API, email intake). */
+export interface SystemCtx {
   state: DemoState;
-  user: User;
   today: IsoDate;
   /** ISO timestamp for records written now. */
   now: string;
+  files: FileStore;
 }
 
-export interface ListQuery {
-  page?: number;
-  pageSize?: number;
-  sort?: string;
-  q?: string;
+export interface Ctx extends SystemCtx {
+  user: User;
+}
+
+/** A file that came with a request (multipart upload or email attachment). */
+export interface DemoFile {
+  name: string;
+  mime: string;
+  size: number;
+  data?: DemoFileData;
 }
 
 // ---- helpers -------------------------------------------------------------------------------------
 
 export function requireRole(ctx: Ctx, ...roles: Role[]) {
-  if (!roles.includes(ctx.user.role)) {
-    throw new ServiceError(403, "forbidden", "You don't have access to this.");
+  if (!roles.includes(ctx.user.role)) throw forbidden();
+}
+
+/**
+ * Runs `fn` like a database transaction: when it throws, every change it made to the state is undone. The dispatcher
+ * wraps each write; services use it where the backend commits part of a request on its own (bulk rows, bulk approve).
+ */
+export function transaction<T>(state: DemoState, fn: () => T): T {
+  const snapshot = JSON.parse(JSON.stringify(state)) as DemoState;
+  try {
+    return fn();
+  } catch (e) {
+    Object.assign(state, snapshot);
+    throw e;
   }
 }
 
-export const notFound = (what: string) =>
-  new ServiceError(404, "not_found", `${what} not found.`);
-
-export function paginate<T>(
-  items: T[],
-  { page = 1, pageSize = 25 }: ListQuery,
-): Paginated<T> {
-  const size = Math.min(100, Math.max(1, pageSize));
-  const current = Math.max(1, page);
-  return {
-    items: items.slice((current - 1) * size, current * size),
-    total: items.length,
-    page: current,
-    pageSize: size,
-  };
+export interface ListQuery {
+  page: number;
+  pageSize: number;
+  sort?: string;
+  q?: string;
 }
 
+export type RawQuery = Record<string, string | undefined>;
+
+const positiveInt = (value: string | undefined) => {
+  const n = value ? Number(value) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+};
+
+/** A single query value, trimmed; blank means "not given". */
+export const queryString = (query: RawQuery, key: string) => query[key]?.trim() || undefined;
+
+/** A query value that must be one of `allowed`; anything else is treated as "no filter". */
+export function queryEnum<T extends string>(query: RawQuery, key: string, allowed: readonly T[]) {
+  const value = queryString(query, key);
+  return value && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
+
+/** ?page=1&pageSize=25&sort=-field&q=text. pageSize is clamped to 1..100 rather than rejected. */
+export const listQuery = (query: RawQuery): ListQuery => ({
+  page: positiveInt(query.page) ?? 1,
+  pageSize: Math.min(100, positiveInt(query.pageSize) ?? 25),
+  sort: queryString(query, "sort")?.slice(0, 50),
+  q: queryString(query, "q")?.slice(0, 100),
+});
+
+export function paginate<T>(items: T[], { page, pageSize }: ListQuery): Paginated<T> {
+  return { items: items.slice((page - 1) * pageSize, page * pageSize), total: items.length, page, pageSize };
+}
+
+type SortValue = string | number | undefined;
+export type SortKeys<T> = Record<string, (row: T) => SortValue>;
+
+function compareValues(a: SortValue, b: SortValue): number {
+  if (a === undefined || b === undefined) return a === b ? 0 : a === undefined ? 1 : -1; // nulls last
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b));
+}
+
+/** Numeric order of readable ids ("REG-999" before "REG-1000"). */
+export const idOrder = (id: string) => Number(/(\d+)$/.exec(id)?.[1] ?? 0);
+
+/**
+ * Sorts by "-field" from an allow-list of sortable fields; an unknown field falls back to the default order instead
+ * of failing the page (as the backend does). Ties keep `tieBreak` ascending.
+ */
 export function sortRows<T>(
-  items: T[],
+  items: readonly T[],
   sort: string | undefined,
+  keys: SortKeys<T>,
   fallback: string,
+  tieBreak: (row: T) => SortValue,
 ): T[] {
-  const spec = sort || fallback;
+  const keyOf = (spec: string | undefined) => (spec ? keys[spec.replace(/^-/, "")] : undefined);
+  const spec = keyOf(sort) ? (sort as string) : fallback;
   const desc = spec.startsWith("-");
-  const key = spec.replace(/^-/, "") as keyof T;
+  const key = keyOf(spec) ?? (() => undefined);
   return [...items].sort((a, b) => {
-    const av = a[key];
-    const bv = b[key];
-    const cmp =
-      typeof av === "number" && typeof bv === "number"
-        ? av - bv
-        : String(av ?? "").localeCompare(String(bv ?? ""));
-    return desc ? -cmp : cmp;
+    const va = key(a);
+    const vb = key(b);
+    // Nulls stay last in both directions.
+    const primary =
+      va === undefined || vb === undefined ? compareValues(va, vb) : compareValues(va, vb) * (desc ? -1 : 1);
+    return primary || compareValues(tieBreak(a), tieBreak(b));
   });
 }
 
-export const matches = (
-  q: string | undefined,
-  ...values: (string | undefined)[]
-) => {
+/** Case-insensitive "contains" over the given values. */
+export const matches = (q: string | undefined, ...values: (string | undefined)[]) => {
   if (!q) return true;
-  const needle = q.trim().toLowerCase();
+  const needle = q.toLowerCase();
   return values.some((v) => v?.toLowerCase().includes(needle));
 };
 
-export const dealerName = (state: DemoState, id?: string) =>
-  state.dealers.find((d) => d.id === id)?.name;
-const customerName = (state: DemoState, id?: string) =>
-  state.customers.find((c) => c.id === id)?.name;
-const brandName = (state: DemoState, id: string) =>
-  state.brands.find((b) => b.id === id)?.name ?? id;
+const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+
+export const dealerName = (state: DemoState, id?: string) => state.dealers.find((d) => d.id === id)?.name;
+export const customerName = (state: DemoState, id?: string) => state.customers.find((c) => c.id === id)?.name;
 
 // ---- auth ----------------------------------------------------------------------------------------
 
-export function authenticate(
-  state: DemoState,
-  email: string,
-  password: string,
-): User {
-  const user = state.users.find(
-    (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
-  );
+export function authenticate(state: DemoState, email: unknown, password: unknown): User {
+  const address = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const user = state.users.find((u) => u.email.toLowerCase() === address);
   if (!user || password !== DEMO_PASSWORD) {
     throw new ServiceError(
       401,
@@ -149,10 +197,6 @@ export function authenticate(
 }
 
 export function toSessionUser(state: DemoState, user: User): SessionUser {
-  const orgName =
-    dealerName(state, user.dealerId) ??
-    state.distributors.find((d) => d.id === user.distributorId)?.name ??
-    customerName(state, user.customerId);
   return {
     id: user.id,
     name: user.name,
@@ -161,267 +205,173 @@ export function toSessionUser(state: DemoState, user: User): SessionUser {
     dealerId: user.dealerId,
     distributorId: user.distributorId,
     customerId: user.customerId,
-    orgName,
-    currency: "INR",
+    orgName:
+      dealerName(state, user.dealerId) ??
+      state.distributors.find((d) => d.id === user.distributorId)?.name ??
+      customerName(state, user.customerId),
+    currency: "USD",
   };
 }
 
 // ---- views ---------------------------------------------------------------------------------------
 
-export function toUnitView(
-  state: DemoState,
-  unit: Unit,
-  today: IsoDate,
-): UnitView {
-  const model = state.models.find((m) => m.id === unit.modelId);
-  const overall = unitWarranty(unit, today);
+export function toModelView(state: DemoState, modelId: string): ModelView | undefined {
+  const model = state.models.find((m) => m.id === modelId);
+  if (!model) return undefined;
+  return { ...model, categoryName: state.categories.find((c) => c.id === model.categoryId)?.name ?? "" };
+}
+
+export function toUnitView(state: DemoState, unit: Unit, today: IsoDate): UnitView {
+  const model = toModelView(state, unit.modelId);
+  const warranty = unitWarranty(unit, today);
   return {
     ...unit,
     modelCode: model?.code ?? unit.modelId,
     modelName: model?.name ?? "",
-    capacity: model?.capacity ?? "",
-    unitType: model?.type ?? "",
-    brandName: brandName(state, unit.brandId),
+    modelDescription: model?.description ?? "",
+    categoryName: model?.categoryName ?? "",
     dealerName: dealerName(state, unit.dealerId),
     customerName: customerName(state, unit.customerId),
-    status: overall.status,
-    daysRemaining: overall.daysRemaining,
-    parts: unit.parts.map((part) => ({
-      ...part,
-      ...partWarranty(part, today, { voided: !!unit.void }),
-    })),
+    status: warranty.status,
+    daysRemaining: warranty.daysRemaining,
   };
 }
 
-export function findUnit(ctx: Ctx, serial: string): Unit {
-  const unit = ctx.state.units.find((u) => u.serial === serial.toUpperCase());
-  if (!unit || !canSee(ctx.user, unit, ctx.state.dealers))
-    throw notFound("Unit");
-  return unit;
+/** `duplicateOf` (the existing product, for the A03 comparison) is shown to admins only. */
+export function toRegistrationView(ctx: Ctx, r: Registration): RegistrationView {
+  const duplicate =
+    r.duplicateOfSerial && ctx.user.role === "admin"
+      ? ctx.state.units.find((u) => u.serial === r.duplicateOfSerial)
+      : undefined;
+  return {
+    ...r,
+    dealerName: dealerName(ctx.state, r.dealerId),
+    duplicateOf: duplicate ? toUnitView(ctx.state, duplicate, ctx.today) : undefined,
+  };
+}
+
+export const attachmentsById = (state: DemoState, ids: readonly string[]): Attachment[] =>
+  ids.flatMap((id) => state.attachments.find((a) => a.id === id) ?? []);
+
+export function toClaimView(state: DemoState, c: WarrantyClaim, today: IsoDate): WarrantyClaimView {
+  const unit = state.units.find((u) => u.serial === c.unitSerial);
+  const model = unit ? toModelView(state, unit.modelId) : undefined;
+  return {
+    ...c,
+    batchNumber: unit?.batchNumber,
+    modelCode: model?.code ?? "",
+    modelName: model?.name ?? "",
+    categoryName: model?.categoryName ?? "",
+    dealerName: dealerName(state, c.dealerId),
+    customerName: customerName(state, c.customerId),
+    purchaseDate: unit?.purchaseDate,
+    warrantyEnd: unit?.warrantyEnd,
+    warrantyStatus: unit ? unitWarranty(unit, today).status : "PENDING",
+    attachments: attachmentsById(state, c.attachmentIds),
+  };
 }
 
 // ---- units ---------------------------------------------------------------------------------------
 
-export function listUnits(
-  ctx: Ctx,
-  query: ListQuery & { status?: WarrantyStatus; dealerId?: string } = {},
-): Paginated<UnitView> {
+const UNIT_SORTS: SortKeys<UnitView> = {
+  serial: (u) => u.serial,
+  status: (u) => u.status,
+  daysRemaining: (u) => u.daysRemaining,
+  modelCode: (u) => u.modelCode,
+  modelName: (u) => u.modelName,
+  batchNumber: (u) => u.batchNumber,
+  categoryName: (u) => u.categoryName,
+  dealerName: (u) => u.dealerName,
+  customerName: (u) => u.customerName,
+  purchaseDate: (u) => u.purchaseDate,
+  warrantyEnd: (u) => u.warrantyEnd,
+};
+
+/** The unit if the caller may see it; 404 otherwise (never 403, so serials can't be probed). */
+export function findUnit(ctx: Ctx, serial: string): Unit {
+  const unit = ctx.state.units.find((u) => u.serial === serial.trim().toUpperCase());
+  if (!unit || !canSee(ctx.user, unit, ctx.state.dealers)) throw notFound("Product");
+  return unit;
+}
+
+/** A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. Default sort `serial`. */
+export function listUnits(ctx: Ctx, query: RawQuery = {}): Paginated<UnitView> {
+  const list = listQuery(query);
+  const status = queryEnum<WarrantyStatus>(query, "status", WARRANTY_STATUSES);
+  const dealerId = queryString(query, "dealerId");
   const rows = ctx.state.units
     .filter((u) => canSee(ctx.user, u, ctx.state.dealers))
     .map((u) => toUnitView(ctx.state, u, ctx.today))
     .filter(
       (u) =>
-        (!query.status || u.status === query.status) &&
-        (!query.dealerId || u.dealerId === query.dealerId) &&
-        matches(query.q, u.serial, u.customerName, u.dealerName, u.modelCode),
+        (!status || u.status === status) &&
+        (!dealerId || u.dealerId === dealerId) &&
+        matches(list.q, u.serial, u.batchNumber, u.customerName, u.dealerName, u.modelCode),
     );
-  return paginate(sortRows(rows, query.sort, "serial"), query);
+  return paginate(
+    sortRows(rows, list.sort, UNIT_SORTS, "serial", (u) => u.serial),
+    list,
+  );
 }
 
 export const getUnit = (ctx: Ctx, serial: string): UnitView =>
   toUnitView(ctx.state, findUnit(ctx, serial), ctx.today);
 
-// ---- registrations -------------------------------------------------------------------------------
+/** Whether a warranty claim on this product would be covered today (shown before filing a claim). */
+export const unitCoverage = (ctx: Ctx, serial: string): Coverage =>
+  coverageFor(findUnit(ctx, serial), ctx.today);
 
-function toRegistrationView(ctx: Ctx, r: Registration): RegistrationView {
-  const duplicate = r.duplicateOfSerial
-    ? ctx.state.units.find((u) => u.serial === r.duplicateOfSerial)
-    : undefined;
-  return {
-    ...r,
-    dealerName: dealerName(ctx.state, r.dealerId),
-    duplicateOf:
-      duplicate && ctx.user.role === "admin"
-        ? toUnitView(ctx.state, duplicate, ctx.today)
-        : undefined,
-  };
+/** The product for its warranty certificate: registered products only. */
+export function certificateUnit(ctx: Ctx, serial: string): UnitView {
+  const unit = getUnit(ctx, serial);
+  if (!unit.warrantyEnd) throw conflict("not_registered", "This product isn't registered yet.");
+  return unit;
 }
 
-export function listRegistrations(
-  ctx: Ctx,
-  query: ListQuery & {
-    status?: RegistrationStatus;
-    channel?: RegistrationChannel;
-    flag?: RegistrationFlag;
-  } = {},
-): Paginated<RegistrationView> {
-  const rows = ctx.state.registrations.filter(
-    (r) =>
-      canSee(ctx.user, r, ctx.state.dealers) &&
-      (!query.status || r.status === query.status) &&
-      (!query.channel || r.channel === query.channel) &&
-      (!query.flag || r.flags.includes(query.flag)) &&
-      matches(
-        query.q,
-        r.serial,
-        r.customer.name,
-        r.modelCode,
-        dealerName(ctx.state, r.dealerId),
-      ),
-  );
-  return paginate(
-    sortRows(rows, query.sort, "-submittedAt").map((r) =>
-      toRegistrationView(ctx, r),
-    ),
-    query,
-  );
+export function addUnitEvent(unit: Unit, event: UnitEvent) {
+  unit.history.push(event);
 }
 
-export function getRegistration(ctx: Ctx, id: string): RegistrationView {
-  const r = ctx.state.registrations.find((x) => x.id === id);
-  if (!r || !canSee(ctx.user, r, ctx.state.dealers))
-    throw notFound("Registration");
-  return toRegistrationView(ctx, r);
+/** W5: the warranty desk voids a product's warranty with a reason and note, recorded with user and date. */
+export function voidWarranty(ctx: Ctx, serial: string, body: { reason?: unknown; note?: unknown }): UnitView {
+  requireRole(ctx, "admin");
+  const unit = findUnit(ctx, serial);
+  const reason = body.reason as VoidReason;
+  if (!VOID_REASONS.includes(reason))
+    throw validation("Choose a reason.", { reason: "validation.voidReason" });
+  if (unit.void) throw conflict("already_void", "This warranty is already void.");
+  if (!unit.warrantyEnd) throw conflict("not_registered", "This product isn't registered yet.");
+  const note = text(body.note, 2000) || undefined;
+  unit.void = { reason, note, by: ctx.user.id, byName: ctx.user.name, at: ctx.now };
+  addUnitEvent(unit, { at: ctx.now, type: "voided", byName: ctx.user.name, reason, text: note });
+  notify(ctx.state, followers(ctx.state, unit), "unit_voided", ctx.now, {
+    params: { serial: unit.serial },
+    link: `/units/${unit.serial}`,
+  });
+  return getUnit(ctx, unit.serial);
 }
 
-// ---- complaints ----------------------------------------------------------------------------------
+// ---- catalogue and organisation --------------------------------------------------------------------
 
-export const attachmentsById = (state: DemoState, ids: string[] = []): Attachment[] =>
-  ids.map((id) => state.attachments.find((a) => a.id === id)).filter((a): a is Attachment => !!a);
-
-/** Job result with photos and each new part's warranty end (read from the unit's replacement part). */
-export function toJobResultView(state: DemoState, job: JobResult | undefined, unitSerial: string): JobResultView | undefined {
-  if (!job) return undefined;
-  const unit = state.units.find((u) => u.serial === unitSerial);
-  return {
-    ...job,
-    partsReplaced: job.partsReplaced.map((p) => ({
-      ...p,
-      newWarrantyEnd: unit?.parts.find((x) => x.serial === p.newSerial)?.warrantyEnd,
-    })),
-    photos: attachmentsById(state, job.photoIds),
-  };
+/** A06 and every model picker: grouped by category, in catalogue order. */
+export function listModels(state: DemoState): ModelView[] {
+  const position = (categoryId: string) => state.categories.findIndex((c) => c.id === categoryId);
+  return [...state.models]
+    .sort((a, b) => position(a.categoryId) - position(b.categoryId))
+    .flatMap((m) => toModelView(state, m.id) ?? []);
 }
 
-function toComplaintView(ctx: Ctx, c: Complaint): ComplaintView {
-  const unit = ctx.state.units.find((u) => u.serial === c.unitSerial);
-  const model = ctx.state.models.find((m) => m.id === unit?.modelId);
-  const claim = ctx.state.claims.find((x) => x.id === c.claimId);
-  return {
-    ...c,
-    modelCode: model?.code ?? "",
-    modelName: model?.name ?? "",
-    brandName: unit ? brandName(ctx.state, unit.brandId) : "",
-    dealerName: dealerName(ctx.state, c.dealerId),
-    customerName: customerName(ctx.state, c.customerId),
-    attachments: attachmentsById(ctx.state, c.attachmentIds),
-    jobResult: toJobResultView(
-      ctx.state,
-      ctx.state.jobResults.find((j) => j.id === c.jobResultId),
-      c.unitSerial,
-    ),
-    claimStatus:
-      claim && canSeeClaim(ctx.user, claim, ctx.state.dealers)
-        ? claim.status
-        : undefined,
-  };
-}
+export const listCategories = (state: DemoState): ProductCategory[] =>
+  state.categories.map((c) => ({ id: c.id, name: c.name }));
 
-export function listComplaints(
-  ctx: Ctx,
-  query: ListQuery & {
-    status?: ComplaintStatus;
-    source?: ComplaintSource;
-  } = {},
-): Paginated<ComplaintView> {
-  const rows = ctx.state.complaints
-    .filter(
-      (c) =>
-        canSee(ctx.user, c, ctx.state.dealers) &&
-        (!query.status || c.status === query.status) &&
-        (!query.source || c.source === query.source),
-    )
-    .map((c) => toComplaintView(ctx, c))
-    .filter((c) =>
-      matches(query.q, c.id, c.unitSerial, c.customerName, c.dealerName),
-    );
-  return paginate(sortRows(rows, query.sort, "-createdAt"), query);
-}
-
-export function getComplaint(ctx: Ctx, id: string): ComplaintView {
-  const c = ctx.state.complaints.find((x) => x.id === id);
-  if (!c || !canSee(ctx.user, c, ctx.state.dealers))
-    throw notFound("Complaint");
-  return toComplaintView(ctx, c);
-}
-
-// ---- claims --------------------------------------------------------------------------------------
-
-function toClaimView(ctx: Ctx, c: Claim): ClaimView {
-  const unit = ctx.state.units.find((u) => u.serial === c.unitSerial);
-  const complaint = ctx.state.complaints.find((x) => x.id === c.complaintId);
-  return {
-    ...c,
-    brandName: brandName(ctx.state, c.brandId),
-    dealerName: dealerName(ctx.state, c.dealerId),
-    modelCode: ctx.state.models.find((m) => m.id === unit?.modelId)?.code ?? "",
-    customerName: customerName(ctx.state, unit?.customerId),
-    complaintDescription: complaint?.description,
-    jobResult: toJobResultView(
-      ctx.state,
-      ctx.state.jobResults.find((j) => j.id === c.jobResultId),
-      c.unitSerial,
-    ),
-  };
-}
-
-export function listClaims(
-  ctx: Ctx,
-  query: ListQuery & { status?: ClaimStatus; brandId?: string } = {},
-): Paginated<ClaimView> {
-  const rows = ctx.state.claims
-    .filter(
-      (c) =>
-        canSeeClaim(ctx.user, c, ctx.state.dealers) &&
-        (!query.status || c.status === query.status) &&
-        (!query.brandId || c.brandId === query.brandId),
-    )
-    .map((c) => toClaimView(ctx, c))
-    .filter((c) =>
-      matches(query.q, c.id, c.unitSerial, c.rmaNumber, c.brandName),
-    );
-  return paginate(sortRows(rows, query.sort, "-createdAt"), query);
-}
-
-export function getClaim(ctx: Ctx, id: string): ClaimView {
-  const c = ctx.state.claims.find((x) => x.id === id);
-  if (!c || !canSeeClaim(ctx.user, c, ctx.state.dealers))
-    throw notFound("Claim");
-  return toClaimView(ctx, c);
-}
-
-export function claimCounts(ctx: Ctx): Record<ClaimStatus, number> {
-  const counts: Record<ClaimStatus, number> = {
-    DRAFT: 0,
-    SUBMITTED: 0,
-    APPROVED: 0,
-    PAID: 0,
-    REJECTED: 0,
-  };
-  for (const c of ctx.state.claims)
-    if (canSeeClaim(ctx.user, c, ctx.state.dealers)) counts[c.status] += 1;
-  return counts;
-}
-
-// ---- master data ---------------------------------------------------------------------------------
-
-export const listModels = (ctx: Ctx): ModelView[] =>
-  ctx.state.models.map((m) => ({
-    ...m,
-    brandName: brandName(ctx.state, m.brandId),
-  }));
-
-export const listBrands = (ctx: Ctx) => ctx.state.brands;
-
+/** Dealers the caller may see: admin all, distributor its dealers, dealer itself. */
 export function listDealers(ctx: Ctx): DealerView[] {
   const ids = visibleDealerIds(ctx.user, ctx.state.dealers);
   return ctx.state.dealers
     .filter((d) => ids === null || ids.includes(d.id))
     .map((d) => ({
       ...d,
-      distributorName: ctx.state.distributors.find(
-        (x) => x.id === d.distributorId,
-      )?.name,
+      distributorName: ctx.state.distributors.find((x) => x.id === d.distributorId)?.name,
     }));
 }
 
@@ -434,89 +384,85 @@ export function orgStructure(ctx: Ctx): OrgStructure {
       dealers: state.dealers.filter((x) => x.distributorId === d.id),
     })),
     directDealers: state.dealers.filter((d) => !d.distributorId),
-    users: state.users.map((u) => ({
-      ...u,
-      orgName: toSessionUser(state, u).orgName,
-    })),
+    users: state.users.map((u) => ({ ...u, orgName: toSessionUser(state, u).orgName })),
   };
 }
 
 // ---- dashboard -----------------------------------------------------------------------------------
 
+const OPEN_CLAIM = CLAIM_STATUSES.filter(isOpenClaim);
 const DASHBOARD_CHANNELS: ChannelCount["channel"][] = [
   "DEALER",
   "PORTAL",
+  "WEB",
   "EMAIL",
   "ERP",
+  "API",
+  "RETAIL",
 ];
 
-export function dashboardSummary(
-  ctx: Ctx,
-  filters: { dealerId?: string } = {},
-): DashboardSummary {
+function statusCounts(units: readonly UnitView[]): Record<WarrantyStatus, number> {
+  const counts = Object.fromEntries(WARRANTY_STATUSES.map((s) => [s, 0])) as Record<WarrantyStatus, number>;
+  for (const u of units) counts[u.status] += 1;
+  return counts;
+}
+
+/** A01 warranty desk, DL01 dealer / distributor, customer home. `dealerId` narrows a distributor's numbers. */
+export function dashboardSummary(ctx: Ctx, query: RawQuery = {}): DashboardSummary {
   const { state, user, today } = ctx;
-  const month = today.slice(0, 7);
-  // DL01 for a distributor: optionally narrowed to one of its dealers (scoping still applies first).
-  const dealerFilter =
-    user.role === "distributor" && filters.dealerId
-      ? (row: { dealerId?: string }) => row.dealerId === filters.dealerId
-      : () => true;
   const units = state.units
-    .filter((u) => canSee(user, u, state.dealers) && dealerFilter(u))
+    .filter((u) => canSee(user, u, state.dealers))
     .map((u) => toUnitView(state, u, today));
-  const complaints = state.complaints.filter(
-    (c) => canSee(user, c, state.dealers) && dealerFilter(c),
-  );
-  const claims = state.claims.filter(
-    (c) => canSeeClaim(user, c, state.dealers) && dealerFilter(c),
-  );
-  const registrations = state.registrations.filter(
-    (r) => canSee(user, r, state.dealers) && dealerFilter(r),
-  );
-  const countStatus = (s: WarrantyStatus) =>
-    units.filter((u) => u.status === s).length;
+  const counts = statusCounts(units);
+  const claims = state.claims.filter((c) => canSee(user, c, state.dealers));
 
   if (user.role === "admin") {
-    const channel = new Map<ChannelCount["channel"], number>(
-      DASHBOARD_CHANNELS.map((c) => [c, 0]),
-    );
-    for (const r of registrations) {
+    const channel = new Map<ChannelCount["channel"], number>(DASHBOARD_CHANNELS.map((c) => [c, 0]));
+    for (const r of state.registrations) {
       if (r.status !== "APPROVED") continue;
+      // Bulk uploads are dealer registrations.
       const bucket = r.channel === "BULK" ? "DEALER" : r.channel;
       channel.set(bucket, (channel.get(bucket) ?? 0) + 1);
     }
-    const byBrand: BrandCount[] = state.brands.map((b) => ({
-      brandId: b.id,
-      brandName: b.name,
-      count: claims.filter((c) => c.brandId === b.id).length,
-    }));
+    const byStatus = (s: ClaimStatus) => claims.filter((c) => c.status === s).length;
+    const categoryOf = (c: WarrantyClaim) => {
+      const unit = state.units.find((u) => u.serial === c.unitSerial);
+      return state.models.find((m) => m.id === unit?.modelId)?.categoryId;
+    };
     return {
       role: "admin",
       units: units.length,
-      active: countStatus("ACTIVE"),
-      expiring30: countStatus("EXPIRING_SOON"),
-      expired: countStatus("EXPIRED"),
-      pending: countStatus("PENDING"),
-      voided: countStatus("VOID"),
+      active: counts.ACTIVE,
+      expiring30: counts.EXPIRING_SOON,
+      expired: counts.EXPIRED,
+      pending: counts.PENDING,
+      voided: counts.VOID,
       openClaims: claims.filter((c) => isOpenClaim(c.status)).length,
-      registrationsByChannel: DASHBOARD_CHANNELS.map((c) => ({
-        channel: c,
-        count: channel.get(c) ?? 0,
+      pendingRegistrations: state.registrations.filter((r) => r.status === "PENDING").length,
+      registrationsByChannel: DASHBOARD_CHANNELS.map((c) => ({ channel: c, count: channel.get(c) ?? 0 })),
+      claimsByStatus: CLAIM_STATUSES.map((status) => ({ status, count: byStatus(status) })),
+      claimsByCategory: state.categories.map((c) => ({
+        categoryId: c.id,
+        categoryName: c.name,
+        count: claims.filter((x) => categoryOf(x) === c.id).length,
       })),
-      claimsByBrand: byBrand,
-      expiringSoon: units
-        .filter((u) => u.status === "EXPIRING_SOON")
-        .sort((a, b) => (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0))
+      expiringSoon: sortRows(
+        units.filter((u) => u.status === "EXPIRING_SOON"),
+        undefined,
+        { daysRemaining: (u) => u.daysRemaining },
+        "daysRemaining",
+        (u) => u.serial,
+      )
         .slice(0, 5)
         .map((u) => ({
           serial: u.serial,
           modelName: u.modelName,
           customerName: u.customerName,
           dealerName: u.dealerName,
-          warrantyEnd:
-            u.parts.find((p) => p.partType === "UNIT")?.warrantyEnd ?? today,
-          daysRemaining: u.daysRemaining ?? 0,
+          warrantyEnd: u.warrantyEnd ?? today,
+          daysRemaining: u.daysRemaining,
         })),
+      // Same instant: keep the order the events were written in (stable sort).
       recentActivity: state.units
         .flatMap((u) => u.history.map((e) => ({ ...e, serial: u.serial })))
         .sort((a, b) => b.at.localeCompare(a.at))
@@ -528,160 +474,241 @@ export function dashboardSummary(
     return {
       role: "customer",
       units: units.length,
-      active: countStatus("ACTIVE"),
-      expiringSoon: countStatus("EXPIRING_SOON"),
-      openComplaints: complaints.filter((c) => c.status !== "RESOLVED").length,
+      active: counts.ACTIVE,
+      expiringSoon: counts.EXPIRING_SOON,
+      openClaims: claims.filter((c) => isOpenClaim(c.status)).length,
     };
   }
 
+  // DL01 for a distributor: optionally one of its dealers (scoping still applies first).
+  const dealerId = user.role === "distributor" ? queryString(query, "dealerId") : undefined;
+  const ids = visibleDealerIds(user, state.dealers) ?? [];
+  const visible = dealerId ? ids.filter((id) => id === dealerId) : ids;
+  const month = today.slice(0, 7);
+  const registrations = state.registrations.filter((r) => !!r.dealerId && visible.includes(r.dealerId));
+  const openClaims = claims.filter((c) => isOpenClaim(c.status) && (!dealerId || c.dealerId === dealerId));
   const thisMonth = (r: Registration) => r.submittedAt.slice(0, 7) === month;
   const dealers: DealerStats[] = listDealers(ctx).map((d) => ({
     dealerId: d.id,
     dealerName: d.name,
-    registrationsThisMonth: registrations.filter(
-      (r) => r.dealerId === d.id && thisMonth(r),
-    ).length,
-    pending: registrations.filter(
-      (r) => r.dealerId === d.id && r.status === "PENDING",
-    ).length,
-    openComplaints: complaints.filter(
-      (c) => c.dealerId === d.id && c.status !== "RESOLVED",
-    ).length,
+    registrationsThisMonth: registrations.filter((r) => r.dealerId === d.id && thisMonth(r)).length,
+    pending: registrations.filter((r) => r.dealerId === d.id && r.status === "PENDING").length,
+    openClaims: openClaims.filter((c) => c.dealerId === d.id).length,
   }));
   return {
     role: user.role,
     registrationsThisMonth: registrations.filter(thisMonth).length,
     pending: registrations.filter((r) => r.status === "PENDING").length,
     rejected: registrations.filter((r) => r.status === "REJECTED").length,
-    openComplaints: complaints.filter((c) => c.status !== "RESOLVED").length,
-    claimsInProgress: claims.filter((c) => isOpenClaim(c.status)).length,
+    openClaims: openClaims.length,
     dealers,
   };
 }
 
+/** Claim counts by status in the caller's scope (count tiles). */
+export function claimCounts(ctx: Ctx): Record<ClaimStatus, number> {
+  const counts = Object.fromEntries(CLAIM_STATUSES.map((s) => [s, 0])) as Record<ClaimStatus, number>;
+  for (const c of ctx.state.claims) if (canSee(ctx.user, c, ctx.state.dealers)) counts[c.status] += 1;
+  return counts;
+}
+
+export const openClaimStatuses = OPEN_CLAIM;
+
 // ---- notifications -------------------------------------------------------------------------------
 
+/** The caller's latest 30 notifications, newest first (same instant: in the order they were written). */
 export const listNotifications = (ctx: Ctx): Notification[] =>
   sortRows(
     ctx.state.notifications.filter((n) => n.userId === ctx.user.id),
     undefined,
+    { createdAt: (n) => n.createdAt },
     "-createdAt",
+    (n) => idOrder(n.id),
   ).slice(0, 30);
 
-export function markNotificationsRead(ctx: Ctx, ids?: string[]): void {
+/** No ids = all of the caller's notifications. */
+export function markNotificationsRead(ctx: Ctx, rawIds: unknown): void {
+  const ids = Array.isArray(rawIds) ? rawIds.filter((id): id is string => typeof id === "string") : undefined;
   for (const n of ctx.state.notifications) {
     if (n.userId === ctx.user.id && (!ids || ids.includes(n.id))) n.read = true;
   }
 }
 
+/** In-app notifications. Only real users get them (submitters like "system" or "public" aren't logins). */
 export function notify(
   state: DemoState,
-  userIds: string[],
+  userIds: readonly string[],
   key: string,
   now: string,
-  extra: Partial<Notification> = {},
+  extra: Pick<Notification, "params" | "link"> = {},
 ) {
   for (const userId of new Set(userIds)) {
+    if (!state.users.some((u) => u.id === userId)) continue;
     state.notifications.push({
       id: nextId(state, "NTF"),
       userId,
       key,
+      ...extra,
       createdAt: now,
       read: false,
-      ...extra,
     });
   }
 }
 
+export const adminIds = (state: DemoState) => state.users.filter((u) => u.role === "admin").map((u) => u.id);
+
+/** Users who follow a record: its customer and, unless excluded, the selling dealer and that dealer's distributor. */
+export function followers(state: DemoState, record: Scoped, { includeDealer = true } = {}): string[] {
+  const dealer = includeDealer ? state.dealers.find((d) => d.id === record.dealerId) : undefined;
+  return state.users
+    .filter(
+      (u) =>
+        (!!record.customerId && u.customerId === record.customerId) ||
+        (!!dealer && u.dealerId === dealer.id) ||
+        (!!dealer?.distributorId && u.distributorId === dealer.distributorId),
+    )
+    .map((u) => u.id);
+}
+
 // ---- integration log -----------------------------------------------------------------------------
 
-export function listIntegrations(
-  ctx: Ctx,
-  query: ListQuery & {
-    system?: string;
-    direction?: string;
-    status?: string;
-  } = {},
-) {
+export interface LogEntry {
+  system: IntegrationSystem;
+  direction: IntegrationDirection;
+  type: string;
+  payload: unknown;
+  refId?: string;
+  status?: IntegrationStatus;
+  lastError?: string;
+}
+
+/**
+ * Records a message in the integration log (A12). Outbound messages are recorded as delivered, as the backend does
+ * while no external system is connected.
+ */
+export function logMessage(ctx: Pick<SystemCtx, "state" | "now">, entry: LogEntry): IntegrationMessage {
+  const message: IntegrationMessage = {
+    id: nextId(ctx.state, "MSG"),
+    system: entry.system,
+    direction: entry.direction,
+    type: entry.type,
+    status: entry.status ?? "SUCCESS",
+    // JSON-safe copy (drops undefined), like the backend's jsonb column.
+    payload: JSON.parse(JSON.stringify(entry.payload ?? {})) as unknown,
+    attempts: 1,
+    lastError: entry.lastError,
+    refId: entry.refId,
+    createdAt: ctx.now,
+    updatedAt: ctx.now,
+  };
+  ctx.state.integrations.push(message);
+  return message;
+}
+
+const INTEGRATION_SORTS: SortKeys<IntegrationMessage> = {
+  id: (m) => idOrder(m.id),
+  system: (m) => m.system,
+  direction: (m) => m.direction,
+  type: (m) => m.type,
+  status: (m) => m.status,
+  attempts: (m) => m.attempts,
+  refId: (m) => m.refId,
+  createdAt: (m) => m.createdAt,
+  updatedAt: (m) => m.updatedAt,
+};
+
+export function listIntegrations(ctx: Ctx, query: RawQuery = {}): Paginated<IntegrationMessage> {
   requireRole(ctx, "admin");
+  const list = listQuery(query);
+  const system = queryEnum(query, "system", INTEGRATION_SYSTEMS);
+  const direction = queryEnum<IntegrationDirection>(query, "direction", ["IN", "OUT"]);
+  const status = queryEnum(query, "status", INTEGRATION_STATUSES);
   const rows = ctx.state.integrations.filter(
     (m) =>
-      (!query.system || m.system === query.system) &&
-      (!query.direction || m.direction === query.direction) &&
-      (!query.status || m.status === query.status) &&
-      matches(query.q, m.id, m.type, m.refId),
+      (!system || m.system === system) &&
+      (!direction || m.direction === direction) &&
+      (!status || m.status === status) &&
+      matches(list.q, m.id, m.type, m.refId),
   );
   return paginate(
-    sortRows<IntegrationMessage>(rows, query.sort, "-createdAt"),
-    query,
+    sortRows(rows, list.sort, INTEGRATION_SORTS, "-createdAt", (m) => idOrder(m.id)),
+    list,
   );
 }
 
-// ---- attachments ---------------------------------------------------------------------------------
+/** Sends a FAILED message again (attempts + 1). With no external system connected, a retry is recorded as delivered. */
+export function retryIntegration(ctx: Ctx, id: string): IntegrationMessage {
+  requireRole(ctx, "admin");
+  const message = ctx.state.integrations.find((m) => m.id === id);
+  if (!message) throw notFound("Message");
+  if (message.status !== "FAILED") throw conflict("not_failed", "Only failed messages can be retried.");
+  message.status = "SUCCESS";
+  message.attempts += 1;
+  delete message.lastError;
+  message.updatedAt = ctx.now;
+  return message;
+}
 
+// ---- files ---------------------------------------------------------------------------------------
+
+/** Photos, videos and PDFs. SVG is refused: it can carry script. */
 export const ALLOWED_UPLOAD_TYPES = /^(image\/|video\/|application\/pdf$)/;
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
-export function addAttachment(
-  ctx: Ctx,
-  file: { name: string; mime: string; size: number },
-  urlFor: (id: string) => string,
-): Attachment {
-  if (!ALLOWED_UPLOAD_TYPES.test(file.mime)) {
-    throw new ServiceError(
-      415,
-      "unsupported_type",
-      "Upload a photo, video or PDF.",
-    );
+/**
+ * Photos, videos and PDFs only, within the size limit. Used for every file that comes in, signed in or not. The
+ * backend also checks that the bytes look like the declared type; the mock doesn't (tests upload stand-in bytes).
+ */
+export function checkFile(file: DemoFile | undefined, name?: string): DemoFile {
+  if (!file || !file.size) throw validation("Choose a file to upload.");
+  const mime = file.mime.toLowerCase();
+  if (!ALLOWED_UPLOAD_TYPES.test(mime) || mime === "image/svg+xml") {
+    throw new ServiceError(415, "unsupported_type", "Upload a photo, video or PDF.");
   }
-  if (file.size > MAX_UPLOAD_BYTES)
-    throw new ServiceError(413, "too_large", "Files can be up to 15 MB.");
+  if (file.size > MAX_UPLOAD_BYTES) throw new ServiceError(413, "too_large", "Files can be up to 15 MB.");
+  return { ...file, name: (name?.trim() || file.name || "upload").slice(0, 255), mime };
+}
+
+/** Records a checked file and hands its bytes to the adapter's store. */
+export function storeFile(ctx: SystemCtx, file: DemoFile, uploadedBy: string): Attachment {
   const id = nextId(ctx.state, "ATT");
   const attachment: Attachment = {
     id,
     name: file.name,
     mime: file.mime,
     size: file.size,
-    url: urlFor(id),
-    uploadedBy: ctx.user.id,
+    url: ctx.files.url(id),
+    uploadedBy,
     createdAt: ctx.now,
   };
   ctx.state.attachments.push(attachment);
+  if (file.data !== undefined) ctx.files.save(attachment, file.data);
   return attachment;
 }
 
-/** Uploader, admin, or anyone who can see a record that references the file. */
+/** POST /uploads: checks type and size, stores the file, records the attachment. */
+export const addAttachment = (ctx: Ctx, file: DemoFile | undefined, name?: string): Attachment =>
+  storeFile(ctx, checkFile(file, name), ctx.user.id);
+
+/** GET /files/:id: the uploader, admins, or anyone who can see a record that references the file. */
 export function getAttachment(ctx: Ctx, id: string): Attachment {
   const { state, user } = ctx;
   const attachment = state.attachments.find((a) => a.id === id);
   if (!attachment) throw notFound("File");
-  const referencedBy = (ids: string[]) => ids.includes(id);
+  const uses = (row: Scoped & { attachmentIds: string[] }) =>
+    row.attachmentIds.includes(id) && canSee(user, row, state.dealers);
   const visible =
     user.role === "admin" ||
     attachment.uploadedBy === user.id ||
-    state.registrations.some(
-      (r) => referencedBy(r.attachmentIds) && canSee(user, r, state.dealers),
-    ) ||
-    state.complaints.some(
-      (c) => referencedBy(c.attachmentIds) && canSee(user, c, state.dealers),
-    ) ||
-    state.units.some(
-      (u) => referencedBy(u.attachmentIds) && canSee(user, u, state.dealers),
-    ) ||
-    state.jobResults.some((j) => {
-      const complaint = state.complaints.find((c) => c.id === j.complaintId);
-      return (
-        referencedBy(j.photoIds) &&
-        !!complaint &&
-        canSee(user, complaint, state.dealers)
-      );
-    });
+    state.registrations.some(uses) ||
+    state.claims.some(uses) ||
+    state.units.some(uses);
   if (!visible) throw notFound("File");
   return attachment;
 }
 
-/** Only attachments the caller uploaded can be linked to a new record. */
-export function assertOwnAttachments(ctx: Ctx, ids: string[] = []) {
+/** Only files the caller uploaded (or any, for admins) can be linked to a new record. */
+export function assertOwnAttachments(ctx: Ctx, ids: readonly string[] = []) {
   for (const id of ids) {
     const a = ctx.state.attachments.find((x) => x.id === id);
     if (!a || (a.uploadedBy !== ctx.user.id && ctx.user.role !== "admin")) {
@@ -693,3 +720,7 @@ export function assertOwnAttachments(ctx: Ctx, ids: string[] = []) {
     }
   }
 }
+
+/** Up to `max` string ids from a request body. */
+export const idList = (value: unknown, max = 20): string[] | undefined =>
+  Array.isArray(value) ? value.filter((id): id is string => typeof id === "string").slice(0, max) : undefined;

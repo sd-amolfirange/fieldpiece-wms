@@ -2,9 +2,9 @@ import { voidWarrantySchema } from "./schemas";
 
 describe("void warranty schema", () => {
   it("accepts a known reason with an optional note", () => {
-    expect(voidWarrantySchema.safeParse({ reason: "UNAUTHORISED_REPAIR" }).success).toBe(true);
-    const parsed = voidWarrantySchema.safeParse({ reason: "OTHER", note: "  Seal broken  " });
-    expect(parsed.data?.note).toBe("Seal broken");
+    expect(voidWarrantySchema.safeParse({ reason: "UNAUTHORIZED_REPAIR" }).success).toBe(true);
+    const parsed = voidWarrantySchema.safeParse({ reason: "OTHER", note: "  Tamper label broken  " });
+    expect(parsed.data?.note).toBe("Tamper label broken");
   });
 
   it("needs a reason", () => {

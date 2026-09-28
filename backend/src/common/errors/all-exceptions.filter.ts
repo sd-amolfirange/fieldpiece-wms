@@ -64,7 +64,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (exception.code === "P2002" || exception.code === "P2034") {
         return [
           409,
-          { code: "invalid_transition", message: "This changed in the meantime. Refresh and try again.", requestId },
+          {
+            code: "invalid_transition",
+            message: "This changed in the meantime. Refresh and try again.",
+            requestId,
+          },
         ];
       }
     }

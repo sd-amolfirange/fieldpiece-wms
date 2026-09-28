@@ -1,25 +1,31 @@
 import { isIsoDate } from "./dates";
-import type { IsoDateTime, IsoDate } from "./types";
+import type { IsoDateTime, IsoDate, Model } from "./types";
 
-// Row validation for dealer registrations (single form and bulk import), checked against the product master.
+// Row validation for dealer, bulk and partner registrations, checked against the product catalogue.
+// Serial and batch formats come from each model (Model.serialPattern / batchPattern). Fieldpiece doesn't publish
+// them; the defaults below are assumptions until Fieldpiece confirms the real label format. [CONFIRM]
 
 export interface RegistrationRowInput {
   serial?: string;
+  batchNumber?: string;
   modelCode?: string;
-  installDate?: string;
+  purchaseDate?: string;
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
   city?: string;
+  state?: string;
+  zip?: string;
   invoiceNumber?: string;
 }
 
 export type RegistrationField =
-  "serial" | "modelCode" | "installDate" | "customerName" | "customerPhone";
+  "serial" | "batchNumber" | "modelCode" | "purchaseDate" | "customerName";
 
 export type RowErrorCode =
   | "required"
   | "invalid_serial"
+  | "invalid_batch"
   | "unknown_model"
   | "duplicate_serial"
   | "duplicate_in_file"
@@ -28,13 +34,35 @@ export type RowErrorCode =
 
 export type RowErrors = Partial<Record<RegistrationField, RowErrorCode>>;
 
+/** Loose check any serial must pass (before the model's own format is known). */
 export const SERIAL_PATTERN = /^[A-Z0-9-]{6,20}$/;
+
+/** Assumed Fieldpiece formats: serial = yy + ww + 5-digit sequence; batch = yyww-L + line. [CONFIRM] */
+export const DEFAULT_SERIAL_PATTERN = "^\\d{9}$";
+export const DEFAULT_BATCH_PATTERN = "^\\d{4}-L\\d{2}$";
 
 export const normalizeSerialValue = (value: string | undefined) =>
   (value ?? "").replace(/\s+/g, "").toUpperCase();
 
+export const normalizeBatchValue = (value: string | undefined) =>
+  (value ?? "").trim().toUpperCase();
+
+/** The formats of one model, compiled. */
+export interface ModelFormat {
+  serial: RegExp;
+  batch: RegExp;
+}
+
+export const modelFormat = (
+  model: Pick<Model, "serialPattern" | "batchPattern">,
+): ModelFormat => ({
+  serial: new RegExp(model.serialPattern || DEFAULT_SERIAL_PATTERN),
+  batch: new RegExp(model.batchPattern || DEFAULT_BATCH_PATTERN),
+});
+
 export interface RowContext {
-  modelCodes: ReadonlySet<string>;
+  /** Model code -> its serial and batch formats (the catalogue). */
+  models: ReadonlyMap<string, ModelFormat>;
   /** Serials already registered in the system. */
   existingSerials: ReadonlySet<string>;
   /** Serials seen earlier in the same upload. */
@@ -48,20 +76,30 @@ export function validateRegistrationRow(
 ): RowErrors {
   const errors: RowErrors = {};
   const serial = normalizeSerialValue(row.serial);
+  const batch = normalizeBatchValue(row.batchNumber);
   const modelCode = (row.modelCode ?? "").trim().toUpperCase();
-  const installDate = (row.installDate ?? "").trim();
+  const purchaseDate = (row.purchaseDate ?? "").trim();
+  const format = ctx.models.get(modelCode);
+
+  if (!modelCode) errors.modelCode = "required";
+  else if (!format) errors.modelCode = "unknown_model";
 
   if (!serial) errors.serial = "required";
-  else if (!SERIAL_PATTERN.test(serial)) errors.serial = "invalid_serial";
+  else if (
+    !SERIAL_PATTERN.test(serial) ||
+    (format && !format.serial.test(serial))
+  )
+    errors.serial = "invalid_serial";
   else if (ctx.existingSerials.has(serial)) errors.serial = "duplicate_serial";
   else if (ctx.seenInFile?.has(serial)) errors.serial = "duplicate_in_file";
 
-  if (!modelCode) errors.modelCode = "required";
-  else if (!ctx.modelCodes.has(modelCode)) errors.modelCode = "unknown_model";
+  if (!batch) errors.batchNumber = "required";
+  else if (format && !format.batch.test(batch))
+    errors.batchNumber = "invalid_batch";
 
-  if (!installDate) errors.installDate = "required";
-  else if (!isIsoDate(installDate)) errors.installDate = "invalid_date";
-  else if (installDate > ctx.today) errors.installDate = "future_date";
+  if (!purchaseDate) errors.purchaseDate = "required";
+  else if (!isIsoDate(purchaseDate)) errors.purchaseDate = "invalid_date";
+  else if (purchaseDate > ctx.today) errors.purchaseDate = "future_date";
 
   if (!(row.customerName ?? "").trim()) errors.customerName = "required";
 
@@ -70,7 +108,7 @@ export function validateRegistrationRow(
 
 export const hasErrors = (errors: RowErrors) => Object.keys(errors).length > 0;
 
-/** A duplicate serial needs a human (admin review); every other error is fixed by the dealer. */
+/** A duplicate serial needs a human (admin review); every other error is fixed by the sender. */
 export const needsAdminReview = (errors: RowErrors) =>
   errors.serial === "duplicate_serial" && Object.keys(errors).length === 1;
 

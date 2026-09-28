@@ -168,16 +168,23 @@ export default function RegistrationReviewPage() {
               <Field label={t("review.fields.serial")}>
                 <MonoId>{r.serial}</MonoId>
               </Field>
+              <Field label={t("review.fields.batch")}>
+                {r.batchNumber ? <MonoId>{r.batchNumber}</MonoId> : "—"}
+              </Field>
               <Field label={t("review.fields.model")}>{r.modelCode}</Field>
               <Field label={t("review.fields.customer")}>{r.customer.name}</Field>
               <Field label={t("review.fields.phone")}>{r.customer.phone ?? "—"}</Field>
               <Field label={t("review.fields.email")}>{r.customer.email ?? "—"}</Field>
-              <Field label={t("review.fields.city")}>{r.customer.city ?? "—"}</Field>
-              <Field label={t("review.fields.installDate")}>
-                {formatDate(r.installDate, i18n.language) || "—"}
+              <Field label={t("review.fields.address")}>
+                {[r.customer.city, [r.customer.state, r.customer.zip].filter(Boolean).join(" ")]
+                  .filter(Boolean)
+                  .join(", ") || "—"}
               </Field>
               <Field label={t("review.fields.purchaseDate")}>
                 {formatDate(r.purchaseDate, i18n.language) || "—"}
+              </Field>
+              <Field label={t("review.fields.placeOfPurchase")}>
+                {r.placeOfPurchase ?? r.dealerName ?? "—"}
               </Field>
               <Field label={t("review.fields.invoiceNumber")}>{r.invoiceNumber ?? "—"}</Field>
               <Field label={t("review.fields.dealer")}>{r.dealerName ?? "—"}</Field>
@@ -211,8 +218,11 @@ export default function RegistrationReviewPage() {
                 <Field label={t("review.fields.model")}>{r.duplicateOf.modelCode}</Field>
                 <Field label={t("review.fields.customer")}>{r.duplicateOf.customerName ?? "—"}</Field>
                 <Field label={t("review.fields.dealer")}>{r.duplicateOf.dealerName ?? "—"}</Field>
-                <Field label={t("review.fields.installDate")}>
-                  {formatDate(r.duplicateOf.installDate, i18n.language) || "—"}
+                <Field label={t("review.fields.batch")}>
+                  {r.duplicateOf.batchNumber ? <MonoId>{r.duplicateOf.batchNumber}</MonoId> : "—"}
+                </Field>
+                <Field label={t("review.fields.purchaseDate")}>
+                  {formatDate(r.duplicateOf.purchaseDate, i18n.language) || "—"}
                 </Field>
                 <Field label={t("review.fields.warranty")}>
                   <WarrantyStatusBadge status={r.duplicateOf.status} />

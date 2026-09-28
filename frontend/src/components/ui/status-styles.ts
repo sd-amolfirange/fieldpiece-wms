@@ -1,10 +1,7 @@
 import type {
   BulkRowStatus,
+  ClaimSource,
   ClaimStatus as DomainClaimStatus,
-  ComplaintSource,
-  ComplaintStatus,
-  Coverage,
-  FinancePostingStatus,
   IntegrationDirection,
   IntegrationStatus,
   RegistrationChannel,
@@ -12,11 +9,7 @@ import type {
   RegistrationStatus,
   WarrantyStatus as DomainWarrantyStatus,
 } from "@wms/domain";
-import type {
-  ClaimStatus as LegacyClaimStatus,
-  RmaStatus,
-  WarrantyStatus as LegacyWarrantyStatus,
-} from "@/types";
+import type { ClaimStatus as LegacyClaimStatus, WarrantyStatus as LegacyWarrantyStatus } from "@/types";
 
 // The existing colour variants, reused by every status (no new colours).
 const NEUTRAL = "bg-ink-100 text-ink-600";
@@ -38,13 +31,11 @@ export const claimStatusStyle: Record<AnyClaimStatus, string> = {
   NEEDS_INFO: "bg-warning-bg text-warning",
   APPROVED: "bg-success-bg text-success",
   REJECTED: "bg-danger-bg text-danger",
-  RMA_ISSUED: "bg-brand-100 text-brand-800",
   IN_TRANSIT: "bg-info-bg text-info",
   RECEIVED: "bg-info-bg text-info",
   REPAIRED: "bg-success-bg text-success",
   REPLACED: "bg-success-bg text-success",
   CREDITED: "bg-success-bg text-success",
-  PAID: SUCCESS,
   CLOSED: "bg-ink-100 text-ink-600",
 };
 
@@ -57,15 +48,6 @@ export const warrantyStatusStyle: Record<AnyWarrantyStatus, string> = {
   VOID: "bg-ink-100 text-ink-600 line-through",
 };
 
-export const rmaStatusStyle: Record<RmaStatus, string> = {
-  ISSUED: "bg-brand-100 text-brand-800",
-  IN_TRANSIT: "bg-info-bg text-info",
-  RECEIVED: "bg-info-bg text-info",
-  INSPECTED: "bg-info-bg text-info",
-  COMPLETED: "bg-success-bg text-success",
-  CANCELLED: "bg-ink-100 text-ink-600",
-};
-
 export const registrationStatusStyle: Record<RegistrationStatus, string> = {
   PENDING: WARNING,
   APPROVED: SUCCESS,
@@ -74,10 +56,13 @@ export const registrationStatusStyle: Record<RegistrationStatus, string> = {
 
 export const channelStyle: Record<RegistrationChannel, string> = {
   DEALER: BRAND,
+  BULK: BRAND,
   PORTAL: INFO,
+  WEB: INFO,
   EMAIL: NEUTRAL,
   ERP: NEUTRAL,
-  BULK: BRAND,
+  API: NEUTRAL,
+  RETAIL: WARNING,
 };
 
 export const registrationFlagStyle: Record<RegistrationFlag, string> = {
@@ -93,27 +78,17 @@ export const bulkRowStatusStyle: Record<BulkRowStatus, string> = {
   REVIEW: WARNING,
 };
 
-export const coverageStyle: Record<Coverage, string> = {
-  COVERED: SUCCESS,
-  CHARGEABLE: WARNING,
-};
-
-export const complaintStatusStyle: Record<ComplaintStatus, string> = {
-  NEW: INFO,
-  WITH_SERVICE: BRAND,
-  RESOLVED: SUCCESS,
-};
-
-export const complaintSourceStyle: Record<ComplaintSource, string> = {
+export const claimSourceStyle: Record<ClaimSource, string> = {
   CUSTOMER: INFO,
   DEALER: BRAND,
   ADMIN: NEUTRAL,
 };
 
-export const financePostingStyle: Record<FinancePostingStatus, string> = {
-  NOT_POSTED: NEUTRAL,
-  POSTED: SUCCESS,
-  FAILED: DANGER,
+export type PartnerKeyStatus = "ACTIVE" | "INACTIVE";
+
+export const partnerKeyStyle: Record<PartnerKeyStatus, string> = {
+  ACTIVE: SUCCESS,
+  INACTIVE: NEUTRAL,
 };
 
 export const integrationStatusStyle: Record<IntegrationStatus, string> = {

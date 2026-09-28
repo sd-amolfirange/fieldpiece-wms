@@ -3,10 +3,10 @@ import { ClaimStatusBadge, WarrantyStatusBadge } from "./StatusBadge";
 
 describe("status badges", () => {
   it("always shows a text label, not just colour", () => {
-    render(<ClaimStatusBadge status="NEEDS_INFO" />);
-    const badge = screen.getByText("Needs info");
-    expect(badge.className).toContain("bg-warning-bg");
-    expect(badge.className).toContain("text-warning");
+    render(<ClaimStatusBadge status="REJECTED" />);
+    const badge = screen.getByText("Rejected");
+    expect(badge.className).toContain("bg-danger-bg");
+    expect(badge.className).toContain("text-danger");
   });
 
   it("strikes through VOID warranties", () => {

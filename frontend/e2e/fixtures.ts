@@ -11,11 +11,11 @@ import {
 // Shared helpers for the workflow specs (docs/demo-workflows.md). Chromium only.
 
 export const ACCOUNTS = {
-  admin: "Admin: WMS office admin",
-  dealer: "Dealer: CoolAir Traders, Pune",
-  breeze: "Dealer: Breeze Point, Nashik",
-  distributor: "Distributor: NorthStar Distribution",
-  customer: "Customer: R. Kulkarni",
+  admin: "Admin: Fieldpiece warranty desk",
+  dealer: "Dealer: Lone Star Refrigeration Supply, Houston TX",
+  bayou: "Dealer: Bayou Air Parts, Baton Rouge LA",
+  distributor: "Distributor: Gulf States HVAC Distribution",
+  customer: "Customer: Marcus Reed",
 } as const;
 export type Account = keyof typeof ACCOUNTS;
 
@@ -24,7 +24,7 @@ const VIEWPORT: Record<Account, { width: number; height: number }> = {
   admin: { width: 1440, height: 900 },
   distributor: { width: 1440, height: 900 },
   dealer: { width: 1024, height: 768 },
-  breeze: { width: 1024, height: 768 },
+  bayou: { width: 1024, height: 768 },
   customer: { width: 390, height: 844 },
 };
 
@@ -67,11 +67,27 @@ export function isoDay(days = 0): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** An ISO date as the app shows it ("20 Sep 2027"), tolerant of "Sept". */
+/** An ISO date as the app shows it, US style ("Sep 20, 2027"). */
 export function shownDate(iso: string): RegExp {
   const [y = 0, m = 1, d = 1] = iso.split("-").map(Number);
-  const month = new Date(y, m - 1, d).toLocaleString("en-GB", { month: "short" }).slice(0, 3);
-  return new RegExp(`${d} ${month}t? ${y}`);
+  const month = new Date(y, m - 1, d).toLocaleString("en-US", { month: "short" });
+  return new RegExp(`${month} ${d}, ${y}`);
+}
+
+/** The last day of a warranty that starts on `iso` and runs `months` (end = start + months - 1 day). */
+export function warrantyEnd(iso: string, months = 12): string {
+  const [y = 0, m = 1, d = 1] = iso.split("-").map(Number);
+  const end = new Date(y, m - 1 + months, d - 1);
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+}
+
+/** A small JPEG to stand in for a receipt photo. */
+export async function receiptPhoto(page: Page) {
+  return {
+    name: "receipt.jpg",
+    mimeType: "image/jpeg",
+    buffer: await page.screenshot({ type: "jpeg", clip: { x: 0, y: 0, width: 400, height: 500 } }),
+  };
 }
 
 /** WCAG 2.2 AA scan of the current page (axe). */

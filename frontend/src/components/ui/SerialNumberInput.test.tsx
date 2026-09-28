@@ -7,10 +7,10 @@ describe("SerialNumberInput", () => {
   it("uppercases while typing and trims on blur", async () => {
     render(<SerialNumberInput aria-label="Serial number" />);
     const input = screen.getByLabelText("Serial number");
-    await userEvent.type(input, " aer spl15");
-    expect(input).toHaveValue(" AER SPL15");
+    await userEvent.type(input, " 2514 06233a");
+    expect(input).toHaveValue(" 2514 06233A");
     await userEvent.tab();
-    expect(input).toHaveValue("AERSPL15");
+    expect(input).toHaveValue("251406233A");
   });
 
   it("renders in the mono font", () => {
@@ -21,12 +21,12 @@ describe("SerialNumberInput", () => {
 
 describe("isValidSerial", () => {
   it("checks against the default pattern", () => {
-    expect(isValidSerial("aer-spl15-240917")).toBe(true);
+    expect(isValidSerial("251406233")).toBe(true);
     expect(isValidSerial("abc")).toBe(false);
   });
 
   it("accepts a product-specific pattern", () => {
-    expect(isValidSerial("VRF10123456", "^VRF10[0-9]{6}$")).toBe(true);
-    expect(isValidSerial("VRF10-12", "^VRF10[0-9]{6}$")).toBe(false);
+    expect(isValidSerial("251406233", "^[0-9]{9}$")).toBe(true);
+    expect(isValidSerial("25140623", "^[0-9]{9}$")).toBe(false);
   });
 });

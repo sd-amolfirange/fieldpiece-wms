@@ -1,13 +1,10 @@
 import type {
-  ClaimView,
-  ComplaintView,
   IntegrationDirection,
   IntegrationMessage,
   IntegrationStatus,
   IntegrationSystem,
   OrgStructure,
   Paginated as DemoPaginated,
-  PartType,
   RegistrationView,
 } from "@wms/domain";
 import { http } from "@/lib/http";
@@ -37,21 +34,12 @@ export const adminApi = {
   // A11 Dealers & users: distributor -> dealer hierarchy and every login.
   org: () => http.get<OrgStructure>("/admin/org").then((r) => r.data),
 
-  // A13 Simulate panel (demo only): stand-ins for the ERP feed, the mailbox, the service system and the OEM.
+  // A13 System events: stand-ins for the systems that send registrations (distributor ERP, the registration
+  // mailbox, an online marketplace through the partner API).
   simulateErpInvoice: () => http.post<RegistrationView[]>("/simulate/erp-invoice").then((r) => r.data),
   simulateRegistrationEmail: () =>
     http.post<RegistrationView>("/simulate/registration-email").then((r) => r.data),
-  complaintsWithService: () =>
-    http
-      .get<DemoPaginated<ComplaintView>>("/complaints", { params: { status: "WITH_SERVICE", pageSize: 100 } })
-      .then((r) => r.data.items),
-  submittedClaims: () =>
-    http
-      .get<DemoPaginated<ClaimView>>("/claims", { params: { status: "SUBMITTED", pageSize: 100 } })
-      .then((r) => r.data.items),
-  simulateJobResult: (body: { complaintId: string; partType?: Exclude<PartType, "UNIT"> }) =>
-    http.post<ComplaintView>("/simulate/job-result", body).then((r) => r.data),
-  simulateOemDecision: (body: { claimId: string; decision: "APPROVED" | "REJECTED"; reason?: string }) =>
-    http.post<ClaimView>("/simulate/oem-decision", body).then((r) => r.data),
+  simulateMarketplaceOrder: () =>
+    http.post<RegistrationView[]>("/simulate/marketplace-order").then((r) => r.data),
   resetDemo: () => http.post<{ ok: true }>("/simulate/reset").then((r) => r.data),
 };

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query, Res } from "@nestjs/common";
 import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
-import { VOID_REASONS, WARRANTY_STATUSES, type Entitlement, type Paginated, type UnitView } from "@wms/domain";
+import { VOID_REASONS, WARRANTY_STATUSES, type Coverage, type Paginated, type UnitView } from "@wms/domain";
 import type { FastifyReply } from "fastify";
 import type { Ctx as RequestCtx } from "../../common/auth/context";
 import { CookieAuth, Ctx, Roles } from "../../common/auth/decorators";
@@ -16,8 +16,9 @@ export class UnitsController {
   @Get()
   @Roles("admin", "dealer", "distributor", "customer")
   @ApiOperation({
-    summary: "Units in the caller's scope",
-    description: "A04, DL04, CU02. `q` matches serial, customer, dealer and model code. Default sort `serial`.",
+    summary: "Registered products in the caller's scope",
+    description:
+      "A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. Default sort `serial`.",
   })
   @ApiQuery({ name: "status", required: false, enum: WARRANTY_STATUSES })
   @ApiQuery({ name: "dealerId", required: false })
@@ -28,7 +29,7 @@ export class UnitsController {
 
   @Get(":serial")
   @Roles("admin", "dealer", "distributor", "customer")
-  @ApiOperation({ summary: "Unit with part-wise warranty status for today", description: "404 if not visible." })
+  @ApiOperation({ summary: "Product with its warranty status for today", description: "404 if not visible." })
   @ApiOkResponse({ description: "UnitView" })
   get(@Ctx() ctx: RequestCtx, @Param("serial") serial: string): Promise<UnitView> {
     return this.units.get(ctx, serial);
@@ -52,12 +53,12 @@ export class UnitsController {
       .send(pdf);
   }
 
-  @Get(":serial/entitlement")
+  @Get(":serial/coverage")
   @Roles("admin", "dealer", "distributor", "customer")
-  @ApiOperation({ summary: "What a complaint on this unit would be entitled to today (CU04, DL06)" })
-  @ApiOkResponse({ description: "Entitlement" })
-  entitlement(@Ctx() ctx: RequestCtx, @Param("serial") serial: string): Promise<Entitlement> {
-    return this.units.entitlement(ctx, serial);
+  @ApiOperation({ summary: "Whether a warranty claim on this product would be covered today" })
+  @ApiOkResponse({ description: "Coverage" })
+  coverage(@Ctx() ctx: RequestCtx, @Param("serial") serial: string): Promise<Coverage> {
+    return this.units.coverage(ctx, serial);
   }
 
   @Post(":serial/void")
@@ -75,7 +76,11 @@ export class UnitsController {
     },
   })
   @ApiOkResponse({ description: "UnitView with `void` set" })
-  voidWarranty(@Ctx() ctx: RequestCtx, @Param("serial") serial: string, @Body() body: unknown): Promise<UnitView> {
+  voidWarranty(
+    @Ctx() ctx: RequestCtx,
+    @Param("serial") serial: string,
+    @Body() body: unknown,
+  ): Promise<UnitView> {
     return this.units.voidWarranty(ctx, serial, body ?? {});
   }
 }

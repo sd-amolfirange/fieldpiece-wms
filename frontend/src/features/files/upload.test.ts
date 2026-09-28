@@ -8,9 +8,9 @@ describe("uploads", () => {
   afterEach(() => useSession.getState().signOut());
 
   it("uploads a file and serves it back to the uploader", async () => {
-    await signInAs("customer.rk@demo.wms");
-    const attachment = await uploadFile(new File(["invoice-bytes"], "invoice.jpg", { type: "image/jpeg" }));
-    expect(attachment).toMatchObject({ name: "invoice.jpg", mime: "image/jpeg", size: 13 });
+    await signInAs("customer.mreed@wms.local");
+    const attachment = await uploadFile(new File(["receipt-byte"], "receipt.jpg", { type: "image/jpeg" }));
+    expect(attachment).toMatchObject({ name: "receipt.jpg", mime: "image/jpeg", size: 12 });
     expect(attachment.url).toBe(`/api/files/${attachment.id}`);
 
     const file = await http.get<Blob>(`/files/${attachment.id}`, { responseType: "blob" });
@@ -18,14 +18,14 @@ describe("uploads", () => {
   });
 
   it("hides the file from another dealer", async () => {
-    await signInAs("customer.rk@demo.wms");
+    await signInAs("customer.mreed@wms.local");
     const attachment = await uploadFile(new File(["x"], "photo.png", { type: "image/png" }));
-    await signInAs("dealer.breeze@demo.wms");
+    await signInAs("dealer.bayou@wms.local");
     await expect(http.get(`/files/${attachment.id}`)).rejects.toMatchObject({ status: 404 });
   });
 
   it("rejects unsupported file types", async () => {
-    await signInAs("customer.rk@demo.wms");
+    await signInAs("customer.mreed@wms.local");
     await expect(
       uploadFile(new File(["x"], "tool.exe", { type: "application/x-msdownload" })),
     ).rejects.toMatchObject({
@@ -34,7 +34,7 @@ describe("uploads", () => {
   });
 
   it("uploads every item once, reports progress and returns the attachment ids", async () => {
-    await signInAs("dealer.coolair@demo.wms");
+    await signInAs("dealer.lonestar@wms.local");
     const items: UploadItem[] = [
       { file: new File(["a"], "a.jpg", { type: "image/jpeg" }) },
       { file: new File(["b"], "b.pdf", { type: "application/pdf" }) },

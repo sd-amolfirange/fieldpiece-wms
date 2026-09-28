@@ -12,6 +12,6 @@ export const env = {
   showEnvironmentTag: import.meta.env.VITE_SHOW_ENV_TAG !== "false",
   /** "Forgot password" link and form; `.env.showcase` turns it off (the demo server has no password reset). */
   showForgotPassword: import.meta.env.VITE_SHOW_FORGOT_PASSWORD !== "false",
-  expiringSoonDays: Number(import.meta.env.VITE_EXPIRING_SOON_DAYS ?? 60) || 60,
+  expiringSoonDays: Number(import.meta.env.VITE_EXPIRING_SOON_DAYS ?? 30) || 30,
   mode: import.meta.env.MODE,
 } as const;

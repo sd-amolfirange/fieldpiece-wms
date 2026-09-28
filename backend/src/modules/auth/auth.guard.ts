@@ -45,7 +45,12 @@ export class AuthGuard implements CanActivate {
     }
     if (!actor) throw AppError.unauthenticated();
 
-    request.ctx = { user: actor, now, today: isoDateIn(this.env.APP_TIMEZONE, now), requestId: String(request.id) };
+    request.ctx = {
+      user: actor,
+      now,
+      today: isoDateIn(this.env.APP_TIMEZONE, now),
+      requestId: String(request.id),
+    };
     (request as unknown as { user: { id: string } }).user = { id: actor.id }; // rate-limit tracker
     (request.raw as { userId?: string }).userId = actor.id; // request log line
 

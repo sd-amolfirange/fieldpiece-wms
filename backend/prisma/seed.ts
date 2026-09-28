@@ -24,7 +24,7 @@ async function main(): Promise<void> {
     const now = new Date();
     const today = isoDateIn(env.APP_TIMEZONE, now);
     await writeSeed(db, { today, now, passwordHash: await hashPassword(env.DEMO_PASSWORD) });
-    process.stdout.write(`Seeded the demo data (dated from ${today}). Demo accounts use DEMO_PASSWORD.\n`);
+    process.stdout.write(`Loaded the starting data (dated from ${today}). Demo accounts use DEMO_PASSWORD.\n`);
   } finally {
     await db.$disconnect();
   }

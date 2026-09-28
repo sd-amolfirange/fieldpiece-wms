@@ -1,340 +1,973 @@
-import type { Paginated, UnitView } from "@wms/domain";
-import {
-  createSessionStore,
-  dispatch,
-  type DemoDb,
-  type DemoRequest,
-} from "./api";
-import { createSeed, DEMO_PASSWORD } from "./seed";
-import { addAttachment, getAttachment, ServiceError } from "./services";
-import type { DemoState } from "./state";
+import { addDaysIso, type Paginated, type UnitView } from "@wms/domain";
+import { createSessionStore, dispatch, type DemoDb, type DemoRequest, type DemoResponse } from "./api";
+import { createSeed, DEMO_PARTNER_KEYS, DEMO_PASSWORD } from "./seed";
+import type { DemoFile } from "./services";
 
-const TODAY = "2026-09-24";
+// The mock API end to end through dispatch(), ported from the backend's e2e tests (backend/test/e2e), so the mock and
+// the real backend answer the same requests the same way.
+
+const TODAY = "2026-09-28";
+const SECRET = "test-inbound-secret-0123456789";
+const JPEG: DemoFile = {
+  name: "receipt.jpg",
+  mime: "image/jpeg",
+  size: 4,
+  data: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]),
+};
+
+type Who = "admin" | "dealer" | "bayou" | "distributor" | "customer";
+const EMAILS: Record<Who, string> = {
+  admin: "admin@wms.local",
+  dealer: "dealer.lonestar@wms.local",
+  bayou: "dealer.bayou@wms.local",
+  distributor: "dist.gulfstates@wms.local",
+  customer: "customer.mreed@wms.local",
+};
+
+// Response bodies are loosely typed on purpose: each test reads the fields it checks.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Body = any;
 
 function setup() {
-  const db: DemoDb = { state: createSeed(TODAY), today: () => TODAY };
+  const db: DemoDb = { state: createSeed(TODAY), today: () => TODAY, inboundEmailSecret: SECRET };
   const sessions = createSessionStore();
-  const call = (req: Partial<DemoRequest> & { path: string }) =>
+  const tokens = {} as Record<Who, string>;
+  const raw = (req: Partial<DemoRequest> & { path: string }): DemoResponse =>
     dispatch(db, sessions, { method: "GET", query: {}, ...req });
-  const login = (email: string) => {
-    const res = call({
+  const login = (who: Who) => {
+    const res = raw({
       method: "POST",
       path: "/auth/login",
-      body: { email, password: DEMO_PASSWORD },
+      body: { email: EMAILS[who], password: DEMO_PASSWORD },
     });
     expect(res.status).toBe(200);
     return (res.body as { accessToken: string }).accessToken;
   };
-  const units = (token: string, query: DemoRequest["query"] = {}) =>
-    call({
-      path: "/units",
-      accessToken: token,
-      query: { pageSize: "100", ...query },
-    }).body as Paginated<UnitView>;
-  return { db, sessions, call, login, units };
+  for (const who of Object.keys(EMAILS) as Who[]) tokens[who] = login(who);
+  const call = (who: Who | null, method: string, path: string, extra: Partial<DemoRequest> = {}) => {
+    const [pathname, search = ""] = path.split("?");
+    const res = raw({
+      method,
+      path: pathname!,
+      query: Object.fromEntries(new URLSearchParams(search)),
+      accessToken: who ? tokens[who] : undefined,
+      ...extra,
+    });
+    return { status: res.status, body: res.body as Body, download: res.download };
+  };
+  const get = (who: Who | null, path: string) => call(who, "GET", path);
+  const post = (who: Who | null, path: string, body?: unknown, extra: Partial<DemoRequest> = {}) =>
+    call(who, "POST", path, { body, ...extra });
+  const move = (id: string, body: Record<string, unknown>) =>
+    post("admin", `/claims/${id}/transitions`, body);
+  const upload = (who: Who, file: DemoFile = JPEG) => post(who, "/uploads", {}, { file });
+  const units = (who: Who, query = "") => get(who, `/units?pageSize=100${query}`).body as Paginated<UnitView>;
+  return { db, sessions, tokens, raw, login, call, get, post, move, upload, units };
 }
 
 describe("seed", () => {
-  const state: DemoState = createSeed(TODAY);
-  const unit = (serial: string) =>
-    state.units.find((u) => u.serial === serial)!;
+  const state = createSeed(TODAY);
 
-  it("has the named units from the workflows doc", () => {
-    expect(unit("AER-SPL15-240917").parts).toEqual([]);
-    expect(unit("AER-SPL15-240917").customerId).toBeUndefined();
-    expect(
-      unit("AER-SPL15-210311").parts.find((p) => p.partType === "COMPRESSOR")
-        ?.warrantyEnd,
-    ).toBe("2031-03-11");
-    expect(
-      unit("AER-SPL18-230502").history.some((e) =>
-        /unauthorised repair/i.test(e.text ?? ""),
-      ),
-    ).toBe(true);
-  });
-
-  it("has the model template unit 1y / compressor 10y / PCB 5y", () => {
-    const model = state.models.find((m) => m.code === "AER-SPL15")!;
-    expect(model.parts.map((p) => [p.partType, p.warrantyMonths])).toEqual([
-      ["UNIT", 12],
-      ["COMPRESSOR", 120],
-      ["PCB", 60],
+  it("has the backend's accounts, products, claims and partner keys", () => {
+    expect(state.users.map((u) => u.email)).toEqual(expect.arrayContaining(Object.values(EMAILS)));
+    expect(state.units).toHaveLength(15);
+    expect(state.claims.map((c) => c.id)).toEqual([
+      "CLM-1001",
+      "CLM-1002",
+      "CLM-1003",
+      "CLM-1004",
+      "CLM-1005",
+      "CLM-1006",
+      "CLM-1007",
     ]);
+    expect(state.partnerClients.map((p) => [p.id, p.apiKey])).toEqual(Object.entries(DEMO_PARTNER_KEYS));
+    expect(state.units.find((u) => u.serial === "261804517")).toMatchObject({
+      batchNumber: "2618-L02",
+      dealerId: "d-lonestar",
+    });
+    expect(state.units.find((u) => u.serial === "261804517")?.warrantyEnd).toBeUndefined();
   });
 
-  it("links NorthStar to CoolAir Traders and Breeze Point", () => {
-    expect(
-      state.dealers
-        .filter((d) => d.distributorId === "dist-northstar")
-        .map((d) => d.name),
-    ).toEqual(["CoolAir Traders", "Breeze Point"]);
+  it("places the named products relative to today and continues the id sequences", () => {
+    const s = setup();
+    expect(s.get("admin", "/units/251406233").body).toMatchObject({
+      status: "ACTIVE",
+      categoryName: "Clamp meters",
+    });
+    expect(s.get("admin", "/units/243208841").body.status).toBe("EXPIRED");
+    expect(s.get("admin", "/units/252707701").body).toMatchObject({ replacesSerial: "252005531" });
+    const reg = s.post("dealer", "/registrations", {
+      serial: "263899001",
+      batchNumber: "2638-L01",
+      modelCode: "SC680",
+      purchaseDate: TODAY,
+      customerName: "Pat Moreno",
+    });
+    expect(reg.body.id).toBe("REG-1014");
+  });
+});
+
+describe("auth", () => {
+  it("signs in with a trimmed, case-insensitive email and returns the session user", () => {
+    const s = setup();
+    const res = s.post(null, "/auth/login", {
+      email: " Dealer.LoneStar@wms.local ",
+      password: DEMO_PASSWORD,
+    });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(JSON.stringify(res.body.user))).toEqual({
+      id: "u-lonestar",
+      name: "Lone Star Refrigeration Supply",
+      email: "dealer.lonestar@wms.local",
+      role: "dealer",
+      dealerId: "d-lonestar",
+      orgName: "Lone Star Refrigeration Supply",
+      currency: "USD",
+    });
   });
 
-  it("has every demo login", () => {
-    expect(state.users.map((u) => u.email)).toEqual(
-      expect.arrayContaining([
-        "admin@demo.wms",
-        "dealer.coolair@demo.wms",
-        "dist.northstar@demo.wms",
-        "customer.rk@demo.wms",
-      ]),
-    );
-  });
-
-  it("only raises claims for claimable complaints", () => {
-    for (const claim of state.claims) {
-      const complaint = state.complaints.find(
-        (c) => c.id === claim.complaintId,
-      )!;
-      expect(complaint.entitlement.claimable).toBe(true);
+  it("answers invalid_credentials for a wrong password or an unknown email", () => {
+    const s = setup();
+    for (const body of [{ email: "admin@wms.local", password: "wrong" }, { email: "nobody@wms.local" }, {}]) {
+      const res = s.post(null, "/auth/login", body);
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({ code: "invalid_credentials", requestId: expect.any(String) });
     }
   });
-});
 
-describe("demo API auth", () => {
-  it("offers the demo accounts to the sign-in page without a token", () => {
-    const { call } = setup();
-    const res = call({ path: "/auth/demo-accounts" });
-    expect(res.status).toBe(200);
-    const accounts = res.body as {
-      email: string;
-      label: string;
-      password: string;
-    }[];
-    expect(accounts.map((a) => a.email)).toContain("customer.rk@demo.wms");
-    expect(accounts.every((a) => a.password === DEMO_PASSWORD)).toBe(true);
-  });
-
-  it("rejects a wrong password", () => {
-    const { call } = setup();
-    const res = call({
+  it("refreshes with the session cookie and ends both tokens on logout", () => {
+    const s = setup();
+    const login = s.raw({
       method: "POST",
       path: "/auth/login",
-      body: { email: "admin@demo.wms", password: "x" },
+      body: { email: EMAILS.customer, password: DEMO_PASSWORD },
     });
-    expect(res.status).toBe(401);
-  });
-
-  it("requires a token and restores the session from the refresh cookie", () => {
-    const { call } = setup();
-    expect(call({ path: "/units" }).status).toBe(401);
-    const login = call({
-      method: "POST",
-      path: "/auth/login",
-      body: { email: "admin@demo.wms", password: DEMO_PASSWORD },
-    });
-    const refresh = call({
-      method: "POST",
-      path: "/auth/refresh",
-      refreshToken: login.setRefreshToken,
-    });
-    expect(refresh.status).toBe(200);
-    expect((refresh.body as { user: { role: string } }).user.role).toBe(
-      "admin",
-    );
-    const out = call({
-      method: "POST",
-      path: "/auth/logout",
-      refreshToken: login.setRefreshToken,
-    });
-    expect(out.clearRefreshToken).toBe(true);
+    const refresh = login.setRefreshToken!;
+    expect(s.raw({ method: "POST", path: "/auth/refresh", refreshToken: refresh }).status).toBe(200);
+    expect(s.raw({ method: "POST", path: "/auth/refresh" }).body).toMatchObject({ code: "unauthenticated" });
+    const access = (login.body as { accessToken: string }).accessToken;
     expect(
-      call({
-        method: "POST",
-        path: "/auth/refresh",
-        refreshToken: login.setRefreshToken,
-      }).status,
-    ).toBe(401);
+      s.raw({ method: "POST", path: "/auth/logout", accessToken: access, refreshToken: refresh }).status,
+    ).toBe(204);
+    expect(s.raw({ path: "/units", accessToken: access }).status).toBe(401);
+    expect(s.raw({ method: "POST", path: "/auth/refresh", refreshToken: refresh }).status).toBe(401);
+  });
+
+  it("offers the demo accounts for the sign-in picker", () => {
+    const s = setup();
+    const res = s.get(null, "/auth/demo-accounts");
+    expect(res.body).toHaveLength(5);
+    expect(res.body[0]).toEqual({
+      email: "admin@wms.local",
+      label: "Admin: Fieldpiece warranty desk",
+      password: DEMO_PASSWORD,
+    });
+  });
+
+  it("accepts the session cookie only on file routes, never on JSON endpoints", () => {
+    const s = setup();
+    const refresh = s.raw({
+      method: "POST",
+      path: "/auth/login",
+      body: { email: EMAILS.customer, password: DEMO_PASSWORD },
+    }).setRefreshToken!;
+    expect(s.raw({ path: "/units", refreshToken: refresh }).status).toBe(401);
+    const pdf = s.raw({ path: "/units/251406233/certificate.pdf", refreshToken: refresh });
+    expect(pdf.status).toBe(200);
+    expect(pdf.download).toMatchObject({ mime: "application/pdf", name: "warranty-251406233.pdf" });
+    expect(String(pdf.download?.data).slice(0, 5)).toBe("%PDF-");
+    expect(s.raw({ path: "/units/261804517/certificate.pdf", refreshToken: refresh }).status).toBe(404);
+    expect(s.get("admin", "/units/261804517/certificate.pdf").body.code).toBe("not_registered");
   });
 });
 
-describe("demo API scoping", () => {
-  it("scopes units per role", () => {
-    const { login, units } = setup();
-    expect(units(login("admin@demo.wms")).total).toBe(15);
-    expect(units(login("dist.northstar@demo.wms")).total).toBe(11);
-    const coolair = units(login("dealer.coolair@demo.wms"));
-    expect(coolair.total).toBe(7);
-    expect(coolair.items.every((u) => u.dealerName === "CoolAir Traders")).toBe(
-      true,
+describe("roles and data scope", () => {
+  it("requires a signed-in user everywhere except the auth, public-form and partner routes", () => {
+    const s = setup();
+    for (const url of [
+      "/units",
+      "/registrations",
+      "/claims",
+      "/models",
+      "/dashboard/summary",
+      "/notifications",
+      "/files/ATT-1",
+      "/intake",
+    ]) {
+      expect([url, s.get(null, url).status]).toEqual([url, 401]);
+    }
+    expect(s.get(null, "/public/models").status).toBe(200);
+    expect(s.get("admin", "/nowhere").status).toBe(404);
+  });
+
+  it("shows each role only its products", () => {
+    const s = setup();
+    expect(s.units("admin").items).toHaveLength(15);
+    const lonestar = s.units("dealer").items;
+    expect(lonestar.length).toBeGreaterThan(0);
+    expect(lonestar.every((u) => u.dealerId === "d-lonestar")).toBe(true);
+    expect(new Set(s.units("distributor").items.map((u) => u.dealerId))).toEqual(
+      new Set(["d-lonestar", "d-bayou"]),
     );
-    const customer = units(login("customer.rk@demo.wms"));
-    expect(customer.items.map((u) => u.serial).sort()).toEqual([
-      "AER-SPL15-210311",
-      "AER-SPL18-230502",
-    ]);
-  });
-
-  it("hides other dealers' records behind 404", () => {
-    const { call, login } = setup();
-    const token = login("dealer.coolair@demo.wms");
     expect(
-      call({ path: "/units/KEL-CAS30-240220", accessToken: token }).status,
-    ).toBe(404);
-    expect(
-      call({ path: "/units/AER-SPL15-210311", accessToken: token }).status,
-    ).toBe(200);
+      s
+        .units("customer")
+        .items.map((u) => u.serial)
+        .sort(),
+    ).toEqual(["243208841", "251406233", "252207119"]);
   });
 
-  it("lets the distributor filter by dealer", () => {
-    const { login, units } = setup();
-    const res = units(login("dist.northstar@demo.wms"), {
-      dealerId: "d-breeze",
-    });
-    expect(res.total).toBe(4);
+  it("answers 404, not 403, for a record outside the caller's scope", () => {
+    const s = setup();
+    for (const who of ["dealer", "distributor", "customer"] as const) {
+      const res = s.get(who, "/units/252409963");
+      expect([who, res.status, res.body.code]).toEqual([who, 404, "not_found"]);
+    }
+    expect(s.get("bayou", "/units/251406233").status).toBe(404);
+    expect(s.get("admin", "/units/252409963").status).toBe(200);
   });
 
-  it("computes part-wise status in unit views", () => {
-    const { call, login } = setup();
-    const res = call({
-      path: "/units/AER-SPL15-210311",
-      accessToken: login("customer.rk@demo.wms"),
-    });
-    const unit = res.body as UnitView;
-    expect(unit.status).toBe("EXPIRED");
-    expect(unit.parts.map((p) => [p.partType, p.status])).toEqual([
-      ["UNIT", "EXPIRED"],
-      ["COMPRESSOR", "ACTIVE"],
-      ["PCB", "EXPIRED"],
+  it("scopes warranty claims: customers see their own, dealers their products', admins all", () => {
+    const s = setup();
+    const claims = (who: Who) =>
+      s.get(who, "/claims?pageSize=100").body.items as { id: string; dealerId: string; customerId: string }[];
+    expect(claims("admin")).toHaveLength(7);
+    expect(claims("dealer").every((c) => c.dealerId === "d-lonestar")).toBe(true);
+    expect(claims("customer").every((c) => c.customerId === "c-mreed")).toBe(true);
+    const foreign = claims("admin").find((c) => c.dealerId === "d-desertpeak")!;
+    expect(s.get("dealer", `/claims/${foreign.id}`).status).toBe(404);
+    expect(s.get("customer", `/claims/${foreign.id}`).status).toBe(404);
+    expect(s.get("dealer", "/claims/counts").body).toMatchObject({ CLOSED: 1, IN_REVIEW: 1, REJECTED: 0 });
+  });
+
+  it("keeps warranty desk actions admin-only", () => {
+    const s = setup();
+    const denied: [Who, string, string][] = [
+      ["dealer", "GET", "/integrations"],
+      ["distributor", "GET", "/admin/org"],
+      ["dealer", "GET", "/admin/partner-clients"],
+      ["dealer", "POST", "/registrations/bulk-approve"],
+      ["dealer", "POST", "/units/251406233/void"],
+      ["distributor", "POST", "/claims/CLM-1006/transitions"],
+      ["customer", "POST", "/claims/CLM-1006/transitions"],
+      ["customer", "POST", "/simulate/erp-invoice"],
+      ["customer", "POST", "/simulate/reset"],
+      ["customer", "GET", "/dealers"],
+      ["customer", "GET", "/bulk-imports"],
+      ["customer", "GET", "/intake"],
+    ];
+    for (const [who, method, url] of denied) {
+      expect([who, url, s.call(who, method, url, { body: {} }).status]).toEqual([who, url, 403]);
+    }
+  });
+
+  it("limits dealer lists to what the caller may see", () => {
+    const s = setup();
+    expect(s.get("admin", "/dealers").body).toHaveLength(3);
+    expect(s.get("distributor", "/dealers").body.map((d: { id: string }) => d.id)).toEqual([
+      "d-lonestar",
+      "d-bayou",
     ]);
+    expect(s.get("dealer", "/dealers").body.map((d: { id: string }) => d.id)).toEqual(["d-lonestar"]);
   });
 
-  it("keeps claims, integrations and admin data away from customers and dealers", () => {
-    const { call, login } = setup();
-    const customer = login("customer.rk@demo.wms");
-    const dealer = login("dealer.coolair@demo.wms");
-    expect(call({ path: "/claims", accessToken: customer }).status).toBe(403);
-    expect(call({ path: "/integrations", accessToken: dealer }).status).toBe(
-      403,
+  it("scopes files: the uploader and admins, or anyone who can see a record that uses it", () => {
+    const s = setup();
+    const up = s.upload("dealer");
+    expect(up.status).toBe(201);
+    expect(up.body.url).toBe(`/api/files/${up.body.id}`);
+    const url = `/files/${up.body.id}`;
+    expect(s.get("dealer", url).download).toMatchObject({ mime: "image/jpeg", disposition: "inline" });
+    expect(s.get("admin", url).status).toBe(200);
+    expect(s.get("bayou", url).status).toBe(404);
+    expect(s.get("customer", url).status).toBe(404);
+  });
+
+  it("checks uploads and refuses linking someone else's upload to a new record", () => {
+    const s = setup();
+    expect(s.post("dealer", "/uploads", {}).status).toBe(422);
+    expect(s.upload("dealer", { name: "x.svg", mime: "image/svg+xml", size: 10 }).body.code).toBe(
+      "unsupported_type",
     );
-    expect(call({ path: "/admin/org", accessToken: dealer }).status).toBe(403);
-    expect(
-      call({ method: "POST", path: "/simulate/reset", accessToken: dealer })
-        .status,
-    ).toBe(403);
-    const claims = call({
-      path: "/claims",
-      accessToken: dealer,
-      query: { pageSize: "100" },
-    }).body as Paginated<{
-      dealerId: string;
-    }>;
-    expect(claims.items.every((c) => c.dealerId === "d-coolair")).toBe(true);
+    expect(s.upload("dealer", { ...JPEG, size: 16 * 1024 * 1024 }).body.code).toBe("too_large");
+    const up = s.upload("dealer");
+    const res = s.post("customer", "/claims", {
+      unitSerial: "251406233",
+      issueType: "DISPLAY",
+      description: "Display flickers all the time.",
+      attachmentIds: [up.body.id],
+    });
+    expect([res.status, res.body.code]).toEqual([422, "invalid_attachment"]);
+  });
+});
+
+describe("registration entry points", () => {
+  it("W1: bulk import registers clean rows, sends the duplicate to review, and re-checks fixed rows in place", () => {
+    const s = setup();
+    const sheet = [
+      [
+        "Serial number",
+        "Batch number",
+        "Model",
+        "Purchase date",
+        "Customer name",
+        "Customer phone",
+        "State",
+        "ZIP",
+      ],
+      ["263510101", "2635-L01", "SC680", TODAY, "Adam Rhodes", "(713) 555-0102", "TX", "77002"],
+      ["252811902", "2528-L01", "MG44", TODAY, "Bianca Flores", "(713) 555-0103", "TX", "77502"],
+      ["263510103", "2635-L01", "SC999", TODAY, "Carl Jenkins", "(713) 555-0104", "TX", "77581"],
+      ["263510104", "2635-L02", "VP87", "", "Dana Scott", "(713) 555-0105", "TX", "77373"],
+    ];
+    const file: DemoFile = { name: "week38.csv", mime: "text/csv", size: 100 };
+    expect(s.post("dealer", "/bulk-imports", {}).status).toBe(422);
+    expect(s.post("dealer", "/bulk-imports", {}, { file: { ...file, name: "a.txt" } }).body.code).toBe(
+      "unsupported_type",
+    );
+    expect(s.post("dealer", "/bulk-imports", {}, { file, sheet: null }).body.code).toBe("unsupported_type");
+    expect(s.post("dealer", "/bulk-imports", {}, { file, sheet: [sheet[0]!] }).body.code).toBe("empty_file");
+    expect(s.post("distributor", "/bulk-imports", {}, { file, sheet }).body.fieldErrors).toEqual({
+      dealerId: "validation.pickDealer",
+    });
+
+    const up = s.post("dealer", "/bulk-imports", { name: "week38.csv" }, { file, sheet });
+    expect(up.status).toBe(201);
+    expect(up.body).toMatchObject({ fileName: "week38.csv", dealerName: "Lone Star Refrigeration Supply" });
+    expect(up.body.counts).toEqual({ total: 4, registered: 1, errors: 2, review: 1 });
+    const errors = (
+      up.body.rows as { rowNumber: number; status: string; errors: Record<string, string> }[]
+    ).filter((r) => r.status === "ERROR");
+    expect(errors.flatMap((r) => Object.values(r.errors)).sort()).toEqual(["required", "unknown_model"]);
+
+    const fixes = errors.map((r) => ({
+      rowNumber: r.rowNumber,
+      values: r.errors.purchaseDate ? { purchaseDate: TODAY } : { modelCode: "SC680" },
+    }));
+    const fixed = s.call("dealer", "PUT", `/bulk-imports/${up.body.id}/rows`, { body: { rows: fixes } });
+    expect(fixed.body.counts).toEqual({ total: 4, registered: 3, errors: 0, review: 1 });
+    expect(fixed.body.rows.map((r: { status: string }) => r.status)).toEqual([
+      "REGISTERED",
+      "REVIEW",
+      "FIXED",
+      "FIXED",
+    ]);
+
+    expect(s.get("dealer", "/units?q=263510101").body.items[0]).toMatchObject({
+      batchNumber: "2635-L01",
+      status: "ACTIVE",
+    });
+    const inbox = s.get("admin", "/registrations?flag=DUPLICATE&status=PENDING");
+    expect(inbox.body.items.some((r: { channel: string }) => r.channel === "BULK")).toBe(true);
+    expect(s.get("dealer", "/bulk-imports").body).toHaveLength(1);
+    expect(s.get("bayou", `/bulk-imports/${up.body.id}`).status).toBe(404);
+    expect(s.get("dealer", "/notifications").body[0]).toMatchObject({ key: "bulk_processed" });
+    expect(String(s.get("dealer", "/bulk-imports/template.csv").download?.data)).toMatch(
+      /^Serial number,Batch number,Model/,
+    );
   });
 
-  it("returns role-specific dashboards", () => {
-    const { call, login } = setup();
-    const admin = call({
-      path: "/dashboard/summary",
-      accessToken: login("admin@demo.wms"),
-    }).body as {
-      role: string;
-      units: number;
-      registrationsByChannel: { channel: string; count: number }[];
+  it("DL03: a dealer's registration needs a batch number in the model's format and is approved at once", () => {
+    const s = setup();
+    const bad = s.post("dealer", "/registrations", {
+      serial: "SC680-1",
+      modelCode: "SC680",
+      purchaseDate: TODAY,
+      customerName: "X",
+    });
+    expect(bad.status).toBe(422);
+    expect(bad.body.fieldErrors).toEqual({
+      serial: "rowErrors.invalid_serial",
+      batchNumber: "rowErrors.required",
+    });
+    expect(
+      s.post("dealer", "/registrations", {
+        serial: "263899001",
+        batchNumber: "L01",
+        modelCode: "SC680",
+        purchaseDate: TODAY,
+        customerName: "X",
+      }).body.fieldErrors,
+    ).toEqual({ batchNumber: "rowErrors.invalid_batch" });
+
+    const ok = s.post("dealer", "/registrations", {
+      serial: "263899001",
+      batchNumber: "2638-l01",
+      modelCode: "SC680",
+      purchaseDate: "2026-01-10",
+      customerName: "Alicia Parker",
+      customerPhone: "7135550117", // matches the existing customer by phone
+    });
+    expect(ok.body).toMatchObject({
+      status: "APPROVED",
+      channel: "DEALER",
+      dealerId: "d-lonestar",
+      customerId: "c-aparker",
+      batchNumber: "2638-L01",
+    });
+    expect(s.get("dealer", "/units/263899001").body).toMatchObject({
+      warrantyStart: "2026-01-10",
+      warrantyEnd: "2027-01-09",
+      categoryName: "Clamp meters",
+    });
+    // Already registered: waits for the warranty desk as a duplicate.
+    const again = s.post("dealer", "/registrations", {
+      serial: "263899001",
+      batchNumber: "2638-L01",
+      modelCode: "SC680",
+      purchaseDate: TODAY,
+      customerName: "Someone Else",
+    });
+    expect(again.body).toMatchObject({ status: "PENDING", flags: ["DUPLICATE", "EXCEPTION"] });
+    expect(s.post("admin", `/registrations/${again.body.id}/approve`).body.code).toBe("duplicate_serial");
+    expect(s.get("admin", `/registrations/${again.body.id}`).body.duplicateOf).toMatchObject({
+      serial: "263899001",
+    });
+    expect(s.get("dealer", `/registrations/${again.body.id}`).body.duplicateOf).toBeUndefined();
+    expect(s.post("admin", `/registrations/${again.body.id}/merge`).body.status).toBe("APPROVED");
+    expect(s.post("admin", `/registrations/${again.body.id}/merge`).body.code).toBe("not_pending");
+  });
+
+  it("W2: a customer's QR registration waits for the warranty desk, then starts the 1-year warranty", () => {
+    const s = setup();
+    const noProof = s.post("customer", "/registrations", {
+      serial: "261804517",
+      modelCode: "SM482V",
+      purchaseDate: TODAY,
+    });
+    expect(noProof.body.fieldErrors).toEqual({ attachmentIds: "validation.invoiceRequired" });
+    const up = s.upload("customer");
+    const reg = s.post("customer", "/registrations", {
+      serial: "261804517",
+      modelCode: "SM482V",
+      purchaseDate: TODAY,
+      attachmentIds: [up.body.id],
+    });
+    expect(reg.body).toMatchObject({
+      status: "PENDING",
+      channel: "PORTAL",
+      flags: [],
+      dealerId: "d-lonestar",
+    });
+    expect(s.post("admin", `/registrations/${reg.body.id}/approve`).body.status).toBe("APPROVED");
+    const unit = s.get("customer", "/units/261804517").body;
+    expect(unit).toMatchObject({
+      status: "ACTIVE",
+      batchNumber: "2618-L02",
+      warrantyStart: TODAY,
+      customerId: "c-mreed",
+    });
+    expect(unit.daysRemaining).toBeGreaterThan(360);
+    expect(s.get("customer", `/files/${up.body.id}`).status).toBe(200);
+    expect(s.get("customer", "/notifications").body[0]).toMatchObject({ key: "registration_approved" });
+  });
+
+  it("rejects with a reason and tells the submitter", () => {
+    const s = setup();
+    const up = s.upload("customer");
+    const reg = s.post("customer", "/registrations", {
+      serial: "263899011",
+      modelCode: "SC680",
+      purchaseDate: TODAY,
+      attachmentIds: [up.body.id],
+    });
+    expect(reg.body.flags).toEqual(["EXCEPTION"]);
+    expect(s.post("admin", `/registrations/${reg.body.id}/reject`, {}).body.fieldErrors).toEqual({
+      reason: "validation.reasonRequired",
+    });
+    expect(
+      s.post("admin", `/registrations/${reg.body.id}/reject`, { reason: "Unreadable invoice." }).body,
+    ).toMatchObject({
+      status: "REJECTED",
+      rejectReason: "Unreadable invoice.",
+    });
+    expect(s.get("customer", "/notifications").body[0]).toMatchObject({ key: "registration_rejected" });
+  });
+
+  it("public web form: no account, proof of purchase required, waits in the inbox", () => {
+    const s = setup();
+    const fields = {
+      serial: "263899002",
+      batchNumber: "2638-L02",
+      modelCode: "VP87",
+      purchaseDate: TODAY,
+      customerName: "Jordan Lee",
+      customerEmail: "jordan.lee@example.com",
+      state: "CA",
+      zip: "92612",
     };
-    expect(admin.role).toBe("admin");
-    expect(admin.units).toBe(15);
-    expect(admin.registrationsByChannel.map((c) => c.channel)).toEqual([
+    expect(s.post(null, "/public/registrations", {}).status).toBe(422);
+    const bad = s.post(
+      null,
+      "/public/registrations",
+      { ...fields, zip: "926", customerEmail: "nope" },
+      { file: JPEG },
+    );
+    expect(bad.body.fieldErrors).toEqual({ zip: "validation.zip", customerEmail: "validation.email" });
+
+    const ok = s.post(null, "/public/registrations", fields, { file: JPEG });
+    expect(ok.body).toEqual({ registrationId: expect.stringMatching(/^REG-/), status: "PENDING" });
+    const inbox = s.get("admin", `/registrations/${ok.body.registrationId}`).body;
+    expect(inbox).toMatchObject({
+      channel: "WEB",
+      flags: ["EXCEPTION"],
+      submittedByName: "Web form: Jordan Lee",
+      customer: { name: "Jordan Lee", state: "CA", zip: "92612" },
+    });
+    expect(inbox.attachmentIds).toHaveLength(1);
+    expect(s.get("admin", `/files/${inbox.attachmentIds[0]}`).download?.data).toEqual(JPEG.data);
+    s.post("admin", `/registrations/${ok.body.registrationId}/approve`);
+    const crm = s.get("admin", "/integrations?system=CRM");
+    expect(crm.body.items.some((m: { refId: string }) => m.refId === ok.body.registrationId)).toBe(true);
+
+    const bot = s.post(
+      null,
+      "/public/registrations",
+      { ...fields, serial: "263899009", website: "http://spam" },
+      { file: JPEG },
+    );
+    expect(bot.status).toBe(200);
+    expect(s.get("admin", "/registrations?q=263899009").body.total).toBe(0);
+  });
+
+  it("partner API: clean items registered at once, duplicates reviewed, errors returned per item", () => {
+    const s = setup();
+    const partner = (key: string, body: unknown) =>
+      s.post(null, "/partner/v1/registrations", body, { headers: { "x-api-key": key } });
+    const res = partner(DEMO_PARTNER_KEYS["pc-desertpeak-pos"], {
+      registrations: [
+        {
+          serial: "263899003",
+          batchNumber: "2638-L01",
+          modelCode: "SC260",
+          purchaseDate: TODAY,
+          customer: { name: "Pat Moreno", state: "AZ" },
+        },
+        {
+          serial: "251406233",
+          batchNumber: "2514-L01",
+          modelCode: "SC680",
+          purchaseDate: TODAY,
+          customer: { name: "Someone" },
+        },
+        {
+          serial: "263899003",
+          batchNumber: "2638-L01",
+          modelCode: "SC260",
+          purchaseDate: TODAY,
+          customer: { name: "Repeat" },
+        },
+        { serial: "x" },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.results.map((r: { status: string }) => r.status)).toEqual([
+      "REGISTERED",
+      "REVIEW",
+      "REVIEW",
+      "ERROR",
+    ]);
+    expect(s.get("admin", "/units/263899003").body).toMatchObject({
+      dealerId: "d-desertpeak",
+      status: "ACTIVE",
+    });
+    expect(s.get("admin", `/registrations/${res.body.results[0].registrationId}`).body.channel).toBe("API");
+    expect(s.get("admin", "/integrations?type=x&q=partner_registration").body.items[0]).toMatchObject({
+      system: "PARTNER",
+      payload: { received: 4, registered: 1, review: 2, errors: 1 },
+    });
+
+    const retail = partner(DEMO_PARTNER_KEYS["pc-marketplace"], {
+      serial: "263899006",
+      batchNumber: "2638-L02",
+      modelCode: "SRS1",
+      purchaseDate: TODAY,
+      customer: { name: "Nina Patel", email: "nina@example.com" },
+    });
+    expect(retail.body.results[0].status).toBe("REGISTERED");
+    expect(s.get("admin", "/units/263899006").body).toMatchObject({ placeOfPurchase: "Online marketplace" });
+
+    expect([partner("fpk_wrong", {}).status, partner("fpk_wrong", {}).body.code]).toEqual([
+      401,
+      "invalid_api_key",
+    ]);
+    const created = s.post("admin", "/admin/partner-clients", { name: "Retail chain", channel: "RETAIL" });
+    expect(created.status).toBe(201);
+    expect(created.body.apiKey).toMatch(/^fpk_/);
+    expect(created.body.client).toMatchObject({ active: true, keyPrefix: created.body.apiKey.slice(0, 12) });
+    expect(JSON.stringify(s.get("admin", "/admin/partner-clients").body)).not.toContain(created.body.apiKey);
+    expect(s.post("admin", "/admin/partner-clients", { channel: "FAX" }).body.fieldErrors).toEqual({
+      name: "validation.required",
+      channel: "validation.channel",
+    });
+    const off = s.call("admin", "PATCH", `/admin/partner-clients/${created.body.client.id}`, {
+      body: { active: false },
+    });
+    expect(off.body.active).toBe(false);
+    expect(partner(created.body.apiKey, {}).status).toBe(401);
+    expect(s.get("admin", "/admin/partner-clients").body[0].lastUsedAt).toBeDefined();
+  });
+
+  it("email intake: reads the registration from the message, keeps the attachment, needs the shared secret", () => {
+    const s = setup();
+    const email = {
+      from: "Renee Carter <renee.carter@example.com>",
+      subject: "Register my gauge",
+      text: "Model: MG44\nSerial number: 263899004\nBatch: 2638-L03\nPurchased: 09/20/2026\nState: LA",
+      attachments: [
+        { filename: "receipt.jpg", contentType: "image/jpeg", contentBase64: btoa("\xff\xd8\xff\xe0") },
+      ],
+    };
+    const inbound = (secret: string, body: unknown) =>
+      s.post(null, "/inbound/email", body, { headers: { "x-inbound-secret": secret } });
+    expect(inbound("wrong", email).status).toBe(401);
+    const res = inbound(SECRET, email);
+    expect(res.status).toBe(202);
+    const reg = s.get("admin", `/registrations/${res.body.registrationId}`).body;
+    expect(reg).toMatchObject({
+      channel: "EMAIL",
+      serial: "263899004",
+      batchNumber: "2638-L03",
+      modelCode: "MG44",
+      purchaseDate: "2026-09-20",
+      customer: { name: "Renee Carter", email: "renee.carter@example.com", state: "LA" },
+    });
+    expect(reg.attachmentIds).toHaveLength(1);
+    // Renee is an existing customer (same email): approval links the product to her record.
+    s.post("admin", `/registrations/${reg.id}/approve`);
+    expect(s.get("admin", "/units/263899004").body.customerId).toBe("c-rcarter");
+
+    expect(inbound(SECRET, { from: "x@example.com", text: "hello" }).body.status).toBe("IGNORED");
+    expect(s.get("admin", "/integrations?system=EMAIL&status=FAILED").body.total).toBe(1);
+
+    s.db.inboundEmailSecret = undefined;
+    expect(inbound(SECRET, email).status).toBe(404);
+  });
+
+  it("tells dealers and distributors where registrations come in", () => {
+    const s = setup();
+    expect(s.get("dealer", "/intake").body).toEqual({
+      publicFormPath: "/register-product",
+      inboundEmail: "registrations@wms.local",
+      partnerApiPath: "/api/partner/v1",
+    });
+  });
+});
+
+describe("warranty claims", () => {
+  it("a covered claim approved as a replacement moves the rest of the warranty to the new serial", () => {
+    const s = setup();
+    expect(s.get("customer", "/units/251406233/coverage").body).toMatchObject({
+      covered: true,
+      reason: "IN_WARRANTY",
+    });
+    const filed = s.post("customer", "/claims", {
+      unitSerial: "251406233",
+      issueType: "DISPLAY",
+      description: "Backlight flickers and the reading freezes.",
+    });
+    expect(filed.body).toMatchObject({
+      status: "SUBMITTED",
+      source: "CUSTOMER",
+      raisedByName: "Marcus Reed",
+      coverage: { covered: true },
+      batchNumber: "2514-L01",
+      modelCode: "SC680",
+      warrantyStatus: "ACTIVE",
+    });
+    const again = s.post("customer", "/claims", {
+      unitSerial: "251406233",
+      issueType: "DISPLAY",
+      description: "Filing the same problem twice.",
+    });
+    expect([again.status, again.body.code]).toEqual([409, "claim_open"]);
+    expect(s.post("customer", "/claims", { unitSerial: "251406233" }).body.fieldErrors).toEqual({
+      issueType: "validation.issueType",
+      description: "validation.describeFault",
+    });
+    expect(
+      s.post("admin", "/claims", {
+        unitSerial: "261804517",
+        issueType: "OTHER",
+        description: "Not registered yet.",
+      }).body.code,
+    ).toBe("not_registered");
+
+    const id = filed.body.id as string;
+    expect(s.move(id, { action: "approve", resolution: "REPAIR" }).body.code).toBe("invalid_transition");
+    s.move(id, { action: "start_review" });
+    expect(s.move(id, { action: "approve" }).body.fieldErrors).toEqual({
+      resolution: "validation.resolution",
+    });
+    s.move(id, { action: "approve", resolution: "REPLACE", note: "Display fault confirmed." });
+    expect(s.move(id, { action: "close" }).body.fieldErrors).toEqual({
+      replacementSerial: "validation.required",
+    });
+    expect(s.move(id, { action: "close", replacementSerial: "252811902" }).body.code).toBe(
+      "duplicate_serial",
+    );
+    const closed = s.move(id, {
+      action: "close",
+      replacementSerial: "263899005",
+      replacementBatchNumber: "2638-L02",
+    });
+    expect(closed.body).toMatchObject({
+      status: "CLOSED",
+      resolution: "REPLACE",
+      replacementSerial: "263899005",
+    });
+    expect(closed.body.history.map((e: { status: string }) => e.status)).toEqual([
+      "SUBMITTED",
+      "IN_REVIEW",
+      "APPROVED",
+      "CLOSED",
+    ]);
+
+    const original = s.get("customer", "/units/251406233").body;
+    const replacement = s.get("customer", "/units/263899005").body;
+    expect(original).toMatchObject({ status: "EXPIRED", replacedBySerial: "263899005" });
+    expect(replacement).toMatchObject({
+      status: "ACTIVE",
+      replacesSerial: "251406233",
+      warrantyEnd: original.warrantyEnd,
+      warrantyStart: TODAY,
+      batchNumber: "2638-L02",
+    });
+    expect(original.history.map((e: { type: string }) => e.type).slice(-3)).toEqual([
+      "claim_filed",
+      "replaced",
+      "claim_closed",
+    ]);
+    expect(s.get("customer", "/notifications").body.map((n: { key: string }) => n.key)).toEqual(
+      expect.arrayContaining(["claim_approved", "claim_closed"]),
+    );
+    expect(s.get("admin", "/notifications").body[0]).toMatchObject({ key: "claim_submitted" });
+  });
+
+  it("a credit is posted to Finance; a rejection needs a reason; dealers and customers can't decide", () => {
+    const s = setup();
+    const filed = s.post("dealer", "/claims", {
+      unitSerial: "252811902",
+      issueType: "CONNECTIVITY",
+      description: "Gauge drops the Bluetooth link every few minutes.",
+    });
+    expect(filed.body.source).toBe("DEALER");
+    const id = filed.body.id as string;
+    expect(s.post("dealer", `/claims/${id}/transitions`, { action: "start_review" }).status).toBe(403);
+    s.move(id, { action: "start_review" });
+    expect(s.move(id, { action: "approve", resolution: "CREDIT" }).body.fieldErrors).toEqual({
+      creditAmount: "validation.amount",
+    });
+    expect(
+      s.move(id, { action: "approve", resolution: "CREDIT", creditAmount: 249.5 }).body.creditAmount,
+    ).toBe(249.5);
+    s.move(id, { action: "close" });
+    const finance = s.get("admin", "/integrations?system=FINANCE");
+    expect(finance.body.items.find((m: { refId: string }) => m.refId === id)).toMatchObject({
+      type: "credit_memo",
+      direction: "OUT",
+      payload: { amount: 249.5, currency: "USD", model: "MG44" },
+    });
+
+    const expired = s.post("customer", "/claims", {
+      unitSerial: "243208841",
+      issueType: "MECHANICAL",
+      description: "Pump motor stalls after a minute.",
+    });
+    expect(expired.body.coverage).toMatchObject({ covered: false, reason: "EXPIRED" });
+    expect(s.move(expired.body.id, { action: "reject" }).body.fieldErrors).toEqual({
+      reason: "validation.reasonRequired",
+    });
+    expect(
+      s.move(expired.body.id, { action: "reject", reason: "Out of warranty. Repair quote sent." }).body,
+    ).toMatchObject({
+      status: "REJECTED",
+      rejectReason: "Out of warranty. Repair quote sent.",
+    });
+    expect(s.get("customer", `/claims/${expired.body.id}`).body.status).toBe("REJECTED");
+    expect(s.move("CLM-9999", { action: "start_review" }).status).toBe(404);
+  });
+
+  it("W5: a voided product's claim is filed as not covered", () => {
+    const s = setup();
+    const voided = s.post("admin", "/units/252207119/void", {
+      reason: "UNAUTHORIZED_REPAIR",
+      note: "Tamper label broken.",
+    });
+    expect(voided.body).toMatchObject({
+      status: "VOID",
+      void: { reason: "UNAUTHORIZED_REPAIR", byName: "Warranty Desk" },
+    });
+    expect(s.post("admin", "/units/252207119/void", { reason: "NOPE" }).body.fieldErrors).toEqual({
+      reason: "validation.voidReason",
+    });
+    expect(s.post("admin", "/units/252207119/void", { reason: "MISUSE" }).body.code).toBe("already_void");
+    expect(s.post("admin", "/units/261804517/void", { reason: "MISUSE" }).body.code).toBe("not_registered");
+    const claim = s.post("customer", "/claims", {
+      unitSerial: "252207119",
+      issueType: "INACCURATE_READING",
+      description: "Detector alarms with no leak present.",
+    });
+    expect(claim.body.coverage).toMatchObject({ covered: false, reason: "VOID" });
+    expect(claim.body.warrantyStatus).toBe("VOID");
+    expect(s.get("customer", "/notifications").body.map((n: { key: string }) => n.key)).toContain(
+      "unit_voided",
+    );
+  });
+
+  it("filters and searches claims", () => {
+    const s = setup();
+    expect(s.get("admin", "/claims?status=CLOSED").body.total).toBe(3);
+    expect(s.get("admin", "/claims?q=2427-L01").body.items.map((c: { id: string }) => c.id)).toEqual([
+      "CLM-1004",
+    ]);
+    expect(
+      s
+        .get("admin", "/claims?issueType=MECHANICAL&sort=createdAt")
+        .body.items.map((c: { id: string }) => c.id),
+    ).toEqual(["CLM-1006", "CLM-1007"]);
+    expect(s.get("admin", "/claims?pageSize=2&page=2").body).toMatchObject({
+      total: 7,
+      page: 2,
+      pageSize: 2,
+    });
+  });
+});
+
+describe("system events, dashboards, reset", () => {
+  it("W6: ERP, email and marketplace intake land where they should; approving the email updates CRM", () => {
+    const s = setup();
+    const erp = s.post("admin", "/simulate/erp-invoice");
+    expect(
+      erp.body.map(
+        (r: { channel: string; status: string; flags: string[] }) =>
+          `${r.channel}:${r.status}:${r.flags.length}`,
+      ),
+    ).toEqual(["ERP:PENDING:0", "ERP:PENDING:0", "ERP:PENDING:0"]);
+    expect(new Set(erp.body.map((r: { serial: string }) => r.serial)).size).toBe(3);
+    const mail = s.post("admin", "/simulate/registration-email");
+    expect(mail.body).toMatchObject({ channel: "EMAIL", status: "PENDING", modelCode: "SC680" });
+    expect(mail.body.attachmentIds).toHaveLength(1);
+    const invoice = s.get("admin", `/files/${mail.body.attachmentIds[0]}`).download!;
+    expect(invoice.mime).toBe("application/pdf");
+    expect(new TextDecoder().decode(invoice.data as Uint8Array).slice(0, 5)).toBe("%PDF-");
+    const market = s.post("admin", "/simulate/marketplace-order");
+    expect(market.body.map((r: { channel: string; status: string }) => `${r.channel}:${r.status}`)).toEqual([
+      "RETAIL:APPROVED",
+      "RETAIL:APPROVED",
+    ]);
+
+    const bulk = s.post("admin", "/registrations/bulk-approve", {
+      ids: [...erp.body.map((r: { id: string }) => r.id), "REG-9999"],
+    });
+    expect(bulk.body).toEqual({ approved: 3, skipped: 1 });
+    s.post("admin", `/registrations/${mail.body.id}/approve`);
+    const crm = s.get("admin", "/integrations?system=CRM&direction=OUT");
+    expect(crm.body.items.some((m: { refId: string }) => m.refId === mail.body.id)).toBe(true);
+    expect(s.get("admin", "/notifications").body.map((n: { key: string }) => n.key)).toEqual(
+      expect.arrayContaining(["erp_invoice_received", "registration_submitted"]),
+    );
+  });
+
+  it("retries only failed integration messages", () => {
+    const s = setup();
+    const failed = s.get("admin", "/integrations?status=FAILED").body.items[0];
+    expect(failed).toMatchObject({ system: "CRM", attempts: 1 });
+    expect(s.post("admin", `/integrations/${failed.id}/retry`).body).toMatchObject({
+      status: "SUCCESS",
+      attempts: 2,
+    });
+    expect(s.post("admin", `/integrations/${failed.id}/retry`).body.code).toBe("not_failed");
+  });
+
+  it("W7: the distributor's dashboard covers both dealers and narrows to one", () => {
+    const s = setup();
+    const all = s.get("distributor", "/dashboard/summary").body;
+    expect(all.dealers.map((d: { dealerId: string }) => d.dealerId)).toEqual(["d-lonestar", "d-bayou"]);
+    expect(all.openClaims).toBe(1);
+    expect(s.get("distributor", "/dashboard/summary?dealerId=d-bayou").body.openClaims).toBe(0);
+    expect(s.get("distributor", "/dashboard/summary?dealerId=d-desertpeak").body).toMatchObject({
+      registrationsThisMonth: 0,
+      openClaims: 0,
+    });
+    expect(s.get("customer", "/dashboard/summary").body).toEqual({
+      role: "customer",
+      units: 3,
+      active: 2,
+      expiringSoon: 0,
+      openClaims: 0,
+    });
+  });
+
+  it("dashboard cards add up to the product list, and the list's status matches every product's own", () => {
+    const s = setup();
+    for (const days of [0, 30, 200, 900]) {
+      s.db.today = () => addDaysIso(TODAY, days);
+      const d = s.get("admin", "/dashboard/summary").body;
+      const list = s.units("admin");
+      expect(d.units).toBe(list.total);
+      expect(d.active + d.expiring30 + d.expired + d.pending + d.voided).toBe(d.units);
+      for (const status of ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOID", "PENDING"]) {
+        const filtered = s
+          .units("admin", `&status=${status}`)
+          .items.map((u) => u.serial)
+          .sort();
+        const expected = list.items
+          .filter((u) => u.status === status)
+          .map((u) => u.serial)
+          .sort();
+        expect([days, status, filtered]).toEqual([days, status, expected]);
+      }
+    }
+  });
+
+  it("reports the admin dashboard from the seed", () => {
+    const s = setup();
+    const d = s.get("admin", "/dashboard/summary").body;
+    expect(d).toMatchObject({ role: "admin", units: 15, pending: 1, openClaims: 3, pendingRegistrations: 0 });
+    expect(d.registrationsByChannel.map((c: { channel: string }) => c.channel)).toEqual([
       "DEALER",
       "PORTAL",
+      "WEB",
       "EMAIL",
       "ERP",
+      "API",
+      "RETAIL",
     ]);
-    const dist = call({
-      path: "/dashboard/summary",
-      accessToken: login("dist.northstar@demo.wms"),
-    }).body as {
-      dealers: { dealerName: string }[];
-    };
-    expect(dist.dealers.map((d) => d.dealerName)).toEqual([
-      "CoolAir Traders",
-      "Breeze Point",
-    ]);
-    const dealer = call({
-      path: "/dashboard/summary",
-      accessToken: login("dealer.coolair@demo.wms"),
-    }).body as {
-      dealers: unknown[];
-    };
-    expect(dealer.dealers).toHaveLength(1);
+    expect(d.registrationsByChannel[0].count).toBe(7); // six dealer registrations plus one bulk upload
+    expect(d.claimsByStatus.find((c: { status: string }) => c.status === "CLOSED").count).toBe(3);
+    expect(d.claimsByCategory.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(7);
+    expect(d.recentActivity).toHaveLength(8);
   });
 
-  it("makes the dashboard total match the units list, and the status cards add up to it", () => {
-    const { call, login, units } = setup();
-    const token = login("admin@demo.wms");
-    const summary = call({ path: "/dashboard/summary", accessToken: token })
-      .body as Record<string, number>;
-    const list = units(token);
-    expect(summary.units).toBe(list.total);
-    expect(
-      summary.active! +
-        summary.expiring30! +
-        summary.expired! +
-        summary.pending! +
-        summary.voided!,
-    ).toBe(list.total);
-    expect(summary.pending).toBe(1); // AER-SPL15-240917: sold with a QR label, not registered yet
+  it("resets the data and keeps signed-in users signed in", () => {
+    const s = setup();
+    s.post("admin", "/simulate/erp-invoice");
+    expect(s.post("admin", "/simulate/reset").body).toEqual({ ok: true });
+    expect(s.get("admin", "/registrations?channel=ERP&status=PENDING").body.total).toBe(0);
+    expect(s.get("dealer", "/units?pageSize=1").status).toBe(200);
   });
 
-  it("resets demo data for the admin", () => {
-    const { db, call, login } = setup();
-    db.state.units = [];
-    const res = call({
-      method: "POST",
-      path: "/simulate/reset",
-      accessToken: login("admin@demo.wms"),
-    });
-    expect(res.status).toBe(200);
-    expect(db.state.units).toHaveLength(15);
-  });
-});
-
-describe("attachments", () => {
-  it("lets only the uploader, admins and people who can see the linked record open a file", () => {
-    const state = createSeed(TODAY);
-    const ctxFor = (userId: string) => ({
-      state,
-      user: state.users.find((u) => u.id === userId)!,
-      today: TODAY,
-      now: `${TODAY}T10:00:00Z`,
-    });
-    const rk = ctxFor("u-rk");
-    const file = addAttachment(
-      rk,
-      { name: "invoice.jpg", mime: "image/jpeg", size: 1000 },
-      (id) => `/api/files/${id}`,
+  it("undoes every change of a request that fails", () => {
+    const s = setup();
+    // A web form registration has no customer record yet: approving creates one, then fails on the unknown model.
+    const reg = s.post(
+      null,
+      "/public/registrations",
+      {
+        serial: "263899012",
+        modelCode: "SC680",
+        purchaseDate: TODAY,
+        customerName: "Jordan Lee",
+        customerEmail: "jordan.lee@example.com",
+      },
+      { file: JPEG },
     );
-    expect(getAttachment(rk, file.id).name).toBe("invoice.jpg");
-    expect(getAttachment(ctxFor("u-admin"), file.id).id).toBe(file.id);
-    expect(() => getAttachment(ctxFor("u-breeze"), file.id)).toThrow(
-      ServiceError,
+    s.db.state.registrations.find((r) => r.id === reg.body.registrationId)!.modelCode = "GONE";
+    const before = JSON.stringify(s.db.state);
+    expect(s.post("admin", `/registrations/${reg.body.registrationId}/approve`).body.code).toBe(
+      "unknown_model",
     );
-
-    state.units
-      .find((u) => u.serial === "AER-SPL15-210311")!
-      .attachmentIds.push(file.id);
-    expect(getAttachment(ctxFor("u-coolair"), file.id).id).toBe(file.id);
-    expect(() => getAttachment(ctxFor("u-breeze"), file.id)).toThrow(
-      ServiceError,
-    );
-  });
-
-  it("refuses unsupported and oversized files", () => {
-    const state = createSeed(TODAY);
-    const ctx = { state, user: state.users[0]!, today: TODAY, now: TODAY };
-    expect(() =>
-      addAttachment(
-        ctx,
-        { name: "a.exe", mime: "application/x-msdownload", size: 10 },
-        String,
-      ),
-    ).toThrow(/photo, video or PDF/);
-    expect(() =>
-      addAttachment(
-        ctx,
-        { name: "big.jpg", mime: "image/jpeg", size: 20 * 1024 * 1024 },
-        String,
-      ),
-    ).toThrow(/15 MB/);
+    expect(JSON.stringify(s.db.state)).toBe(before);
   });
 });

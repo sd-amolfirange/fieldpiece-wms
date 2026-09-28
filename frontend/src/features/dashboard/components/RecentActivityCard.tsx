@@ -5,14 +5,14 @@ import { Link } from "react-router-dom";
 import { Card, Timeline, type TimelineItem } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 
-// A01 recent activity: the latest unit events (registrations, replacements, voids, complaints, claims).
+// A01 recent activity: the latest product events (registrations, claims, replacements, voids).
 
 const icon = {
   registered: ShieldCheck,
-  part_replaced: ArrowRightLeft,
   voided: Ban,
-  complaint_raised: MessageSquare,
-  claim_created: ClipboardList,
+  claim_filed: MessageSquare,
+  claim_closed: ClipboardList,
+  replaced: ArrowRightLeft,
   note: FilePlus2,
 } as const;
 

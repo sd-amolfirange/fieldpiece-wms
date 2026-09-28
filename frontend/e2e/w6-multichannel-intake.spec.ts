@@ -1,8 +1,13 @@
-import { appUrl, expect, resetDemoData, rolePage, test } from "./fixtures";
+import { appUrl, expect, isoDay, present, receiptPhoto, resetDemoData, rolePage, test } from "./fixtures";
 
-// W6 – Multi-channel intake and integrations (docs/demo-workflows.md). Login: admin (the simulator is A13).
+// W6 – Registration channels (docs/demo-workflows.md). Logins: admin (System events and the registration hub),
+// and a visitor without an account (the website form). Registrations arrive from a distributor ERP, the registration
+// mailbox, an online marketplace, the website form and a partner system with its own API key.
 
-test("W6: multi-channel intake and integrations", async ({ browser, baseURL }) => {
+const WEB_SERIAL = "263899911";
+const API_SERIAL = "263899921";
+
+test("W6: registrations from every channel", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));
   const admin = await rolePage(browser, "admin", appUrl(baseURL));
   const channelCount = async (label: string) => {
@@ -11,58 +16,125 @@ test("W6: multi-channel intake and integrations", async ({ browser, baseURL }) =
       has: admin.getByRole("heading", { name: "Registrations by channel" }),
     });
     await card.getByRole("button", { name: "View data" }).click();
-    return Number((await card.locator("tr", { hasText: label }).locator("td").last().innerText()).trim());
+    const row = card.locator("tr", { hasText: label });
+    return (await row.count()) ? Number((await row.locator("td").last().innerText()).trim()) : 0;
   };
   const emailBefore = await channelCount("Email");
+  const marketplaceBefore = await channelCount("Marketplace");
   let erpSerials: string[] = [];
   let emailSerial = "";
 
-  await test.step("1. A13: ERP sales invoice with 3 serials, and a registration email with an invoice", async () => {
+  await test.step("1. A13: ERP invoice (3 serials), registration email, marketplace orders (2 serials)", async () => {
     await admin.goto("/admin/simulate");
-    await admin.getByRole("button", { name: "ERP sales invoice (3 serials)" }).click();
-    await expect(admin.getByText("3 registrations received from ERP").first()).toBeVisible();
+    await admin.getByRole("button", { name: "Distributor ERP invoice (3 serials)" }).click();
+    await expect(admin.getByText("3 registrations received from the ERP").first()).toBeVisible();
     erpSerials = (
       await admin
-        .getByText(/^[A-Z]{3}-SPL\d{2}-\d{6}, /)
+        .getByText(/^\d{9}, \d{9}, \d{9}$/)
         .first()
         .innerText()
     )
       .split(", ")
       .map((s) => s.trim());
-    await admin.getByRole("button", { name: "Registration email with invoice" }).click();
+    await admin.getByRole("button", { name: "Registration email with receipt" }).click();
     await expect(admin.getByText("Registration email received").first()).toBeVisible();
     emailSerial = (
       await admin
-        .getByText(/^POL-SPL12-\d{6}$/)
+        .getByText(/^\d{9}$/)
         .first()
         .innerText()
     ).trim();
+    await admin.getByRole("button", { name: "Marketplace orders (2 serials)" }).click();
+    await expect(admin.getByText("2 marketplace registrations received").first()).toBeVisible();
     expect(erpSerials).toHaveLength(3);
   });
 
-  await test.step("2. A02: new items with ERP and Email badges", async () => {
+  await test.step("2. Website form: a buyer registers without an account", async () => {
+    const context = await browser.newContext({ baseURL: appUrl(baseURL) });
+    const visitor = await context.newPage();
+    await visitor.goto(`/register-product?serial=${WEB_SERIAL}&model=SC260&batch=2638-L02`);
+    await expect(visitor.getByRole("heading", { name: "Register your Fieldpiece product" })).toBeVisible();
+    await visitor.getByLabel("Purchase date").fill(isoDay(-2));
+    await visitor.getByLabel(/Where did you buy it/).fill("Lone Star Refrigeration Supply");
+    await visitor.locator('input[type="file"]').setInputFiles(await receiptPhoto(admin));
+    await visitor.getByLabel("Customer name").fill("Jordan Lee");
+    await visitor.getByLabel("Customer email").fill("jordan.lee@example.com");
+    await visitor.getByLabel("State").fill("TX");
+    await visitor.getByLabel("ZIP code").fill("77002");
+    await visitor.getByRole("button", { name: "Register product" }).click();
+    await expect(visitor.getByRole("heading", { name: "Thanks, your registration is in" })).toBeVisible();
+    await context.close();
+  });
+
+  await test.step("3. A02: one inbox for every channel", async () => {
     await admin.goto("/registrations?status=PENDING");
-    await expect(admin.locator("table tbody tr", { hasText: emailSerial })).toContainText(/Email/i);
+    await expect(admin.locator("table tbody tr", { hasText: emailSerial })).toContainText("Email");
+    await expect(admin.locator("table tbody tr", { hasText: WEB_SERIAL })).toContainText("Web form");
     for (const serial of erpSerials) {
-      await expect(admin.locator("table tbody tr", { hasText: serial })).toContainText("ERP");
+      await expect(admin.locator("table tbody tr", { hasText: serial })).toContainText("Distributor ERP");
     }
+    await admin.goto("/registrations?channel=RETAIL");
+    await expect(admin.locator("table tbody tr", { hasText: "Marketplace" }).first()).toContainText(
+      "Approved",
+    );
   });
 
-  await test.step("3. A03: approve the emailed registration", async () => {
+  await test.step("4. A03: approve the emailed registration with its receipt", async () => {
+    await admin.goto("/registrations?status=PENDING");
     await admin.locator("table tbody tr", { hasText: emailSerial }).getByRole("link").first().click();
-    const invoice = admin.locator("section", {
-      has: admin.getByRole("heading", { name: "Invoice", exact: true }),
+    const receipt = admin.locator("section", {
+      has: admin.getByRole("heading", { name: "Receipt or invoice", exact: true }),
     });
-    await expect(invoice.getByRole("link", { name: /Open full size/ })).toBeVisible();
+    await expect(receipt.getByRole("link", { name: /Open full size/ })).toBeVisible();
     await admin.getByRole("button", { name: "Approve" }).click();
-    await expect(admin.getByRole("link", { name: "Open unit" })).toBeVisible();
+    await expect(admin.getByRole("link", { name: "Open product" })).toBeVisible();
   });
 
-  await test.step("4. A12: inbound ERP and email, outbound CRM update", async () => {
+  await test.step("5. Registration channels: add a partner system and send a registration with its key", async () => {
+    await admin.goto("/registrations/channels");
+    await expect(admin.getByText("registrations@wms.local")).toBeVisible();
+    const partners = admin.locator("section", {
+      has: admin.getByRole("heading", { name: "Partner systems" }),
+    });
+    await expect(partners.getByRole("cell", { name: "Online marketplace" })).toBeVisible();
+    await partners.getByRole("button", { name: "Add partner" }).click();
+    const dialog = admin.getByRole("dialog");
+    await dialog.getByLabel(/Name/).fill("Bayou Air Parts point of sale");
+    await dialog.getByLabel(/Dealer/).selectOption({ label: "Bayou Air Parts" });
+    await dialog.getByRole("button", { name: "Create API key" }).click();
+    const apiKey = (await dialog.locator("pre").innerText()).trim();
+    expect(apiKey).toMatch(/^fpk_/);
+    await dialog.getByRole("button", { name: "Close" }).first().click();
+
+    const res = await admin.request.post("/api/partner/v1/registrations", {
+      headers: { "X-Api-Key": apiKey },
+      data: {
+        serial: API_SERIAL,
+        batchNumber: "2638-L01",
+        modelCode: "SC680",
+        purchaseDate: isoDay(-1),
+        invoiceNumber: "BAP-7001",
+        customer: { name: "Kyle Fontenot", phone: "(225) 555-0161", state: "LA", zip: "70802" },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const body = (await res.json()) as { results: { status: string }[] };
+    expect(present(body.results[0], "result").status).toBe("REGISTERED");
+    const refused = await admin.request.post("/api/partner/v1/registrations", {
+      headers: { "X-Api-Key": "fpk_not_a_real_key" },
+      data: { serial: API_SERIAL },
+    });
+    expect(refused.status()).toBe(401);
+    await admin.goto(`/units/${API_SERIAL}`);
+    await expect(admin.getByText("Bayou Air Parts").first()).toBeVisible();
+  });
+
+  await test.step("6. A12: inbound ERP, email and partner messages; outbound CRM update", async () => {
     await admin.goto("/admin/integrations");
     const rows = admin.locator("table tbody tr");
     await expect(rows.filter({ hasText: "ERP sales invoice" }).first()).toContainText(/Inbound/i);
     await expect(rows.filter({ hasText: "Registration email" }).first()).toContainText(/Inbound/i);
+    await expect(rows.filter({ hasText: "Partner registration" }).first()).toContainText(/Inbound/i);
     const crm = rows.filter({ hasText: "CRM update" }).first();
     await expect(crm).toContainText(/Outbound/i);
     await crm.getByRole("button", { name: "View payload" }).click();
@@ -72,7 +144,8 @@ test("W6: multi-channel intake and integrations", async ({ browser, baseURL }) =
     await expect(admin.getByRole("button", { name: "Retry" }).first()).toBeVisible();
   });
 
-  await test.step("5. A01: the channel chart is updated", async () => {
+  await test.step("7. A01: the channel chart is updated", async () => {
     expect(await channelCount("Email")).toBe(emailBefore + 1);
+    expect(await channelCount("Marketplace")).toBe(marketplaceBefore + 2);
   });
 });

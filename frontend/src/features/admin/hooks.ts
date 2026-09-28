@@ -9,8 +9,6 @@ export const adminKeys = {
   policies: ["admin", "policies"] as const,
   settings: ["admin", "settings"] as const,
   integrations: (filters: IntegrationFilters) => ["integrations", filters] as const,
-  withService: ["complaints", "with-service"] as const,
-  submittedClaims: ["claims", "submitted"] as const,
   org: ["admin", "org"] as const,
 };
 
@@ -41,30 +39,13 @@ export function useRetryIntegration() {
   return useMutation({ mutationFn: adminApi.retryIntegration, onSuccess: () => refreshEverything(qc) });
 }
 
-export function useComplaintsWithService() {
-  return useQuery({
-    queryKey: adminKeys.withService,
-    queryFn: adminApi.complaintsWithService,
-    refetchInterval: LIVE_REFRESH_MS,
-  });
-}
-
-export function useSubmittedClaims() {
-  return useQuery({
-    queryKey: adminKeys.submittedClaims,
-    queryFn: adminApi.submittedClaims,
-    refetchInterval: LIVE_REFRESH_MS,
-  });
-}
-
 export function useSimulator() {
   const qc = useQueryClient();
   const onSuccess = () => refreshEverything(qc);
   return {
     erpInvoice: useMutation({ mutationFn: adminApi.simulateErpInvoice, onSuccess }),
     registrationEmail: useMutation({ mutationFn: adminApi.simulateRegistrationEmail, onSuccess }),
-    jobResult: useMutation({ mutationFn: adminApi.simulateJobResult, onSuccess }),
-    oemDecision: useMutation({ mutationFn: adminApi.simulateOemDecision, onSuccess }),
+    marketplaceOrder: useMutation({ mutationFn: adminApi.simulateMarketplaceOrder, onSuccess }),
     reset: useMutation({ mutationFn: adminApi.resetDemo, onSuccess }),
   };
 }

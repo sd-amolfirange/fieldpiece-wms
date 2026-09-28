@@ -34,7 +34,10 @@ export class StorageModule implements OnModuleInit {
     try {
       await this.storage.ensureReady();
     } catch (err) {
-      this.logger.warn({ err: (err as Error).message }, "Storage isn't reachable; uploads will fail until it is");
+      this.logger.warn(
+        { err: (err as Error).message },
+        "Storage isn't reachable; uploads will fail until it is",
+      );
     }
   }
 }

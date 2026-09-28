@@ -1,21 +1,18 @@
 import type {
   Attachment,
-  Brand,
-  Claim,
-  Complaint,
+  ClaimStatus,
   Dealer,
   Distributor,
   IsoDate,
-  JobResult,
   Model,
+  ProductCategory,
   Registration,
   RegistrationChannel,
-  ReplacedPart,
   Role,
   Unit,
   UnitEvent,
-  UnitPart,
   User,
+  WarrantyClaim,
   WarrantyStatus,
 } from "./types";
 import type { BulkImport, bulkCounts } from "./registration-rules";
@@ -40,58 +37,40 @@ export interface SessionUser {
   customerId?: string;
   /** Dealer, distributor or customer display name for the account menu. */
   orgName?: string;
+  /** ISO 4217 code for money on screen, e.g. "USD". */
   currency: string;
 }
 
-export interface UnitPartView extends UnitPart {
-  status: WarrantyStatus;
-  daysRemaining: number;
-}
-
-export interface UnitView extends Omit<Unit, "parts"> {
+export interface UnitView extends Unit {
   modelCode: string;
   modelName: string;
-  capacity: string;
-  unitType: string;
-  brandName: string;
+  modelDescription: string;
+  categoryName: string;
   dealerName?: string;
   customerName?: string;
   status: WarrantyStatus;
   daysRemaining: number;
-  parts: UnitPartView[];
 }
 
 export interface RegistrationView extends Registration {
   dealerName?: string;
-  /** Existing unit with the same serial, for the duplicate comparison. */
+  /** Existing product with the same serial, for the duplicate comparison. */
   duplicateOf?: UnitView;
 }
 
-/** Job result with its photos and each new part's warranty end (the new warranty starts on the repair day). */
-export interface JobResultView extends Omit<JobResult, "partsReplaced"> {
-  partsReplaced: (ReplacedPart & { newWarrantyEnd?: IsoDate })[];
-  photos: Attachment[];
-}
-
-export interface ComplaintView extends Complaint {
+export interface WarrantyClaimView extends WarrantyClaim {
+  batchNumber?: string;
   modelCode: string;
   modelName: string;
-  brandName: string;
+  categoryName: string;
   dealerName?: string;
   customerName?: string;
+  /** The product's purchase date and warranty end, for the review. */
+  purchaseDate?: IsoDate;
+  warrantyEnd?: IsoDate;
+  /** The product's warranty status today. */
+  warrantyStatus: WarrantyStatus;
   attachments: Attachment[];
-  jobResult?: JobResultView;
-  claimStatus?: Claim["status"];
-}
-
-export interface ClaimView extends Claim {
-  brandName: string;
-  dealerName?: string;
-  modelCode: string;
-  customerName?: string;
-  complaintDescription?: string;
-  /** Evidence pulled from the job result. */
-  jobResult?: JobResultView;
 }
 
 export interface BulkImportView extends BulkImport {
@@ -100,7 +79,7 @@ export interface BulkImportView extends BulkImport {
 }
 
 export interface ModelView extends Model {
-  brandName: string;
+  categoryName: string;
 }
 
 export interface DealerView extends Dealer {
@@ -122,13 +101,13 @@ export interface ChannelCount {
   count: number;
 }
 
-export interface BrandCount {
-  brandId: Brand["id"];
-  brandName: string;
+export interface CategoryCount {
+  categoryId: ProductCategory["id"];
+  categoryName: string;
   count: number;
 }
 
-/** A01 expiring-soon list: units whose warranty ends within 30 days. */
+/** A01 expiring-soon list: products whose warranty ends within 30 days. */
 export interface ExpiringUnit {
   serial: string;
   modelName: string;
@@ -138,7 +117,7 @@ export interface ExpiringUnit {
   daysRemaining: number;
 }
 
-/** A01 recent activity: the latest unit events across the system. */
+/** A01 recent activity: the latest product events across the system. */
 export interface ActivityItem extends UnitEvent {
   serial: string;
 }
@@ -148,24 +127,27 @@ export interface DealerStats {
   dealerName: string;
   registrationsThisMonth: number;
   pending: number;
-  openComplaints: number;
+  openClaims: number;
 }
 
 export type DashboardSummary =
   | {
       role: "admin";
-      /** Every unit in the Units list; equals active + expiring30 + expired + pending + voided. */
+      /** Every product in the Registered products list; equals active + expiring30 + expired + pending + voided. */
       units: number;
       active: number;
       expiring30: number;
       expired: number;
-      /** Known to the system (e.g. sold, QR label printed) but not registered yet. */
+      /** Known to the system (e.g. from an ERP invoice) but not registered yet. */
       pending: number;
       voided: number;
       openClaims: number;
-      /** Approved registrations; bulk uploads count under Dealer. */
+      /** Registrations waiting for review. */
+      pendingRegistrations: number;
+      /** Approved registrations by channel; bulk uploads count under Dealer. */
       registrationsByChannel: ChannelCount[];
-      claimsByBrand: BrandCount[];
+      claimsByStatus: { status: ClaimStatus; count: number }[];
+      claimsByCategory: CategoryCount[];
       expiringSoon: ExpiringUnit[];
       recentActivity: ActivityItem[];
     }
@@ -174,8 +156,7 @@ export type DashboardSummary =
       registrationsThisMonth: number;
       pending: number;
       rejected: number;
-      openComplaints: number;
-      claimsInProgress: number;
+      openClaims: number;
       dealers: DealerStats[];
     }
   | {
@@ -183,5 +164,27 @@ export type DashboardSummary =
       units: number;
       active: number;
       expiringSoon: number;
-      openComplaints: number;
+      openClaims: number;
     };
+
+/** Where registrations can come in (the registration hub). */
+export interface IntakeInfo {
+  /** Path of the public registration form on the web app, e.g. "/register-product". */
+  publicFormPath: string;
+  /** Mailbox that turns emailed invoices into registrations. */
+  inboundEmail: string;
+  /** Base URL of the partner API, e.g. "/api/partner/v1". */
+  partnerApiPath: string;
+}
+
+/** A partner system allowed to send registrations (admin view; the key itself is never shown again). */
+export interface PartnerClientView {
+  id: string;
+  name: string;
+  channel: Extract<RegistrationChannel, "API" | "RETAIL" | "ERP">;
+  dealerId?: string;
+  dealerName?: string;
+  keyPrefix: string;
+  active: boolean;
+  lastUsedAt?: string;
+}

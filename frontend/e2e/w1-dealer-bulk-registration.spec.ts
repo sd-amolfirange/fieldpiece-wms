@@ -1,8 +1,10 @@
 import { appUrl, expect, isoDay, resetDemoData, rolePage, test } from "./fixtures";
 
-// W1 – Dealer bulk registration (docs/demo-workflows.md). Logins: dealer CoolAir Traders, admin, customer R. Kulkarni.
+// W1 – Dealer bulk registration (docs/demo-workflows.md). Logins: dealer Lone Star Refrigeration Supply, admin.
+// The sheet has 25 rows: an unknown model (row 8), a serial that's already registered (row 14) and a missing
+// purchase date (row 20).
 
-const XLSX = "../demo-assets/coolair_sales_week38.xlsx";
+const XLSX = "../demo-assets/lonestar_sales_week38.xlsx";
 
 test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));
@@ -19,64 +21,66 @@ test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
   };
   const dealerBefore = await dealerBar();
 
-  await test.step("1. DL01 Dealer home: CoolAir sees only its own data", async () => {
+  await test.step("1. DL01 Dealer home: Lone Star sees only its own data", async () => {
     await expect(dealer.getByText("Registrations this month")).toBeVisible();
-    await expect(dealer.getByText("Claims in progress")).toBeVisible();
+    await expect(dealer.getByText("Open claims")).toBeVisible();
     const nav = dealer.getByRole("navigation", { name: "Main navigation" });
-    await expect(nav.getByRole("link", { name: "My sold units" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Models & parts" })).toHaveCount(0);
+    await expect(nav.getByRole("link", { name: "Products I sold" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Registration channels" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Product catalog" })).toHaveCount(0);
   });
 
-  await test.step("2. DL02: download the template, upload the sheet: 22 valid, 3 flagged", async () => {
+  await test.step("2. DL02: download the template, upload the sheet: 22 registered, 3 flagged", async () => {
     await dealer.goto("/registrations/bulk");
     expect((await dealer.request.get("/api/bulk-imports/template.csv")).ok()).toBe(true);
     expect((await dealer.request.get("/api/bulk-imports/template.xlsx")).ok()).toBe(true);
     await dealer.locator('input[type="file"]').setInputFiles(XLSX);
     await expect(
-      dealer.getByText(/25 rows checked: 22 registered, 2 need fixing, 1 sent to admin review/),
+      dealer.getByText(/25 rows checked: 22 registered, 2 need fixing, 1 sent to the warranty desk/),
     ).toBeVisible();
   });
 
-  await test.step("3. DL02: fix the date and the model code inline and resubmit, no re-upload", async () => {
-    await dealer.getByLabel("Model code, row 8").first().selectOption("AER-SPL15");
-    await dealer.getByLabel("Install date, row 23").first().fill(isoDay(-6));
+  await test.step("3. DL02: fix the model and the purchase date inline and resubmit, no re-upload", async () => {
+    await dealer.getByLabel("Model, row 8").first().selectOption("SC680");
+    await dealer.getByLabel("Purchase date, row 20").first().fill(isoDay(-6));
     await dealer.getByRole("button", { name: "Resubmit 2 fixed rows" }).click();
     await expect(
-      dealer.getByText(/25 rows checked: 24 registered, 0 need fixing, 1 sent to admin review/),
+      dealer.getByText(/25 rows checked: 24 registered, 0 need fixing, 1 sent to the warranty desk/),
     ).toBeVisible();
   });
 
-  await test.step("4. DL04 My sold units: new units Active with their parts", async () => {
-    await dealer.goto("/units?q=2609&pageSize=50");
+  await test.step("4. DL04 Products I sold: the new products are Active with serial and batch", async () => {
+    await dealer.goto("/units?q=2635&pageSize=50");
     const table = dealer.getByRole("table");
-    await expect(table.getByText("AER-SPL15-260901")).toBeVisible();
+    await expect(table.getByText("263510101")).toBeVisible();
     await expect(table.locator("tbody tr", { hasText: "Active" })).toHaveCount(24);
-    await dealer.goto("/units/AER-SPL15-260901");
-    await expect(dealer.getByRole("table").getByText("Compressor")).toBeVisible();
+    await expect(table.locator("tbody tr", { hasText: "263510101" })).toContainText("2635-L01");
+    await dealer.goto("/units/263510101");
+    await expect(dealer.getByText("1 year from the date of purchase")).toBeVisible();
   });
 
-  await test.step("5. A02 Registration inbox, Exceptions: only the duplicate needs a human", async () => {
+  await test.step("5. A02 Registration inbox, Duplicates: only the known serial needs a human", async () => {
     await admin.goto("/registrations");
-    await admin.getByLabel("Filter by exception").selectOption("EXCEPTION");
-    await expect(admin.getByRole("table").getByText("AER-SPL15-250301")).toBeVisible();
+    await admin.getByLabel("Filter by exception").selectOption("DUPLICATE");
+    await expect(admin.getByRole("table").getByText("252811902")).toBeVisible();
     await expect(admin.getByRole("table").locator("tbody tr")).toHaveCount(1);
   });
 
   await test.step("6. A03: compare with the existing record and reject with a reason", async () => {
-    await admin.getByRole("table").getByRole("link", { name: "AER-SPL15-250301" }).click();
+    await admin.getByRole("table").getByRole("link", { name: "252811902" }).click();
     const existing = admin.locator("section", {
       has: admin.getByRole("heading", { name: "Existing record" }),
     });
-    await expect(existing.getByText("S. Deshpande")).toBeVisible();
+    await expect(existing.getByText("James Nguyen")).toBeVisible();
     await admin.getByRole("button", { name: "Reject" }).first().click();
     await admin.getByRole("dialog").getByRole("button", { name: "Reject" }).click();
     await expect(admin.getByText(/^Rejected: /)).toBeVisible();
   });
 
-  await test.step("7. A04 Units filtered by dealer CoolAir Traders", async () => {
+  await test.step("7. A04 Registered products filtered by dealer Lone Star", async () => {
     await admin.goto("/units");
-    await admin.getByLabel("Filter by dealer").selectOption({ label: "CoolAir Traders" });
-    await expect(admin).toHaveURL(/dealerId=d-coolair/);
+    await admin.getByLabel("Filter by dealer").selectOption({ label: "Lone Star Refrigeration Supply" });
+    await expect(admin).toHaveURL(/dealerId=d-lonestar/);
     await expect(admin.getByText("31 results")).toBeVisible();
   });
 
@@ -84,10 +88,11 @@ test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
     expect(await dealerBar()).toBe(dealerBefore + 24);
   });
 
-  await test.step("9. CU02: the customer sees the new unit, with a notification", async () => {
-    const customer = await rolePage(browser, "customer", appUrl(baseURL));
-    await expect(customer.getByText("AER-SPL15-260901")).toBeVisible();
-    await customer.getByRole("button", { name: /^Notifications/ }).click();
-    await expect(customer.getByText("AER-SPL15-260901 is registered and under warranty.")).toBeVisible();
+  await test.step("9. The dealer gets a notification with the result of the upload", async () => {
+    await dealer.goto("/");
+    await dealer.getByRole("button", { name: /^Notifications/ }).click();
+    await expect(
+      dealer.getByText("lonestar_sales_week38.xlsx: 22 registered, 2 to fix, 1 sent to the warranty desk."),
+    ).toBeVisible();
   });
 });

@@ -29,7 +29,8 @@ import { formatDateTime } from "@/lib/format";
 import { useTableParams } from "@/lib/use-table-params";
 import { useBulkApprove, useRegistrations } from "../hooks";
 
-// A02 Registration inbox: one queue for every channel (dealer, portal, email, ERP, bulk), newest first.
+// A02 Registration inbox: one queue for every channel (dealer, bulk, portal, web form, email, ERP, partner API,
+// marketplace), newest first.
 
 const col = createColumnHelper<RegistrationView>();
 
@@ -66,6 +67,10 @@ export default function RegistrationsListPage() {
             <MonoId>{i.getValue()}</MonoId>
           </Link>
         ),
+      }),
+      col.accessor("batchNumber", {
+        header: t("inbox.columns.batch"),
+        cell: (i) => (i.getValue() ? <MonoId>{i.getValue()}</MonoId> : "—"),
       }),
       col.accessor("modelCode", { header: t("inbox.columns.model") }),
       col.accessor((r) => r.customer.name, {

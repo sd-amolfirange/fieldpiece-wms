@@ -119,8 +119,8 @@
     "/api/models": {
       "get": {
         "operationId": "Catalog_models",
-        "summary": "Models with their part templates",
-        "description": "A06 and every model picker.",
+        "summary": "Fieldpiece product models",
+        "description": "A06 and every model picker, with warranty term and serial/batch formats.",
         "parameters": [],
         "responses": {
           "200": {
@@ -132,14 +132,14 @@
         ]
       }
     },
-    "/api/brands": {
+    "/api/categories": {
       "get": {
-        "operationId": "Catalog_brands",
-        "summary": "Brands",
+        "operationId": "Catalog_categories",
+        "summary": "Product categories",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Brand[]"
+            "description": "ProductCategory[]"
           }
         },
         "tags": [
@@ -312,12 +312,11 @@
             "in": "query",
             "schema": {
               "enum": [
-                "CRM",
                 "ERP",
-                "FINANCE",
-                "SERVICE",
-                "OEM",
-                "EMAIL"
+                "EMAIL",
+                "PARTNER",
+                "CRM",
+                "FINANCE"
               ],
               "type": "string"
             }
@@ -361,8 +360,8 @@
     "/api/units": {
       "get": {
         "operationId": "Units_list",
-        "summary": "Units in the caller's scope",
-        "description": "A04, DL04, CU02. `q` matches serial, customer, dealer and model code. Default sort `serial`.",
+        "summary": "Registered products in the caller's scope",
+        "description": "A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. Default sort `serial`.",
         "parameters": [
           {
             "name": "dealerId",
@@ -399,7 +398,7 @@
     "/api/units/{serial}": {
       "get": {
         "operationId": "Units_get",
-        "summary": "Unit with part-wise warranty status for today",
+        "summary": "Product with its warranty status for today",
         "description": "404 if not visible.",
         "parameters": [
           {
@@ -446,10 +445,10 @@
         ]
       }
     },
-    "/api/units/{serial}/entitlement": {
+    "/api/units/{serial}/coverage": {
       "get": {
-        "operationId": "Units_entitlement",
-        "summary": "What a complaint on this unit would be entitled to today (CU04, DL06)",
+        "operationId": "Units_coverage",
+        "summary": "Whether a warranty claim on this product would be covered today",
         "parameters": [
           {
             "name": "serial",
@@ -462,7 +461,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Entitlement"
+            "description": "Coverage"
           }
         },
         "tags": [
@@ -498,8 +497,8 @@
                   "reason": {
                     "type": "string",
                     "enum": [
-                      "UNAUTHORISED_REPAIR",
-                      "MISSED_SERVICING",
+                      "UNAUTHORIZED_REPAIR",
+                      "MISUSE",
                       "PHYSICAL_DAMAGE",
                       "OTHER"
                     ]
@@ -548,10 +547,13 @@
             "schema": {
               "enum": [
                 "DEALER",
+                "BULK",
                 "PORTAL",
+                "WEB",
                 "EMAIL",
                 "ERP",
-                "BULK"
+                "API",
+                "RETAIL"
               ],
               "type": "string"
             }
@@ -581,7 +583,7 @@
       },
       "post": {
         "operationId": "Registrations_create",
-        "summary": "Register a unit (CU01, DL03)",
+        "summary": "Register a product (CU01, DL03)",
         "description": "Customer: always PENDING (needs purchaseDate and an invoice). Dealer, distributor, admin: approved at once unless the serial is already registered; other problems answer 422 with `rowErrors.<code>` field errors.",
         "parameters": [],
         "requestBody": {
@@ -594,12 +596,11 @@
                   "serial": {
                     "type": "string"
                   },
-                  "modelCode": {
+                  "batchNumber": {
                     "type": "string"
                   },
-                  "installDate": {
-                    "type": "string",
-                    "format": "date"
+                  "modelCode": {
+                    "type": "string"
                   },
                   "purchaseDate": {
                     "type": "string",
@@ -617,10 +618,17 @@
                   "city": {
                     "type": "string"
                   },
+                  "state": {
+                    "type": "string",
+                    "description": "Two-letter US state code"
+                  },
+                  "zip": {
+                    "type": "string"
+                  },
                   "invoiceNumber": {
                     "type": "string"
                   },
-                  "location": {
+                  "placeOfPurchase": {
                     "type": "string"
                   },
                   "dealerId": {
@@ -937,14 +945,38 @@
     "/api/claims": {
       "get": {
         "operationId": "Claims_list",
-        "summary": "Claims (A09, DL07)",
-        "description": "`q` matches id, serial, RMA number and brand. Dealers and distributors get their own, read-only.",
+        "summary": "Warranty claims in the caller's scope",
+        "description": "`q` matches claim id, serial, batch, model, customer and dealer. Newest first by default.",
         "parameters": [
           {
-            "name": "brandId",
+            "name": "issueType",
             "required": false,
             "in": "query",
-            "schema": {}
+            "schema": {
+              "enum": [
+                "NO_POWER",
+                "INACCURATE_READING",
+                "DISPLAY",
+                "CONNECTIVITY",
+                "LEAK_OR_PRESSURE",
+                "MECHANICAL",
+                "OTHER"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "CUSTOMER",
+                "DEALER",
+                "ADMIN"
+              ],
+              "type": "string"
+            }
           },
           {
             "name": "status",
@@ -952,11 +984,11 @@
             "in": "query",
             "schema": {
               "enum": [
-                "DRAFT",
                 "SUBMITTED",
+                "IN_REVIEW",
                 "APPROVED",
-                "PAID",
-                "REJECTED"
+                "REJECTED",
+                "CLOSED"
               ],
               "type": "string"
             }
@@ -964,7 +996,63 @@
         ],
         "responses": {
           "200": {
-            "description": "Paginated<ClaimView>"
+            "description": "Paginated<WarrantyClaimView>"
+          }
+        },
+        "tags": [
+          "claims"
+        ]
+      },
+      "post": {
+        "operationId": "Claims_create",
+        "summary": "File a warranty claim",
+        "description": "On a registered product the caller can see. The server records the coverage on the day of filing. `422` validation.issueType / validation.describeFault; `409 not_registered`; `409 claim_open`.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "unitSerial",
+                  "issueType",
+                  "description"
+                ],
+                "properties": {
+                  "unitSerial": {
+                    "type": "string"
+                  },
+                  "issueType": {
+                    "type": "string",
+                    "enum": [
+                      "NO_POWER",
+                      "INACCURATE_READING",
+                      "DISPLAY",
+                      "CONNECTIVITY",
+                      "LEAK_OR_PRESSURE",
+                      "MECHANICAL",
+                      "OTHER"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 10
+                  },
+                  "attachmentIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WarrantyClaimView"
           }
         },
         "tags": [
@@ -975,7 +1063,7 @@
     "/api/claims/counts": {
       "get": {
         "operationId": "Claims_counts",
-        "summary": "Claim counts by status (A09 tiles)",
+        "summary": "Claim counts by status (count tiles)",
         "parameters": [],
         "responses": {
           "200": {
@@ -990,7 +1078,7 @@
     "/api/claims/{id}": {
       "get": {
         "operationId": "Claims_get",
-        "summary": "Claim with the job result as evidence (A10)",
+        "summary": "Warranty claim with the product's coverage, evidence and history",
         "parameters": [
           {
             "name": "id",
@@ -1003,7 +1091,7 @@
         ],
         "responses": {
           "200": {
-            "description": "ClaimView"
+            "description": "WarrantyClaimView"
           }
         },
         "tags": [
@@ -1014,8 +1102,8 @@
     "/api/claims/{id}/transitions": {
       "post": {
         "operationId": "Claims_transition",
-        "summary": "Move a claim to its next status",
-        "description": "`submit` (needs amount > 0; rmaNumber optional) writes the OEM submission; `mark_paid` posts to Finance. `422` validation.amount / validation.reasonRequired; `409 invalid_transition`.",
+        "summary": "Move a claim to its next status (warranty desk)",
+        "description": "`start_review`; `approve` with a resolution (REPAIR, REPLACE, CREDIT; CREDIT needs creditAmount); `reject` with a reason; `close` (REPLACE needs replacementSerial; a credit is posted to Finance). `409 invalid_transition`.",
         "parameters": [
           {
             "name": "id",
@@ -1039,19 +1127,33 @@
                   "action": {
                     "type": "string",
                     "enum": [
-                      "submit",
+                      "start_review",
                       "approve",
                       "reject",
-                      "mark_paid"
+                      "close"
                     ]
                   },
-                  "rmaNumber": {
-                    "type": "string"
+                  "resolution": {
+                    "type": "string",
+                    "enum": [
+                      "REPAIR",
+                      "REPLACE",
+                      "CREDIT"
+                    ]
                   },
-                  "amount": {
+                  "creditAmount": {
                     "type": "number"
                   },
                   "reason": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replacementSerial": {
+                    "type": "string"
+                  },
+                  "replacementBatchNumber": {
                     "type": "string"
                   }
                 }
@@ -1061,7 +1163,7 @@
         },
         "responses": {
           "200": {
-            "description": "ClaimView"
+            "description": "WarrantyClaimView"
           }
         },
         "tags": [
@@ -1069,75 +1171,132 @@
         ]
       }
     },
-    "/api/complaints": {
+    "/api/intake": {
       "get": {
-        "operationId": "Complaints_list",
-        "summary": "Complaints in the caller's scope (A07, DL07, CU05)",
-        "description": "`q` matches id, serial, customer and dealer. Newest first by default.",
+        "operationId": "Intake_info",
+        "summary": "Where registrations can come in (registration hub)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "IntakeInfo"
+          }
+        },
+        "tags": [
+          "registration intake"
+        ]
+      }
+    },
+    "/api/public/models": {
+      "get": {
+        "operationId": "Intake_publicModels",
+        "summary": "Product models for the public registration form",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ModelView[]"
+          }
+        },
+        "tags": [
+          "registration intake"
+        ]
+      }
+    },
+    "/api/public/registrations": {
+      "post": {
+        "operationId": "Intake_publicRegistration",
+        "summary": "Register a product without an account (public web form)",
+        "description": "Multipart: the registration fields and `file` (proof of purchase: photo or PDF). Always reviewed by the warranty desk. Rate-limited per IP (PUBLIC_FORM_LIMIT_PER_HOUR).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`{ registrationId, status: \"PENDING\" }`"
+          },
+          "429": {
+            "description": "`rate_limited`"
+          }
+        },
+        "tags": [
+          "registration intake"
+        ]
+      }
+    },
+    "/api/partner/v1/registrations": {
+      "post": {
+        "operationId": "Intake_partnerRegistrations",
+        "summary": "Send registrations from a partner system (distributor ERP, marketplace, retailer)",
+        "description": "Authenticate with `X-Api-Key`. Body: one registration, or `{ registrations: [...] }` (up to 500). Each item: serial, batchNumber, modelCode, purchaseDate, customer { name, email, phone, city, state, zip }, invoiceNumber, placeOfPurchase. Clean items are registered at once; a serial that's already registered goes to review; others come back with row errors.",
         "parameters": [
           {
-            "name": "source",
-            "required": false,
-            "in": "query",
+            "name": "X-Api-Key",
+            "in": "header",
+            "required": true,
             "schema": {
-              "enum": [
-                "CUSTOMER",
-                "DEALER",
-                "ADMIN"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "NEW",
-                "WITH_SERVICE",
-                "RESOLVED"
-              ],
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Paginated<ComplaintView>"
+            "description": "`{ results: [{ index, serial, status, registrationId?, errors? }] }`"
+          },
+          "401": {
+            "description": "`invalid_api_key`"
           }
         },
         "tags": [
-          "complaints"
+          "registration intake"
         ]
-      },
+      }
+    },
+    "/api/inbound/email": {
       "post": {
-        "operationId": "Complaints_create",
-        "summary": "Raise a complaint (CU04, DL06)",
-        "description": "The source follows the caller's role; the server decides the entitlement. `422` validation.describeFault; `409 not_registered`; `404` for a unit outside the caller's scope.",
-        "parameters": [],
+        "operationId": "Intake_inboundEmail",
+        "summary": "Inbound registration email (mail provider webhook)",
+        "description": "Called by the mail provider for every message to INBOUND_EMAIL_ADDRESS, with `X-Inbound-Secret`. JSON: { from, to, subject, text, attachments: [{ filename, contentType, contentBase64 }] }. Off (404) until INBOUND_EMAIL_SECRET is set.",
+        "parameters": [
+          {
+            "name": "X-Inbound-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "unitSerial",
-                  "description"
-                ],
                 "properties": {
-                  "unitSerial": {
+                  "from": {
                     "type": "string"
                   },
-                  "description": {
-                    "type": "string",
-                    "minLength": 5
+                  "to": {
+                    "type": "string"
                   },
-                  "attachmentIds": {
+                  "subject": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "attachments": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string"
+                        },
+                        "contentType": {
+                          "type": "string"
+                        },
+                        "contentBase64": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
@@ -1146,44 +1305,78 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "ComplaintView"
+          "202": {
+            "description": ""
           }
         },
         "tags": [
-          "complaints"
+          "registration intake"
         ]
       }
     },
-    "/api/complaints/{id}": {
+    "/api/admin/partner-clients": {
       "get": {
-        "operationId": "Complaints_get",
-        "summary": "Complaint with entitlement, job result and claim status (A08, CU05)",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "operationId": "Intake_listPartners",
+        "summary": "Partner systems allowed to use the partner API",
+        "parameters": [],
         "responses": {
           "200": {
-            "description": "ComplaintView"
+            "description": "PartnerClientView[]"
           }
         },
         "tags": [
-          "complaints"
+          "registration intake"
+        ]
+      },
+      "post": {
+        "operationId": "Intake_createPartner",
+        "summary": "Add a partner system",
+        "description": "Returns its API key once; only a hash is kept.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "channel"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "API",
+                      "RETAIL",
+                      "ERP"
+                    ]
+                  },
+                  "dealerId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "`{ client: PartnerClientView, apiKey }`"
+          }
+        },
+        "tags": [
+          "registration intake"
         ]
       }
     },
-    "/api/complaints/{id}/send-to-service": {
-      "post": {
-        "operationId": "Complaints_sendToService",
-        "summary": "Send to the service system (A08)",
-        "description": "NEW -> WITH_SERVICE; writes the outbound service request. `409 already_sent`.",
+    "/api/admin/partner-clients/{id}": {
+      "patch": {
+        "operationId": "Intake_setPartnerActive",
+        "summary": "Turn a partner's key on or off",
         "parameters": [
           {
             "name": "id",
@@ -1194,13 +1387,31 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "active"
+                ],
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "ComplaintView"
+            "description": "PartnerClientView"
           }
         },
         "tags": [
-          "complaints"
+          "registration intake"
         ]
       }
     },
@@ -1246,7 +1457,7 @@
     "/api/simulate/reset": {
       "post": {
         "operationId": "Demo_reset",
-        "summary": "Demo only: replace all data with the seed, dated from today",
+        "summary": "Demo only: replace all data with the starting data, dated from today",
         "parameters": [],
         "responses": {
           "200": {
@@ -1261,7 +1472,7 @@
     "/api/simulate/erp-invoice": {
       "post": {
         "operationId": "Demo_erpInvoice",
-        "summary": "Demo only: an ERP sales invoice with 3 new serials (W6)",
+        "summary": "Demo only: a distributor ERP invoice with 3 new serials",
         "parameters": [],
         "responses": {
           "200": {
@@ -1276,7 +1487,7 @@
     "/api/simulate/registration-email": {
       "post": {
         "operationId": "Demo_registrationEmail",
-        "summary": "Demo only: a registration email with the invoice attached (W6)",
+        "summary": "Demo only: a registration email with the invoice attached (through the email intake)",
         "parameters": [],
         "responses": {
           "200": {
@@ -1288,83 +1499,14 @@
         ]
       }
     },
-    "/api/simulate/job-result": {
+    "/api/simulate/marketplace-order": {
       "post": {
-        "operationId": "Demo_jobResult",
-        "summary": "Demo only: the service system's job result for a WITH_SERVICE complaint (W3)",
+        "operationId": "Demo_marketplaceOrder",
+        "summary": "Demo only: two online marketplace orders (through the partner API, channel RETAIL)",
         "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "complaintId"
-                ],
-                "properties": {
-                  "complaintId": {
-                    "type": "string"
-                  },
-                  "partType": {
-                    "type": "string",
-                    "enum": [
-                      "COMPRESSOR",
-                      "PCB"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "ComplaintView"
-          }
-        },
-        "tags": [
-          "demo"
-        ]
-      }
-    },
-    "/api/simulate/oem-decision": {
-      "post": {
-        "operationId": "Demo_oemDecision",
-        "summary": "Demo only: the manufacturer's decision on a SUBMITTED claim (W3)",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "claimId",
-                  "decision"
-                ],
-                "properties": {
-                  "claimId": {
-                    "type": "string"
-                  },
-                  "decision": {
-                    "type": "string",
-                    "enum": [
-                      "APPROVED",
-                      "REJECTED"
-                    ]
-                  },
-                  "reason": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "ClaimView"
+            "description": "RegistrationView[]"
           }
         },
         "tags": [
@@ -1375,7 +1517,7 @@
   },
   "info": {
     "title": "Warranty Management API",
-    "description": "Units with part-wise warranties, registrations from every channel, complaints, service hand-off, manufacturer claims and the integration log. Contract: frontend/docs/api-contract.md.",
+    "description": "Fieldpiece product registrations from every channel (dealer, bulk, portal, web form, email, ERP, partner API, marketplace), product warranties with serial and batch numbers, warranty claims and the integration log. Contract: frontend/docs/api-contract.md.",
     "version": "0.2.0",
     "contact": {}
   },

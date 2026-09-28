@@ -1,12 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LIVE_REFRESH_MS } from "@/lib/query-client";
 import { refreshEverything } from "@/lib/refresh";
-import { claimsApi, type ClaimActionBody, type ClaimFilters } from "./api";
+import { claimsApi, type ClaimActionBody, type ClaimFilters, type NewClaim } from "./api";
 
 export const claimKeys = {
   list: (filters: ClaimFilters) => ["claims", filters] as const,
   counts: ["claims", "counts"] as const,
   detail: (id: string) => ["claim", id] as const,
+  coverage: (serial: string) => ["coverage", serial] as const,
 };
 
 export function useClaims(filters: ClaimFilters) {
@@ -35,10 +36,35 @@ export function useClaim(id: string | undefined) {
   });
 }
 
+export function useCreateClaim() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NewClaim) => claimsApi.create(body),
+    onSuccess: () => refreshEverything(qc),
+  });
+}
+
 export function useClaimAction(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: ClaimActionBody) => claimsApi.act(id, body),
     onSuccess: () => refreshEverything(qc),
+  });
+}
+
+export function useCoverage(serial: string | undefined) {
+  return useQuery({
+    queryKey: claimKeys.coverage(serial ?? ""),
+    queryFn: () => claimsApi.coverage(serial ?? ""),
+    enabled: !!serial,
+  });
+}
+
+/** Registered products the caller can file a claim on (the server scopes them to the caller). */
+export function useUnitsForClaim() {
+  return useQuery({
+    queryKey: ["units", "for-claim"],
+    queryFn: () =>
+      claimsApi.units().then((page) => page.items.filter((u) => u.warrantyEnd && !u.replacedBySerial)),
   });
 }

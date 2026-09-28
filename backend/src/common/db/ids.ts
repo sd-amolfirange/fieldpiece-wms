@@ -1,14 +1,11 @@
 import type { Db } from "../../infra/prisma/prisma.service";
 
-// Readable ids ("REG-1001", "CLM-1004"), one Postgres sequence per prefix (see the init migration). Sequences
+// Readable ids ("REG-1001", "CLM-1004"), one Postgres sequence per prefix (see the migrations). Sequences
 // never hand out the same value twice, even across concurrent transactions.
 
 export const ID_SEQUENCES = {
   REG: "id_seq_reg",
   CUS: "id_seq_cus",
-  CMP: "id_seq_cmp",
-  SR: "id_seq_sr",
-  JOB: "id_seq_job",
   CLM: "id_seq_clm",
   MSG: "id_seq_msg",
   NTF: "id_seq_ntf",
@@ -22,7 +19,6 @@ export type IdPrefix = keyof typeof ID_SEQUENCES;
 /** Counters that aren't ids. */
 export const COUNTER_SEQUENCES = {
   ERPINV: "counter_erpinv",
-  NEWPART: "counter_newpart",
 } as const;
 
 export type CounterName = keyof typeof COUNTER_SEQUENCES;

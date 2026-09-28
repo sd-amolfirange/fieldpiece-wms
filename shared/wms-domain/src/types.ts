@@ -1,5 +1,5 @@
-// Domain model for the HVAC warranty demo (docs/demo-workflows.md).
-// Package @wms/domain: shared by frontend/ and backend/demo-server/. Pure data and rules only.
+// Domain model for the Fieldpiece warranty management system.
+// Package @wms/domain: shared by frontend/, backend/ and backend/demo-server/. Pure data and rules only.
 
 /** ISO calendar date, yyyy-MM-dd. */
 export type IsoDate = string;
@@ -17,54 +17,57 @@ export const WARRANTY_STATUSES = [
 ] as const;
 export type WarrantyStatus = (typeof WARRANTY_STATUSES)[number];
 
-export const PART_TYPES = ["UNIT", "COMPRESSOR", "PCB"] as const;
-export type PartType = (typeof PART_TYPES)[number];
+// ── Catalogue ────────────────────────────────────────────────────────────────
 
-export interface Brand {
+/** Product category from the Fieldpiece catalogue, e.g. "Clamp meters". */
+export interface ProductCategory {
   id: string;
   name: string;
 }
 
-/** One line of a model template: which part, how long it's covered, and what the cover includes. */
-export interface ModelPart {
-  partType: PartType;
-  warrantyMonths: number;
-  coversParts: boolean;
-  coversLabour: boolean;
-  /** Key parts carry their own serial number. */
-  serialised: boolean;
-}
-
+/** A Fieldpiece product model, e.g. SC680 Swivel Head Wireless Clamp Meter. */
 export interface Model {
   id: string;
-  /** e.g. "AER-SPL15" */
+  /** Model number as printed on the product, e.g. "SC680". */
   code: string;
-  brandId: string;
+  categoryId: string;
   name: string;
-  capacity: string;
-  type: string;
-  parts: ModelPart[];
+  /** One-line description, e.g. "600A AC/DC swivel head clamp meter with Job Link". */
+  description: string;
+  /** Warranty from the date of purchase. */
+  warrantyMonths: number;
+  /** Regular expression every serial number of this model must match. */
+  serialPattern: string;
+  /** Regular expression every batch (production lot) number of this model must match. */
+  batchPattern: string;
 }
+
+// ── Organisation ─────────────────────────────────────────────────────────────
 
 export interface Distributor {
   id: string;
   name: string;
   city: string;
+  state: string;
 }
 
 export interface Dealer {
   id: string;
   name: string;
   city: string;
+  state: string;
   distributorId?: string;
 }
 
+/** US postal address parts kept for customers. */
 export interface Customer {
   id: string;
   name: string;
   phone: string;
   email?: string;
   city: string;
+  state: string;
+  zip: string;
 }
 
 export interface User {
@@ -77,20 +80,15 @@ export interface User {
   customerId?: string;
 }
 
-export interface UnitPart {
-  id: string;
-  partType: PartType;
-  serial?: string;
-  warrantyStart: IsoDate;
-  warrantyEnd: IsoDate;
-  coversParts: boolean;
-  coversLabour: boolean;
-  /** Set when this part was taken out; the replacement is a new UnitPart. */
-  replacedAt?: IsoDate;
-  replacedBySerial?: string;
-  /** Set on a replacement part: the serial it replaced. */
-  replacesSerial?: string;
-}
+// ── Registered products ──────────────────────────────────────────────────────
+
+export const VOID_REASONS = [
+  "UNAUTHORIZED_REPAIR",
+  "MISUSE",
+  "PHYSICAL_DAMAGE",
+  "OTHER",
+] as const;
+export type VoidReason = (typeof VOID_REASONS)[number];
 
 export interface VoidRecord {
   reason: VoidReason;
@@ -100,57 +98,67 @@ export interface VoidRecord {
   at: IsoDateTime;
 }
 
-export const VOID_REASONS = [
-  "UNAUTHORISED_REPAIR",
-  "MISSED_SERVICING",
-  "PHYSICAL_DAMAGE",
-  "OTHER",
-] as const;
-export type VoidReason = (typeof VOID_REASONS)[number];
-
 export type UnitEventType =
   | "registered"
-  | "part_replaced"
   | "voided"
-  | "complaint_raised"
-  | "claim_created"
+  | "claim_filed"
+  | "claim_closed"
+  | "replaced"
   | "note";
 
 export interface UnitEvent {
   at: IsoDateTime;
   type: UnitEventType;
   byName: string;
-  /** Free text, e.g. the unauthorised-repair note. */
+  /** Free text, e.g. a note or the replacement serial. */
   text?: string;
   /** "voided" events: why the warranty was voided. */
   reason?: VoidReason;
   refId?: string;
 }
 
+/**
+ * One physical product, identified by its serial number. Known before registration (e.g. from an ERP invoice) with
+ * no warranty dates; registration (approval) sets them.
+ */
 export interface Unit {
   serial: string;
+  /** Production lot the product was built in, printed next to the serial. */
+  batchNumber?: string;
   modelId: string;
-  brandId: string;
   dealerId?: string;
   customerId?: string;
-  /** Site or address where the unit is installed. */
-  location?: string;
-  installDate?: IsoDate;
   purchaseDate?: IsoDate;
-  /** Empty until the unit is registered (approved); the warranty starts then. */
-  parts: UnitPart[];
+  /** Where it was bought, when not from a dealer in the system (e.g. an online marketplace). */
+  placeOfPurchase?: string;
+  /** Empty until the product is registered (approved). */
+  warrantyStart?: IsoDate;
+  warrantyEnd?: IsoDate;
   void?: VoidRecord;
   registrationId?: string;
+  /** Set on a replacement product: the serial it replaced. */
+  replacesSerial?: string;
+  /** Set when this product was replaced under warranty. */
+  replacedBySerial?: string;
   attachmentIds: string[];
   history: UnitEvent[];
 }
 
+// ── Registrations ────────────────────────────────────────────────────────────
+
+/**
+ * Where a registration came from. BULK is a dealer file upload, WEB the public form on the website, PORTAL a
+ * signed-in customer, API a partner system, RETAIL an online marketplace or retailer feed.
+ */
 export const REGISTRATION_CHANNELS = [
   "DEALER",
+  "BULK",
   "PORTAL",
+  "WEB",
   "EMAIL",
   "ERP",
-  "BULK",
+  "API",
+  "RETAIL",
 ] as const;
 export type RegistrationChannel = (typeof REGISTRATION_CHANNELS)[number];
 
@@ -173,6 +181,8 @@ export interface RegistrationCustomer {
   phone?: string;
   email?: string;
   city?: string;
+  state?: string;
+  zip?: string;
 }
 
 export interface Registration {
@@ -181,107 +191,66 @@ export interface Registration {
   status: RegistrationStatus;
   flags: RegistrationFlag[];
   serial: string;
+  batchNumber?: string;
   modelCode: string;
   customer: RegistrationCustomer;
   customerId?: string;
   dealerId?: string;
-  installDate?: IsoDate;
   purchaseDate?: IsoDate;
   invoiceNumber?: string;
-  /** Site where the unit is installed. */
-  location?: string;
+  placeOfPurchase?: string;
   attachmentIds: string[];
   submittedBy: string;
   submittedByName: string;
   submittedAt: IsoDateTime;
-  /** Serial of the existing unit this one duplicates. */
+  /** Serial of the existing registered product this one duplicates. */
   duplicateOfSerial?: string;
   rejectReason?: string;
   reviewedByName?: string;
   reviewedAt?: IsoDateTime;
   /** Bulk upload this row came from. */
-  batchId?: string;
+  importId?: string;
 }
 
-export const COMPLAINT_SOURCES = ["CUSTOMER", "DEALER", "ADMIN"] as const;
-export type ComplaintSource = (typeof COMPLAINT_SOURCES)[number];
+// ── Warranty claims ──────────────────────────────────────────────────────────
 
-export const COMPLAINT_STATUSES = ["NEW", "WITH_SERVICE", "RESOLVED"] as const;
-export type ComplaintStatus = (typeof COMPLAINT_STATUSES)[number];
-
-export type Coverage = "COVERED" | "CHARGEABLE";
-
-export type EntitlementReason =
-  "VOID" | "NOT_REGISTERED" | "NOTHING_ACTIVE" | "PARTIAL" | "FULL";
-
-export interface Entitlement {
-  parts: Coverage;
-  labour: Coverage;
-  /** Part types whose parts are still covered. */
-  coveredPartTypes: PartType[];
-  /** False for void units and when nothing is covered: no manufacturer claim will be raised. */
-  claimable: boolean;
-  reason: EntitlementReason;
-}
-
-export interface ComplaintEvent {
-  at: IsoDateTime;
-  status: ComplaintStatus;
-  byName: string;
-  text?: string;
-}
-
-export interface Complaint {
-  id: string;
-  unitSerial: string;
-  source: ComplaintSource;
-  raisedBy: string;
-  raisedByName: string;
-  dealerId?: string;
-  customerId?: string;
-  description: string;
-  attachmentIds: string[];
-  status: ComplaintStatus;
-  entitlement: Entitlement;
-  serviceRequestId?: string;
-  jobResultId?: string;
-  claimId?: string;
-  createdAt: IsoDateTime;
-  history: ComplaintEvent[];
-}
-
-export interface ReplacedPart {
-  partType: PartType;
-  oldSerial?: string;
-  newSerial: string;
-}
-
-export interface JobResult {
-  id: string;
-  complaintId: string;
-  technician: string;
-  completedAt: IsoDateTime;
-  partsReplaced: ReplacedPart[];
-  photoIds: string[];
-  signOffName: string;
-  notes?: string;
-}
+export const CLAIM_SOURCES = ["CUSTOMER", "DEALER", "ADMIN"] as const;
+export type ClaimSource = (typeof CLAIM_SOURCES)[number];
 
 export const CLAIM_STATUSES = [
-  "DRAFT",
   "SUBMITTED",
+  "IN_REVIEW",
   "APPROVED",
-  "PAID",
   "REJECTED",
+  "CLOSED",
 ] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 
-export const FINANCE_POSTING_STATUSES = [
-  "NOT_POSTED",
-  "POSTED",
-  "FAILED",
+/** What the claimant reports is wrong. */
+export const ISSUE_TYPES = [
+  "NO_POWER",
+  "INACCURATE_READING",
+  "DISPLAY",
+  "CONNECTIVITY",
+  "LEAK_OR_PRESSURE",
+  "MECHANICAL",
+  "OTHER",
 ] as const;
-export type FinancePostingStatus = (typeof FINANCE_POSTING_STATUSES)[number];
+export type IssueType = (typeof ISSUE_TYPES)[number];
+
+/** How an approved claim is settled. */
+export const RESOLUTIONS = ["REPAIR", "REPLACE", "CREDIT"] as const;
+export type Resolution = (typeof RESOLUTIONS)[number];
+
+export type CoverageReason =
+  "IN_WARRANTY" | "EXPIRED" | "VOID" | "NOT_REGISTERED";
+
+/** Whether the product's warranty covers a claim on a given day. */
+export interface Coverage {
+  covered: boolean;
+  reason: CoverageReason;
+  warrantyEnd?: IsoDate;
+}
 
 export interface ClaimEvent {
   at: IsoDateTime;
@@ -290,33 +259,42 @@ export interface ClaimEvent {
   text?: string;
 }
 
-export interface Claim {
+export interface WarrantyClaim {
   id: string;
-  complaintId?: string;
   unitSerial: string;
-  brandId: string;
+  source: ClaimSource;
+  raisedBy: string;
+  raisedByName: string;
   dealerId?: string;
+  customerId?: string;
+  issueType: IssueType;
+  description: string;
+  attachmentIds: string[];
   status: ClaimStatus;
-  rmaNumber?: string;
-  amount?: number;
-  /** Evidence pulled from the job result. */
-  jobResultId?: string;
-  photoIds: string[];
-  partsReplaced: ReplacedPart[];
-  financePosting: FinancePostingStatus;
+  /** Coverage when the claim was filed (re-checked when the product is voided later). */
+  coverage: Coverage;
+  resolution?: Resolution;
+  /** Credit issued, in the account currency (CREDIT resolution). */
+  creditAmount?: number;
+  /** Serial (and batch) of the product sent as the replacement (REPLACE resolution). */
+  replacementSerial?: string;
+  replacementBatchNumber?: string;
+  decisionNote?: string;
   rejectReason?: string;
+  reviewedByName?: string;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   history: ClaimEvent[];
 }
 
+// ── Integrations, notifications, files ──────────────────────────────────────
+
 export const INTEGRATION_SYSTEMS = [
-  "CRM",
   "ERP",
-  "FINANCE",
-  "SERVICE",
-  "OEM",
   "EMAIL",
+  "PARTNER",
+  "CRM",
+  "FINANCE",
 ] as const;
 export type IntegrationSystem = (typeof INTEGRATION_SYSTEMS)[number];
 
@@ -329,7 +307,7 @@ export interface IntegrationMessage {
   id: string;
   system: IntegrationSystem;
   direction: IntegrationDirection;
-  /** e.g. "service_request", "job_result", "oem_decision", "finance_posting", "erp_invoice", "crm_update" */
+  /** e.g. "erp_invoice", "registration_email", "partner_registration", "crm_update", "credit_memo" */
   type: string;
   status: IntegrationStatus;
   payload: unknown;

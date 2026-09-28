@@ -1,22 +1,36 @@
 import { Injectable } from "@nestjs/common";
-import type { Brand, DealerView, ModelView, OrgStructure, Role } from "@wms/domain";
+import {
+  modelFormat,
+  type DealerView,
+  type ModelFormat,
+  type ModelView,
+  type OrgStructure,
+  type ProductCategory,
+  type Role,
+} from "@wms/domain";
 import type { Actor } from "../../common/auth/context";
 import { opt } from "../../common/db/dates";
 import { type Db, PrismaService } from "../../infra/prisma/prisma.service";
 import { modelInclude, toDealer, toDealerView, toModelView } from "../../domain/views";
 
-/** Product master (A06) and the distributor -> dealer hierarchy (A11). */
+/** Fieldpiece product catalogue (A06) and the distributor -> dealer hierarchy (A11). */
 @Injectable()
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async models(): Promise<ModelView[]> {
-    const rows = await this.prisma.model.findMany({ include: modelInclude, orderBy: [{ position: "asc" }, { code: "asc" }] });
+    const rows = await this.prisma.model.findMany({
+      include: modelInclude,
+      orderBy: [{ category: { position: "asc" } }, { position: "asc" }, { code: "asc" }],
+    });
     return rows.map(toModelView);
   }
 
-  brands(): Promise<Brand[]> {
-    return this.prisma.brand.findMany({ select: { id: true, name: true }, orderBy: [{ position: "asc" }, { name: "asc" }] });
+  categories(): Promise<ProductCategory[]> {
+    return this.prisma.productCategory.findMany({
+      select: { id: true, name: true },
+      orderBy: [{ position: "asc" }, { name: "asc" }],
+    });
   }
 
   /** Dealers the caller may see: admin all, distributor its dealers, dealer itself. */
@@ -43,6 +57,7 @@ export class CatalogService {
         id: d.id,
         name: d.name,
         city: d.city,
+        state: d.state,
         dealers: dealers.filter((x) => x.distributorId === d.id).map(toDealer),
       })),
       directDealers: dealers.filter((d) => !d.distributorId).map(toDealer),
@@ -59,9 +74,10 @@ export class CatalogService {
     };
   }
 
-  /** Model codes in the product master, for registration row checks. */
-  async modelCodes(db: Db = this.prisma): Promise<Set<string>> {
-    return new Set((await db.model.findMany({ select: { code: true } })).map((m) => m.code));
+  /** Model code -> its serial and batch formats, for registration row checks. */
+  async modelFormats(db: Db = this.prisma): Promise<Map<string, ModelFormat>> {
+    const rows = await db.model.findMany({ select: { code: true, serialPattern: true, batchPattern: true } });
+    return new Map(rows.map((m) => [m.code, modelFormat(m)]));
   }
 
   async dealerIds(db: Db = this.prisma): Promise<string[]> {

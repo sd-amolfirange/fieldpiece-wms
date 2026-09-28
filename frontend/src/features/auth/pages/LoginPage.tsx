@@ -100,6 +100,11 @@ export default function LoginPage() {
             {t("auth.signIn")}
           </Button>
         </form>
+        <p className="mt-4 text-center text-sm text-text-muted">
+          <Link to="/register-product" className="text-info underline underline-offset-2 hover:no-underline">
+            {t("auth.registerLink")}
+          </Link>
+        </p>
       </Card>
     </AuthLayout>
   );

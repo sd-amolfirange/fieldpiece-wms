@@ -1,55 +1,49 @@
 import type { Role } from "@/types";
 
 // UI-only permission helper. It decides what to HIDE, nothing more.
-// The demo server scopes every response and refuses every action the caller isn't allowed to take.
+// The server scopes every response and refuses every action the caller isn't allowed to take.
 
 export type Permission =
   | "registrations:inbox" // A02/A03 registration inbox and review
-  | "registrations:create" // DL03 register a unit (admin: manual add)
+  | "registrations:create" // DL03 register a product (admin: manual add)
   | "registrations:bulk" // DL02 bulk import
   | "registrations:self" // CU01 customer self-registration
+  | "registrations:hub" // registration channels (web form, email, partner API)
+  | "partners:manage" // partner API keys
   | "units:list" // A04 / DL04
   | "units:void"
   | "units:qr_label"
   | "models:manage" // A06
-  | "complaints:create"
-  | "complaints:send" // hand a complaint to the service system
-  | "claims:view"
-  | "claims:act" // submit, approve, reject, mark paid
+  | "claims:create" // file a warranty claim
+  | "claims:act" // start review, approve, reject, close
   | "admin:manage" // A11, A12
-  | "simulate:run" // A13
-  // Legacy permissions still referenced by the old claim pages until their rebuild.
-  | "claims:create"
-  | "claims:review"
-  | "claims:internal_notes";
+  | "simulate:run"; // A13
 
 const rolePermissions: Record<Role, readonly Permission[]> = {
   admin: [
     "registrations:inbox",
     "registrations:create",
     "registrations:bulk",
+    "registrations:hub",
+    "partners:manage",
     "units:list",
     "units:void",
     "units:qr_label",
     "models:manage",
-    "complaints:create",
-    "complaints:send",
-    "claims:view",
+    "claims:create",
     "claims:act",
     "admin:manage",
     "simulate:run",
-    "claims:review",
-    "claims:internal_notes",
   ],
   distributor: [
     "registrations:create",
     "registrations:bulk",
+    "registrations:hub",
     "units:list",
-    "complaints:create",
-    "claims:view",
+    "claims:create",
   ],
-  dealer: ["registrations:create", "registrations:bulk", "units:list", "complaints:create", "claims:view"],
-  customer: ["registrations:self", "complaints:create"],
+  dealer: ["registrations:create", "registrations:bulk", "registrations:hub", "units:list", "claims:create"],
+  customer: ["registrations:self", "claims:create"],
 };
 
 export function can(role: Role | undefined | null, permission: Permission): boolean {
@@ -61,5 +55,5 @@ export function hasRole(role: Role | undefined | null, allowed: readonly Role[])
   return !!role && allowed.includes(role);
 }
 
-/** Office staff see internal notes and integration details that dealers and customers never see. */
+/** Office staff see integration details that dealers and customers never see. */
 export const isStaff = (role: Role | undefined | null) => role === "admin";

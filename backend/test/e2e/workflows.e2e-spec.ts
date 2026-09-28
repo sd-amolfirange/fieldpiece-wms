@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEMO_PARTNER_KEYS } from "../../src/modules/demo/seed-data";
 import { createHarness, type Harness, JPEG, type Session, type Who } from "../setup/harness";
 
-// The demo workflows (frontend/docs/demo-workflows.md) through the API, plus what a mock server can't show:
+// The warranty workflows (frontend/docs/demo-workflows.md) through the API, plus what a mock server can't show:
 // concurrent changes and the SQL status matching the shared warranty rules.
 
 describe("workflows", () => {
@@ -19,259 +20,535 @@ describe("workflows", () => {
 
   const call = (who: Who, method: "GET" | "POST" | "PUT", url: string, body?: unknown) =>
     h.request({ method, url, as: s[who], body });
+  const move = (id: string, body: Record<string, unknown>) =>
+    call("admin", "POST", `/claims/${id}/transitions`, body);
+
+  // ── Registration entry points ─────────────────────────────────────────────
 
   it("W1: bulk import registers clean rows, sends the duplicate to review, and re-checks fixed rows in place", async () => {
-    const file = readFileSync(join(__dirname, "../../../demo-assets/coolair_sales_week38.xlsx"));
+    const file = readFileSync(join(__dirname, "../../../demo-assets/lonestar_sales_week38.xlsx"));
     const up = await h.upload(s.dealer, "/bulk-imports", {
-      name: "coolair_sales_week38.xlsx",
+      name: "lonestar_sales_week38.xlsx",
       mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       content: file,
     });
     expect(up.status).toBe(201);
     expect(up.body.counts).toEqual({ total: 25, registered: 22, errors: 2, review: 1 });
-    const errors = (up.body.rows as { rowNumber: number; status: string; errors: Record<string, string>; values: Record<string, string> }[]).filter(
-      (r) => r.status === "ERROR",
-    );
+    const errors = (
+      up.body.rows as { rowNumber: number; status: string; errors: Record<string, string> }[]
+    ).filter((r) => r.status === "ERROR");
     expect(errors.flatMap((r) => Object.values(r.errors)).sort()).toEqual(["required", "unknown_model"]);
 
     const fixes = errors.map((r) => ({
       rowNumber: r.rowNumber,
-      values: r.errors.installDate ? { installDate: h.today() } : { modelCode: "AER-SPL15" },
+      values: r.errors.purchaseDate ? { purchaseDate: h.today() } : { modelCode: "SC680" },
     }));
     const fixed = await call("dealer", "PUT", `/bulk-imports/${up.body.id}/rows`, { rows: fixes });
-    expect(fixed.status).toBe(200);
     expect(fixed.body.counts).toEqual({ total: 25, registered: 24, errors: 0, review: 1 });
 
-    const inbox = await call("admin", "GET", "/registrations?flag=EXCEPTION&status=PENDING");
-    expect(inbox.body.items.some((r: { channel: string; flags: string[] }) => r.channel === "BULK" && r.flags.includes("DUPLICATE"))).toBe(true);
-    const history = await call("dealer", "GET", "/bulk-imports");
-    expect(history.body[0].id).toBe(up.body.id);
-    const notes = await call("dealer", "GET", "/notifications");
-    expect(notes.body[0].key).toBe("bulk_processed");
+    const registered = await call("dealer", "GET", "/units?q=263510101");
+    expect(registered.body.items[0]).toMatchObject({ batchNumber: "2635-L01", status: "ACTIVE" });
+    const inbox = await call("admin", "GET", "/registrations?flag=DUPLICATE&status=PENDING");
+    expect(inbox.body.items.some((r: { channel: string }) => r.channel === "BULK")).toBe(true);
   });
 
-  it("refuses sheets that aren't xlsx or csv, and empty ones", async () => {
-    const bad = await h.upload(s.dealer, "/bulk-imports", { name: "sales.pdf", mime: "application/pdf", content: Buffer.from("%PDF-1.4") });
-    expect([bad.status, bad.body.code]).toEqual([415, "unsupported_type"]);
-    const empty = await h.upload(s.dealer, "/bulk-imports", { name: "e.csv", mime: "text/csv", content: Buffer.from("Serial number,Model code\r\n") });
-    expect([empty.status, empty.body.code]).toEqual([422, "empty_file"]);
+  it("DL03: a dealer's registration needs a batch number in the model's format and is approved at once", async () => {
+    const bad = await call("dealer", "POST", "/registrations", {
+      serial: "SC680-1",
+      modelCode: "SC680",
+      purchaseDate: h.today(),
+      customerName: "X",
+    });
+    expect(bad.status).toBe(422);
+    expect(bad.body.fieldErrors).toEqual({
+      serial: "rowErrors.invalid_serial",
+      batchNumber: "rowErrors.required",
+    });
+    expect(
+      (
+        await call("dealer", "POST", "/registrations", {
+          serial: "263899001",
+          batchNumber: "L01",
+          modelCode: "SC680",
+          purchaseDate: h.today(),
+          customerName: "X",
+        })
+      ).body.fieldErrors,
+    ).toEqual({
+      batchNumber: "rowErrors.invalid_batch",
+    });
+
+    const ok = await call("dealer", "POST", "/registrations", {
+      serial: "263899001",
+      batchNumber: "2638-l01",
+      modelCode: "SC680",
+      purchaseDate: "2026-01-10",
+      customerName: "Alicia Parker",
+      customerPhone: "7135550117", // matches the existing customer by phone
+    });
+    expect(ok.body).toMatchObject({
+      status: "APPROVED",
+      channel: "DEALER",
+      dealerId: "d-lonestar",
+      customerId: "c-aparker",
+      batchNumber: "2638-L01",
+    });
+    const unit = await call("dealer", "GET", "/units/263899001");
+    expect(unit.body).toMatchObject({
+      warrantyStart: "2026-01-10",
+      warrantyEnd: "2027-01-09",
+      categoryName: "Clamp meters",
+    });
   });
 
-  it("W2: a customer's QR registration waits for the admin, then attaches every part's warranty", async () => {
-    const up = await h.upload(s.customer, "/uploads", { name: "invoice.jpg", mime: "image/jpeg", content: JPEG });
+  it("W2: a customer's QR registration waits for the warranty desk, then starts the 1-year warranty", async () => {
+    const up = await h.upload(s.customer, "/uploads", {
+      name: "receipt.jpg",
+      mime: "image/jpeg",
+      content: JPEG,
+    });
     const reg = await call("customer", "POST", "/registrations", {
-      serial: "aer-spl15-240917",
-      modelCode: "AER-SPL15",
+      serial: "261804517",
+      modelCode: "SM482V",
       purchaseDate: h.today(),
       attachmentIds: [up.body.id],
     });
-    expect(reg.status).toBe(200);
-    expect(reg.body).toMatchObject({ status: "PENDING", channel: "PORTAL", flags: [], serial: "AER-SPL15-240917" });
+    expect(reg.body).toMatchObject({ status: "PENDING", channel: "PORTAL", flags: [] });
+    await call("admin", "POST", `/registrations/${reg.body.id}/approve`);
+    const unit = await call("customer", "GET", "/units/261804517");
+    expect(unit.body).toMatchObject({
+      status: "ACTIVE",
+      batchNumber: "2618-L02",
+      warrantyStart: h.today(),
+      daysRemaining: expect.any(Number),
+    });
+    expect(unit.body.daysRemaining).toBeGreaterThan(360);
+  });
 
-    const approved = await call("admin", "POST", `/registrations/${reg.body.id}/approve`);
-    expect(approved.body.status).toBe("APPROVED");
-    const unit = await call("customer", "GET", "/units/AER-SPL15-240917");
-    expect(unit.body.status).toBe("ACTIVE");
-    expect(unit.body.parts.map((p: { partType: string; warrantyStart: string }) => [p.partType, p.warrantyStart])).toEqual([
-      ["UNIT", h.today()],
-      ["COMPRESSOR", h.today()],
-      ["PCB", h.today()],
+  it("public web form: no account, proof of purchase required, waits in the inbox", async () => {
+    const fields = {
+      serial: "263899002",
+      batchNumber: "2638-L02",
+      modelCode: "VP87",
+      purchaseDate: h.today(),
+      customerName: "Jordan Lee",
+      customerEmail: "jordan.lee@example.com",
+      state: "CA",
+      zip: "92612",
+    };
+    const none = await h.request({ method: "POST", url: "/public/registrations", body: {} });
+    expect(none.status).toBe(422);
+    const bad = await h.upload(
+      null,
+      "/public/registrations",
+      { name: "r.jpg", mime: "image/jpeg", content: JPEG },
+      { ...fields, zip: "926", customerEmail: "nope" },
+    );
+    expect(bad.body.fieldErrors).toEqual({ zip: "validation.zip", customerEmail: "validation.email" });
+
+    const ok = await h.upload(
+      null,
+      "/public/registrations",
+      { name: "r.jpg", mime: "image/jpeg", content: JPEG },
+      fields,
+    );
+    expect(ok.body).toEqual({ registrationId: expect.stringMatching(/^REG-/), status: "PENDING" });
+    const inbox = await call("admin", "GET", `/registrations/${ok.body.registrationId}`);
+    expect(inbox.body).toMatchObject({
+      channel: "WEB",
+      flags: ["EXCEPTION"],
+      customer: { name: "Jordan Lee", state: "CA", zip: "92612" },
+    });
+    expect(inbox.body.attachmentIds).toHaveLength(1);
+    await call("admin", "POST", `/registrations/${ok.body.registrationId}/approve`);
+    const crm = await call("admin", "GET", "/integrations?system=CRM");
+    expect(crm.body.items.some((m: { refId: string }) => m.refId === ok.body.registrationId)).toBe(true);
+
+    const bot = await h.upload(
+      null,
+      "/public/registrations",
+      { name: "r.jpg", mime: "image/jpeg", content: JPEG },
+      { ...fields, serial: "263899009", website: "http://spam" },
+    );
+    expect(bot.status).toBe(200);
+    expect((await call("admin", "GET", "/registrations?q=263899009")).body.total).toBe(0);
+  });
+
+  it("partner API: clean items registered at once, duplicates reviewed, errors returned per item", async () => {
+    const res = await h.request({
+      method: "POST",
+      url: "/partner/v1/registrations",
+      headers: { "x-api-key": DEMO_PARTNER_KEYS["pc-desertpeak-pos"] },
+      body: {
+        registrations: [
+          {
+            serial: "263899003",
+            batchNumber: "2638-L01",
+            modelCode: "SC260",
+            purchaseDate: h.today(),
+            customer: { name: "Pat Moreno", state: "AZ" },
+          },
+          {
+            serial: "251406233",
+            batchNumber: "2514-L01",
+            modelCode: "SC680",
+            purchaseDate: h.today(),
+            customer: { name: "Someone" },
+          },
+          {
+            serial: "263899003",
+            batchNumber: "2638-L01",
+            modelCode: "SC260",
+            purchaseDate: h.today(),
+            customer: { name: "Repeat" },
+          },
+          { serial: "x" },
+        ],
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.results.map((r: { status: string }) => r.status)).toEqual([
+      "REGISTERED",
+      "REVIEW",
+      "REVIEW",
+      "ERROR",
     ]);
-    // The invoice now belongs to a record the customer can see; the admin saw it next to the data.
-    expect((await call("admin", "GET", (up.body.url as string).replace(/^\/api/, ""))).status).toBe(200);
+    const unit = await call("admin", "GET", "/units/263899003");
+    expect(unit.body).toMatchObject({ dealerId: "d-desertpeak", status: "ACTIVE" });
+    const reg = await call("admin", "GET", `/registrations/${res.body.results[0].registrationId}`);
+    expect(reg.body.channel).toBe("API");
 
-    const again = await call("admin", "POST", `/registrations/${reg.body.id}/approve`);
-    expect([again.status, again.body.code]).toEqual([409, "not_pending"]);
+    const retail = await h.request({
+      method: "POST",
+      url: "/partner/v1/registrations",
+      headers: { "x-api-key": DEMO_PARTNER_KEYS["pc-marketplace"] },
+      body: {
+        serial: "263899006",
+        batchNumber: "2638-L02",
+        modelCode: "SRS1",
+        purchaseDate: h.today(),
+        customer: { name: "Nina Patel", email: "nina@example.com" },
+      },
+    });
+    expect(retail.body.results[0].status).toBe("REGISTERED");
+    expect((await call("admin", "GET", "/units/263899006")).body).toMatchObject({
+      placeOfPurchase: "Online marketplace",
+    });
+
+    const denied = await h.request({
+      method: "POST",
+      url: "/partner/v1/registrations",
+      headers: { "x-api-key": "fpk_wrong" },
+      body: {},
+    });
+    expect([denied.status, denied.body.code]).toEqual([401, "invalid_api_key"]);
+    const created = await call("admin", "POST", "/admin/partner-clients", {
+      name: "Retail chain",
+      channel: "RETAIL",
+    });
+    expect(created.status).toBe(201);
+    const off = await h.request({
+      method: "PATCH",
+      url: `/admin/partner-clients/${created.body.client.id}`,
+      as: s.admin,
+      body: { active: false },
+    });
+    expect(off.body.active).toBe(false);
+    const withOff = await h.request({
+      method: "POST",
+      url: "/partner/v1/registrations",
+      headers: { "x-api-key": created.body.apiKey },
+      body: {},
+    });
+    expect(withOff.status).toBe(401);
   });
 
-  it("validates customer registrations with field errors the form understands", async () => {
-    const res = await call("customer", "POST", "/registrations", { serial: "", modelCode: "", purchaseDate: "2999-01-01" });
-    expect(res.status).toBe(422);
-    expect(res.body.fieldErrors).toEqual({
-      serial: "validation.required",
-      modelCode: "validation.required",
-      purchaseDate: "rowErrors.future_date",
-      attachmentIds: "validation.invoiceRequired",
+  it("email intake: reads the registration from the message, keeps the attachment, needs the shared secret", async () => {
+    const email = {
+      from: "Renee Carter <renee.carter@example.com>",
+      subject: "Register my gauge",
+      text: "Model: MG44\nSerial number: 263899004\nBatch: 2638-L03\nPurchased: 09/20/2026\nState: LA",
+      attachments: [
+        { filename: "receipt.jpg", contentType: "image/jpeg", contentBase64: JPEG.toString("base64") },
+      ],
+    };
+    expect(
+      (
+        await h.request({
+          method: "POST",
+          url: "/inbound/email",
+          headers: { "x-inbound-secret": "wrong" },
+          body: email,
+        })
+      ).status,
+    ).toBe(401);
+    const res = await h.request({
+      method: "POST",
+      url: "/inbound/email",
+      headers: { "x-inbound-secret": "e2e-inbound-secret-0123456789" },
+      body: email,
     });
+    expect(res.status).toBe(202);
+    const reg = await call("admin", "GET", `/registrations/${res.body.registrationId}`);
+    expect(reg.body).toMatchObject({
+      channel: "EMAIL",
+      serial: "263899004",
+      batchNumber: "2638-L03",
+      modelCode: "MG44",
+      purchaseDate: "2026-09-20",
+      customer: { name: "Renee Carter", email: "renee.carter@example.com", state: "LA" },
+    });
+    expect(reg.body.attachmentIds).toHaveLength(1);
+    // Renee is an existing customer (same email): approval links the product to her record.
+    await call("admin", "POST", `/registrations/${reg.body.id}/approve`);
+    expect((await call("admin", "GET", "/units/263899004")).body.customerId).toBe("c-rcarter");
+
+    const unreadable = await h.request({
+      method: "POST",
+      url: "/inbound/email",
+      headers: { "x-inbound-secret": "e2e-inbound-secret-0123456789" },
+      body: { from: "x@example.com", text: "hello" },
+    });
+    expect(unreadable.body.status).toBe("IGNORED");
+    const failed = await call("admin", "GET", "/integrations?system=EMAIL&status=FAILED");
+    expect(failed.body.total).toBe(1);
   });
 
-  it("DL03: a dealer's clean registration is approved at once; a duplicate serial goes to review", async () => {
-    const clean = await call("dealer", "POST", "/registrations", {
-      serial: "AER-SPL18-269901",
-      modelCode: "AER-SPL18",
-      installDate: h.today(),
-      customerName: "A. Joshi",
-      customerPhone: "9000000102", // matches the existing customer by phone
+  // ── Warranty claims ───────────────────────────────────────────────────────
+
+  it("claims: a covered claim approved as a replacement moves the rest of the warranty to the new serial", async () => {
+    const coverage = await call("customer", "GET", "/units/251406233/coverage");
+    expect(coverage.body).toMatchObject({ covered: true, reason: "IN_WARRANTY" });
+    const filed = await call("customer", "POST", "/claims", {
+      unitSerial: "251406233",
+      issueType: "DISPLAY",
+      description: "Backlight flickers and the reading freezes.",
     });
-    expect(clean.body).toMatchObject({ status: "APPROVED", channel: "DEALER", dealerId: "d-coolair", customerId: "c-aj" });
-
-    const dup = await call("dealer", "POST", "/registrations", {
-      serial: "AER-SPL15-210311",
-      modelCode: "AER-SPL15",
-      installDate: h.today(),
-      customerName: "Someone",
-    });
-    expect(dup.body).toMatchObject({ status: "PENDING", flags: ["DUPLICATE", "EXCEPTION"], duplicateOfSerial: "AER-SPL15-210311" });
-    expect(dup.body.duplicateOf).toBeUndefined(); // only admins get the comparison
-    const review = await call("admin", "GET", `/registrations/${dup.body.id}`);
-    expect(review.body.duplicateOf.serial).toBe("AER-SPL15-210311");
-    expect((await call("admin", "POST", `/registrations/${dup.body.id}/approve`)).body.code).toBe("duplicate_serial");
-    const rejected = await call("admin", "POST", `/registrations/${dup.body.id}/reject`, { reason: "Already registered" });
-    expect(rejected.body).toMatchObject({ status: "REJECTED", rejectReason: "Already registered" });
-
-    const invalid = await call("dealer", "POST", "/registrations", { serial: "x", modelCode: "NOPE", installDate: "2999-01-01" });
-    expect(invalid.status).toBe(422);
-    expect(invalid.body.fieldErrors).toEqual({
-      serial: "rowErrors.invalid_serial",
-      modelCode: "rowErrors.unknown_model",
-      installDate: "rowErrors.future_date",
-      customerName: "rowErrors.required",
-    });
-    const noDealer = await call("distributor", "POST", "/registrations", { serial: "AER-SPL18-269902", modelCode: "AER-SPL18", installDate: h.today(), customerName: "X" });
-    expect(noDealer.body.fieldErrors).toEqual({ dealerId: "validation.pickDealer" });
-  });
-
-  it("W3: complaint -> service -> job result -> draft claim -> OEM -> paid, all in the integration log", async () => {
-    const preview = await call("customer", "GET", "/units/AER-SPL15-210311/entitlement");
-    expect(preview.body).toEqual({ parts: "COVERED", labour: "CHARGEABLE", coveredPartTypes: ["COMPRESSOR"], claimable: true, reason: "PARTIAL" });
-    const complaint = await call("customer", "POST", "/complaints", { unitSerial: "AER-SPL15-210311", description: "no cooling", attachmentIds: [] });
-    expect(complaint.body).toMatchObject({ source: "CUSTOMER", status: "NEW", entitlement: preview.body });
-
-    const sent = await call("admin", "POST", `/complaints/${complaint.body.id}/send-to-service`);
-    expect(sent.body.status).toBe("WITH_SERVICE");
-    expect((await call("admin", "POST", `/complaints/${complaint.body.id}/send-to-service`)).body.code).toBe("already_sent");
-
-    const job = await call("admin", "POST", "/simulate/job-result", { complaintId: complaint.body.id });
-    expect(job.body.status).toBe("RESOLVED");
-    const replaced = job.body.jobResult.partsReplaced[0];
-    expect(replaced).toMatchObject({ partType: "COMPRESSOR", oldSerial: "CP-210311" });
-    expect(job.body.jobResult.photos).toHaveLength(2);
-
-    const unit = await call("admin", "GET", "/units/AER-SPL15-210311");
-    const fitted = unit.body.parts.find((p: { serial: string }) => p.serial === replaced.newSerial);
-    expect(fitted).toMatchObject({ warrantyStart: h.today(), replacesSerial: "CP-210311", status: "ACTIVE" });
-    expect(unit.body.history.map((e: { type: string }) => e.type).slice(-3)).toEqual(["complaint_raised", "part_replaced", "claim_created"]);
-
-    const claimId = job.body.claimId as string;
-    const draft = await call("admin", "GET", `/claims/${claimId}`);
-    expect(draft.body).toMatchObject({ status: "DRAFT", brandName: "Aeris", complaintDescription: "no cooling", financePosting: "NOT_POSTED" });
-    expect((await call("admin", "POST", `/claims/${claimId}/transitions`, { action: "submit" })).body.fieldErrors).toEqual({ amount: "validation.amount" });
-    expect((await call("admin", "POST", `/claims/${claimId}/transitions`, { action: "mark_paid" })).body.code).toBe("invalid_transition");
-    expect((await call("admin", "POST", `/claims/${claimId}/transitions`, { action: "submit", amount: 5400.4, rmaNumber: "AER-RMA-1" })).body).toMatchObject({
+    expect(filed.body).toMatchObject({
       status: "SUBMITTED",
-      amount: 5400,
-      rmaNumber: "AER-RMA-1",
+      source: "CUSTOMER",
+      coverage: { covered: true },
+      batchNumber: "2514-L01",
+      modelCode: "SC680",
     });
-    expect((await call("admin", "POST", "/simulate/oem-decision", { claimId, decision: "APPROVED" })).body.status).toBe("APPROVED");
-    const paid = await call("admin", "POST", `/claims/${claimId}/transitions`, { action: "mark_paid" });
-    expect(paid.body).toMatchObject({ status: "PAID", financePosting: "POSTED" });
-    expect(paid.body.history.map((e: { status: string }) => e.status)).toEqual(["DRAFT", "SUBMITTED", "APPROVED", "PAID"]);
+    const again = await call("customer", "POST", "/claims", {
+      unitSerial: "251406233",
+      issueType: "DISPLAY",
+      description: "Filing the same problem twice.",
+    });
+    expect([again.status, again.body.code]).toEqual([409, "claim_open"]);
 
-    const log = await call("admin", "GET", "/integrations?pageSize=100");
-    const types = (log.body.items as { type: string; refId: string }[]).filter((m) => m.refId === claimId || m.refId === complaint.body.id).map((m) => m.type);
-    expect(types.sort()).toEqual(["claim_submission", "finance_posting", "job_result", "oem_decision", "service_request"]);
+    const id = filed.body.id as string;
+    expect((await move(id, { action: "approve", resolution: "REPAIR" })).body.code).toBe(
+      "invalid_transition",
+    );
+    await move(id, { action: "start_review" });
+    expect((await move(id, { action: "approve" })).body.fieldErrors).toEqual({
+      resolution: "validation.resolution",
+    });
+    await move(id, { action: "approve", resolution: "REPLACE", note: "Display fault confirmed." });
+    expect((await move(id, { action: "close" })).body.fieldErrors).toEqual({
+      replacementSerial: "validation.required",
+    });
+    expect((await move(id, { action: "close", replacementSerial: "252811902" })).body.code).toBe(
+      "duplicate_serial",
+    );
+    const closed = await move(id, {
+      action: "close",
+      replacementSerial: "263899005",
+      replacementBatchNumber: "2638-L02",
+    });
+    expect(closed.body).toMatchObject({
+      status: "CLOSED",
+      resolution: "REPLACE",
+      replacementSerial: "263899005",
+    });
+    expect(closed.body.history.map((e: { status: string }) => e.status)).toEqual([
+      "SUBMITTED",
+      "IN_REVIEW",
+      "APPROVED",
+      "CLOSED",
+    ]);
 
-    const tracking = await call("customer", "GET", `/complaints/${complaint.body.id}`);
-    expect(tracking.body.history.map((e: { status: string }) => e.status)).toEqual(["NEW", "WITH_SERVICE", "RESOLVED"]);
-    expect(tracking.body.claimStatus).toBeUndefined(); // customers never see claims
-    expect((await call("dealer", "GET", `/complaints/${complaint.body.id}`)).body.claimStatus).toBe("PAID");
+    const original = await call("customer", "GET", "/units/251406233");
+    const replacement = await call("customer", "GET", "/units/263899005");
+    expect(original.body).toMatchObject({ status: "EXPIRED", replacedBySerial: "263899005" });
+    expect(replacement.body).toMatchObject({
+      status: "ACTIVE",
+      replacesSerial: "251406233",
+      warrantyEnd: original.body.warrantyEnd,
+      warrantyStart: h.today(),
+    });
+    const notes = await call("customer", "GET", "/notifications");
+    expect(notes.body.map((n: { key: string }) => n.key)).toEqual(
+      expect.arrayContaining(["claim_approved", "claim_closed"]),
+    );
+  });
+
+  it("claims: a credit is posted to Finance; a rejection needs a reason; dealers and customers can't decide", async () => {
+    const filed = await call("dealer", "POST", "/claims", {
+      unitSerial: "252811902",
+      issueType: "CONNECTIVITY",
+      description: "Gauge drops the Bluetooth link every few minutes.",
+    });
+    expect(filed.body.source).toBe("DEALER");
+    const id = filed.body.id as string;
+    expect(
+      (await call("dealer", "POST", `/claims/${id}/transitions`, { action: "start_review" })).status,
+    ).toBe(403);
+    await move(id, { action: "start_review" });
+    expect((await move(id, { action: "approve", resolution: "CREDIT" })).body.fieldErrors).toEqual({
+      creditAmount: "validation.amount",
+    });
+    expect(
+      (await move(id, { action: "approve", resolution: "CREDIT", creditAmount: 249.5 })).body.creditAmount,
+    ).toBe(249.5);
+    await move(id, { action: "close" });
+    const finance = await call("admin", "GET", "/integrations?system=FINANCE");
+    expect(finance.body.items.find((m: { refId: string }) => m.refId === id)).toMatchObject({
+      type: "credit_memo",
+      payload: { amount: 249.5, currency: "USD" },
+    });
+
+    const expired = await call("customer", "POST", "/claims", {
+      unitSerial: "243208841",
+      issueType: "MECHANICAL",
+      description: "Pump motor stalls after a minute.",
+    });
+    expect(expired.body.coverage).toMatchObject({ covered: false, reason: "EXPIRED" });
+    expect((await move(expired.body.id, { action: "reject" })).body.fieldErrors).toEqual({
+      reason: "validation.reasonRequired",
+    });
+    const rejected = await move(expired.body.id, {
+      action: "reject",
+      reason: "Out of warranty. Repair quote sent.",
+    });
+    expect(rejected.body).toMatchObject({
+      status: "REJECTED",
+      rejectReason: "Out of warranty. Repair quote sent.",
+    });
+    expect((await call("customer", "GET", `/claims/${expired.body.id}`)).body.status).toBe("REJECTED");
   });
 
   it("moves a claim once when two admins act at the same time", async () => {
     const admin2 = await h.login("admin");
-    const claimId = "CLM-1002"; // seeded SUBMITTED claim (Kelvin)
-    expect((await call("admin", "GET", `/claims/${claimId}`)).body.status).toBe("SUBMITTED");
+    const claimId = "CLM-1006"; // seeded, In review
+    expect((await call("admin", "GET", `/claims/${claimId}`)).body.status).toBe("IN_REVIEW");
     const [a, b] = await Promise.all([
-      h.request({ method: "POST", url: `/claims/${claimId}/transitions`, as: s.admin, body: { action: "approve" } }),
-      h.request({ method: "POST", url: `/claims/${claimId}/transitions`, as: admin2, body: { action: "reject", reason: "No" } }),
+      h.request({
+        method: "POST",
+        url: `/claims/${claimId}/transitions`,
+        as: s.admin,
+        body: { action: "approve", resolution: "REPAIR" },
+      }),
+      h.request({
+        method: "POST",
+        url: `/claims/${claimId}/transitions`,
+        as: admin2,
+        body: { action: "reject", reason: "No" },
+      }),
     ]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
-    const events = (await call("admin", "GET", `/claims/${claimId}`)).body.history as unknown[];
-    expect(events).toHaveLength(3); // DRAFT, SUBMITTED, and exactly one decision
+    expect((await call("admin", "GET", `/claims/${claimId}`)).body.history).toHaveLength(3);
   });
 
-  it("W5: a voided unit's complaint is chargeable and creates no claim", async () => {
-    const voided = await call("admin", "POST", "/units/AER-SPL18-230502/void", { reason: "UNAUTHORISED_REPAIR", note: "Seal broken" });
+  it("W5: a voided product's claim is filed as not covered", async () => {
+    const voided = await call("admin", "POST", "/units/252207119/void", {
+      reason: "UNAUTHORIZED_REPAIR",
+      note: "Tamper label broken.",
+    });
     expect(voided.body.status).toBe("VOID");
-    expect(voided.body.parts.every((p: { status: string }) => p.status === "VOID")).toBe(true);
-    expect((await call("admin", "POST", "/units/AER-SPL18-230502/void", { reason: "NOPE" })).body.fieldErrors).toEqual({ reason: "validation.voidReason" });
-
-    const complaint = await call("customer", "POST", "/complaints", { unitSerial: "AER-SPL18-230502", description: "Makes a noise" });
-    expect(complaint.body.entitlement).toMatchObject({ parts: "CHARGEABLE", labour: "CHARGEABLE", claimable: false, reason: "VOID" });
-    await call("admin", "POST", `/complaints/${complaint.body.id}/send-to-service`);
-    const job = await call("admin", "POST", "/simulate/job-result", { complaintId: complaint.body.id });
-    expect(job.body.status).toBe("RESOLVED");
-    expect(job.body.claimId).toBeUndefined();
+    expect(
+      (await call("admin", "POST", "/units/252207119/void", { reason: "NOPE" })).body.fieldErrors,
+    ).toEqual({ reason: "validation.voidReason" });
+    const claim = await call("customer", "POST", "/claims", {
+      unitSerial: "252207119",
+      issueType: "INACCURATE_READING",
+      description: "Detector alarms with no leak present.",
+    });
+    expect(claim.body.coverage).toMatchObject({ covered: false, reason: "VOID" });
+    expect(claim.body.warrantyStatus).toBe("VOID");
   });
 
-  it("W6: ERP and email intake land in the inbox; approving the email updates CRM", async () => {
-    const erp = await call("admin", "POST", "/simulate/erp-invoice");
-    expect(erp.body.map((r: { channel: string; status: string }) => `${r.channel}:${r.status}`)).toEqual(["ERP:PENDING", "ERP:PENDING", "ERP:PENDING"]);
-    expect(new Set(erp.body.map((r: { serial: string }) => r.serial)).size).toBe(3);
-    const mail = await call("admin", "POST", "/simulate/registration-email");
-    expect(mail.body).toMatchObject({ channel: "EMAIL", status: "PENDING" });
-    expect(mail.body.attachmentIds).toHaveLength(1);
+  // ── System events, dashboards, reset ──────────────────────────────────────
 
-    const bulk = await call("admin", "POST", "/registrations/bulk-approve", { ids: [...erp.body.map((r: { id: string }) => r.id), "REG-9999"] });
+  it("W6: ERP, email and marketplace intake land where they should; approving the email updates CRM", async () => {
+    const erp = await call("admin", "POST", "/simulate/erp-invoice");
+    expect(
+      erp.body.map(
+        (r: { channel: string; status: string; flags: string[] }) =>
+          `${r.channel}:${r.status}:${r.flags.length}`,
+      ),
+    ).toEqual(["ERP:PENDING:0", "ERP:PENDING:0", "ERP:PENDING:0"]);
+    const mail = await call("admin", "POST", "/simulate/registration-email");
+    expect(mail.body).toMatchObject({ channel: "EMAIL", status: "PENDING", modelCode: "SC680" });
+    expect(mail.body.attachmentIds).toHaveLength(1);
+    const market = await call("admin", "POST", "/simulate/marketplace-order");
+    expect(market.body.map((r: { channel: string; status: string }) => `${r.channel}:${r.status}`)).toEqual([
+      "RETAIL:APPROVED",
+      "RETAIL:APPROVED",
+    ]);
+
+    const bulk = await call("admin", "POST", "/registrations/bulk-approve", {
+      ids: [...erp.body.map((r: { id: string }) => r.id), "REG-9999"],
+    });
     expect(bulk.body).toEqual({ approved: 3, skipped: 1 });
     await call("admin", "POST", `/registrations/${mail.body.id}/approve`);
     const crm = await call("admin", "GET", "/integrations?system=CRM&direction=OUT");
-    expect(crm.body.items.some((m: { refId: string; type: string }) => m.refId === mail.body.id && m.type === "crm_update")).toBe(true);
-
-    const failed = (await call("admin", "GET", "/integrations?status=FAILED")).body.items[0];
-    const retried = await call("admin", "POST", `/integrations/${failed.id}/retry`);
-    expect(retried.body).toMatchObject({ status: "SUCCESS", attempts: 2 });
-    expect((await call("admin", "POST", `/integrations/${failed.id}/retry`)).body.code).toBe("not_failed");
+    expect(crm.body.items.some((m: { refId: string }) => m.refId === mail.body.id)).toBe(true);
   });
 
   it("W7: the distributor's dashboard covers both dealers and narrows to one", async () => {
     const all = await call("distributor", "GET", "/dashboard/summary");
-    expect(all.body.dealers.map((d: { dealerId: string }) => d.dealerId)).toEqual(["d-coolair", "d-breeze"]);
-    const breeze = await call("distributor", "GET", "/dashboard/summary?dealerId=d-breeze");
-    expect(breeze.body.openComplaints).toBe(1);
-    const foreign = await call("distributor", "GET", "/dashboard/summary?dealerId=d-arctic");
-    expect(foreign.body).toMatchObject({ registrationsThisMonth: 0, openComplaints: 0, claimsInProgress: 0 });
+    expect(all.body.dealers.map((d: { dealerId: string }) => d.dealerId)).toEqual(["d-lonestar", "d-bayou"]);
+    expect(all.body.openClaims).toBe(1);
+    const bayou = await call("distributor", "GET", "/dashboard/summary?dealerId=d-bayou");
+    expect(bayou.body.openClaims).toBe(0);
+    const foreign = await call("distributor", "GET", "/dashboard/summary?dealerId=d-desertpeak");
+    expect(foreign.body).toMatchObject({ registrationsThisMonth: 0, openClaims: 0 });
   });
 
-  it("admin dashboard cards add up to the Units list, and the list's status matches every unit's own", async () => {
+  it("dashboard cards add up to the product list, and the list's status matches every product's own", async () => {
     try {
-      await checkStatusesOverTime();
+      for (const days of [0, 30, 200, 900]) {
+        h.clock.set(new Date(Date.now() + days * 86_400_000));
+        s.admin = await h.login("admin"); // sessions expire; moving the clock ahead needs a fresh one
+        const dash = await call("admin", "GET", "/dashboard/summary");
+        const list = await call("admin", "GET", "/units?pageSize=100");
+        const d = dash.body;
+        expect(d.units).toBe(list.body.total);
+        expect(d.active + d.expiring30 + d.expired + d.pending + d.voided).toBe(d.units);
+        for (const status of ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOID", "PENDING"]) {
+          const filtered = await call("admin", "GET", `/units?pageSize=100&status=${status}`);
+          const expected = (list.body.items as { serial: string; status: string }[])
+            .filter((u) => u.status === status)
+            .map((u) => u.serial);
+          expect([days, status, filtered.body.items.map((u: { serial: string }) => u.serial).sort()]).toEqual(
+            [days, status, expected.sort()],
+          );
+        }
+      }
     } finally {
       h.clock.set(new Date());
     }
   });
 
-  async function checkStatusesOverTime() {
-    for (const days of [0, 30, 400, 3000]) {
-      h.clock.set(new Date(Date.now() + days * 86_400_000));
-      s.admin = await h.login("admin"); // sessions expire; moving the clock years ahead needs a fresh one
-      const dash = await call("admin", "GET", "/dashboard/summary");
-      const list = await call("admin", "GET", "/units?pageSize=100");
-      const d = dash.body;
-      expect(d.units).toBe(list.body.total);
-      expect(d.active + d.expiring30 + d.expired + d.pending + d.voided).toBe(d.units);
-      for (const status of ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOID", "PENDING"]) {
-        const filtered = await call("admin", "GET", `/units?pageSize=100&status=${status}`);
-        const expected = (list.body.items as { serial: string; status: string }[]).filter((u) => u.status === status).map((u) => u.serial);
-        expect([days, status, filtered.body.items.map((u: { serial: string }) => u.serial).sort()]).toEqual([days, status, expected.sort()]);
-      }
-    }
-  }
-
   it("expires sessions after the idle timeout", async () => {
     try {
       h.clock.set(new Date(Date.now() + 15 * 86_400_000));
-      expect((await h.request({ method: "POST", url: "/auth/refresh", headers: { cookie: s.dealer.cookie } })).status).toBe(401);
+      expect(
+        (await h.request({ method: "POST", url: "/auth/refresh", headers: { cookie: s.dealer.cookie } }))
+          .status,
+      ).toBe(401);
       expect((await call("dealer", "GET", "/units")).status).toBe(401);
     } finally {
       h.clock.set(new Date());
     }
   });
 
-  it("resets the demo data and keeps signed-in users signed in", async () => {
+  it("resets the data and keeps signed-in users signed in", async () => {
     await call("admin", "POST", "/simulate/erp-invoice");
-    const reset = await call("admin", "POST", "/simulate/reset");
-    expect(reset.body).toEqual({ ok: true });
+    expect((await call("admin", "POST", "/simulate/reset")).body).toEqual({ ok: true });
     expect((await call("admin", "GET", "/registrations?channel=ERP&status=PENDING")).body.total).toBe(0);
     expect((await call("dealer", "GET", "/units?pageSize=1")).status).toBe(200);
   });

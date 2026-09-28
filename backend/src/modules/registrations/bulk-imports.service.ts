@@ -2,8 +2,6 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
   bulkCounts,
-  hasErrors,
-  needsAdminReview,
   normalizeSerialValue,
   type BulkImportView,
   type BulkRowStatus,
@@ -20,11 +18,11 @@ import { dealerIdFor, requireRole } from "../../domain/scope";
 import { bulkImportInclude, toBulkImportView, toBulkRow } from "../../domain/views";
 import { CatalogService } from "../catalog";
 import { Notifier } from "../notifications";
-import { rowInput, rowToFields } from "./registration-input";
+import { rowInput } from "./registration-input";
 import { RegistrationsService } from "./registrations.service";
 import { readSheet, rowsFromMatrix } from "./sheets";
 
-// DL02 bulk import (api-contract §5.4): every row is checked against the product master; clean rows are registered
+// DL02 bulk import (api-contract §5.4): every row is checked against the product catalog; clean rows are registered
 // at once, a serial that's already registered goes to admin review, anything else waits for an inline fix.
 // Each row is decided in its own transaction, so a large file never holds one long transaction.
 
@@ -66,12 +64,23 @@ export class BulkImportsService {
     try {
       values = rowsFromMatrix(await readSheet(fileName, file.buffer));
     } catch {
-      throw new AppError(415, "unsupported_type", "The file couldn't be read. Use the template and try again.");
+      throw new AppError(
+        415,
+        "unsupported_type",
+        "The file couldn't be read. Use the template and try again.",
+      );
     }
-    const dealerId = dealerIdFor(ctx.user, fields.dealerId?.trim() || undefined, await this.catalog.dealerIds());
-    if (!values.length) throw new AppError(422, "empty_file", "The file has no rows. Use the template and try again.");
+    const dealerId = dealerIdFor(
+      ctx.user,
+      fields.dealerId?.trim() || undefined,
+      await this.catalog.dealerIds(),
+    );
+    if (!values.length)
+      throw new AppError(422, "empty_file", "The file has no rows. Use the template and try again.");
     if (values.length > this.env.BULK_IMPORT_MAX_ROWS) {
-      throw AppError.validation(`The file has more than ${this.env.BULK_IMPORT_MAX_ROWS} rows. Split it and try again.`);
+      throw AppError.validation(
+        `The file has more than ${this.env.BULK_IMPORT_MAX_ROWS} rows. Split it and try again.`,
+      );
     }
 
     const id = await nextId(this.prisma, "BLK");
@@ -86,12 +95,23 @@ export class BulkImportsService {
         updatedAt: ctx.now,
         rows: {
           createMany: {
-            data: values.map((v, i) => ({ rowNumber: i + 2, values: v as Prisma.InputJsonValue, errors: {}, status: "ERROR" })),
+            data: values.map((v, i) => ({
+              rowNumber: i + 2,
+              values: v as Prisma.InputJsonValue,
+              errors: {},
+              status: "ERROR",
+            })),
           },
         },
       },
     });
-    await this.processRows(ctx, id, dealerId, values.map((v, i) => ({ rowNumber: i + 2, values: v })), "REGISTERED");
+    await this.processRows(
+      ctx,
+      id,
+      dealerId,
+      values.map((v, i) => ({ rowNumber: i + 2, values: v })),
+      "REGISTERED",
+    );
     return this.get(ctx, id);
   }
 
@@ -139,41 +159,39 @@ export class BulkImportsService {
   ): Promise<void> {
     // Serials already accepted from this file (registered or sent to review) count as "seen" for duplicates.
     const others = await this.prisma.bulkImportRow.findMany({
-      where: { importId: batchId, status: { not: "ERROR" }, rowNumber: { notIn: rows.map((r) => r.rowNumber) } },
+      where: {
+        importId: batchId,
+        status: { not: "ERROR" },
+        rowNumber: { notIn: rows.map((r) => r.rowNumber) },
+      },
       select: { values: true },
     });
     const seen = new Set(others.map((r) => normalizeSerialValue((r.values as RegistrationRowInput).serial)));
 
     for (const row of rows) {
       await this.prisma.tx(async (tx) => {
-        const context = await this.registrations.rowContext(tx, ctx.today, row.values.serial, seen);
-        const errors = this.registrations.validateRow(row.values, context);
-        const fields = rowToFields(row.values);
-        const extra = { dealerId, purchaseDate: fields.installDate, batchId };
-        const by = { id: ctx.user.id, name: ctx.user.name };
-        let status: BulkRowStatus;
-        let registrationId: string | undefined;
-        if (needsAdminReview(errors)) {
-          registrationId = await this.registrations.insert(tx, { ...fields, ...extra, duplicateOfSerial: fields.serial }, "BULK", by, ctx.now);
-          await this.registrations.sendToReview(tx, registrationId, fields.serial, ["DUPLICATE", "EXCEPTION"], ctx.now);
-          status = "REVIEW";
-        } else if (hasErrors(errors)) {
-          status = "ERROR";
-        } else {
-          const customerId = await this.registrations.customerIdFor(tx, fields.customer, ctx.now);
-          registrationId = await this.registrations.insert(tx, { ...fields, ...extra, customerId }, "BULK", by, ctx.now);
-          await this.registrations.approve(tx, ctx, registrationId, "Auto-approved (dealer bulk upload)", {
+        const result = await this.registrations.registerTrusted(
+          tx,
+          ctx,
+          row.values,
+          "BULK",
+          { id: ctx.user.id, name: ctx.user.name },
+          {
+            dealerId,
+            importId: batchId,
+            seenInFile: seen,
+            reviewer: "Auto-approved (dealer bulk upload)",
             notifyDealer: false,
-          });
-          status = success;
-        }
+          },
+        );
+        const status: BulkRowStatus = result.status === "REGISTERED" ? success : result.status;
         await tx.bulkImportRow.update({
           where: { importId_rowNumber: { importId: batchId, rowNumber: row.rowNumber } },
           data: {
             values: row.values as Prisma.InputJsonValue,
-            errors: (status === "ERROR" || status === "REVIEW" ? errors : {}),
+            errors: result.status === "REGISTERED" ? {} : result.errors,
             status,
-            registrationId: registrationId ?? null,
+            registrationId: result.status === "ERROR" ? null : result.registrationId,
           },
         });
       });
@@ -187,7 +205,12 @@ export class BulkImportsService {
     });
     const counts = bulkCounts(batch.rows.map(toBulkRow));
     await this.notifier.notify(this.prisma, [ctx.user.id], "bulk_processed", ctx.now, {
-      params: { file: batch.fileName, registered: counts.registered, errors: counts.errors, review: counts.review },
+      params: {
+        file: batch.fileName,
+        registered: counts.registered,
+        errors: counts.errors,
+        review: counts.review,
+      },
       link: `/registrations/bulk?batch=${batchId}`,
     });
   }

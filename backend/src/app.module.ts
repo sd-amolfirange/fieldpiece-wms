@@ -3,7 +3,12 @@ import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AllExceptionsFilter } from "./common/errors/all-exceptions.filter";
-import { AppThrottlerGuard, throttlerOptions } from "./common/http/throttling";
+import {
+  AppThrottlerGuard,
+  InMemoryThrottlerStorage,
+  ThrottlerStorageModule,
+  throttlerOptions,
+} from "./common/http/throttling";
 import { loggerOptions } from "./common/observability/logger";
 import type { Clock } from "./common/time/clock";
 import { ConfigModule, ENV } from "./config/config.module";
@@ -15,11 +20,11 @@ import { StorageModule } from "./infra/storage/storage.module";
 import { AuthGuard, AuthModule } from "./modules/auth";
 import { CatalogModule } from "./modules/catalog";
 import { ClaimsModule } from "./modules/claims";
-import { ComplaintsModule } from "./modules/complaints";
 import { DashboardModule } from "./modules/dashboard";
 import { DemoModule } from "./modules/demo";
 import { FilesModule } from "./modules/files";
 import { HealthModule } from "./modules/health";
+import { IntakeModule } from "./modules/intake";
 import { IntegrationsModule } from "./modules/integrations";
 import { NotificationsModule } from "./modules/notifications";
 import { RegistrationsModule } from "./modules/registrations";
@@ -36,9 +41,11 @@ export class AppModule {
         PrismaModule,
         RedisModule,
         StorageModule,
+        ThrottlerStorageModule,
         ThrottlerModule.forRootAsync({
-          inject: [ENV, RedisService],
-          useFactory: (e: Env, redis: RedisService) => throttlerOptions(e, redis.client),
+          inject: [ENV, RedisService, InMemoryThrottlerStorage],
+          useFactory: (e: Env, redis: RedisService, memory: InMemoryThrottlerStorage) =>
+            throttlerOptions(e, redis.client, memory),
         }),
         HealthModule,
         AuthModule,
@@ -49,7 +56,7 @@ export class AppModule {
         UnitsModule,
         RegistrationsModule,
         ClaimsModule,
-        ComplaintsModule,
+        IntakeModule,
         DashboardModule,
         // Demo accounts and the simulator only exist when enabled (refused in production by env validation).
         ...(env.DEMO_FEATURES_ENABLED ? [DemoModule] : []),

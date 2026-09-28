@@ -8,7 +8,8 @@ import { buttonVariants, KpiTile, NativeSelect } from "@/components/ui";
 import { useDealers } from "@/features/catalog";
 import { can } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/session";
-import { ClaimsByBrandChart } from "../components/ClaimsByBrandChart";
+import { ClaimsByCategoryChart } from "../components/ClaimsByCategoryChart";
+import { ClaimsByStatusChart } from "../components/ClaimsByStatusChart";
 import { DealerComparisonCard } from "../components/DealerComparisonCard";
 import { ExpiringSoonCard } from "../components/ExpiringSoonCard";
 import { RecentActivityCard } from "../components/RecentActivityCard";
@@ -16,8 +17,8 @@ import { RegistrationsByChannelChart } from "../components/RegistrationsByChanne
 import type { DashboardSummary } from "../types";
 import { useDashboardSummary } from "../hooks";
 
-// Role home: A01 (admin) and DL01 (dealer / distributor). Customers get CU02 My units (app/pages/HomePage).
-// The demo server scopes the numbers to the signed-in account; a distributor can narrow them to one dealer.
+// Role home: A01 (admin) and DL01 (dealer / distributor). Customers get CU02 My products (app/pages/HomePage).
+// The server scopes the numbers to the signed-in account; a distributor can narrow them to one dealer.
 
 interface Tile {
   key: string;
@@ -29,7 +30,7 @@ interface Tile {
 function tiles(summary: DashboardSummary): Tile[] {
   switch (summary.role) {
     case "admin":
-      // Units counts every unit in the Units list, so the status cards always add up to it:
+      // Products counts every product in the Registered products list, so the status cards always add up to it:
       // active + expiring + expired + awaiting registration + void.
       return [
         { key: "units", value: summary.units, to: "/units" },
@@ -41,21 +42,25 @@ function tiles(summary: DashboardSummary): Tile[] {
           : []),
         ...(summary.voided ? [{ key: "voided", value: summary.voided, to: "/units?status=VOID" }] : []),
         { key: "openClaims", value: summary.openClaims, to: "/claims" },
+        {
+          key: "pendingRegistrations",
+          value: summary.pendingRegistrations,
+          to: "/registrations?status=PENDING",
+        },
       ];
     case "customer":
       return [
         { key: "myUnits", value: summary.units },
         { key: "active", value: summary.active },
         { key: "expiringSoon", value: summary.expiringSoon },
-        { key: "openComplaints", value: summary.openComplaints },
+        { key: "openClaims", value: summary.openClaims, to: "/claims" },
       ];
     default:
       return [
         { key: "registrationsThisMonth", value: summary.registrationsThisMonth, to: "/units" },
         { key: "pending", value: summary.pending },
         { key: "rejected", value: summary.rejected },
-        { key: "openComplaints", value: summary.openComplaints, to: "/complaints" },
-        { key: "claimsInProgress", value: summary.claimsInProgress, to: "/complaints" },
+        { key: "openClaims", value: summary.openClaims, to: "/claims" },
       ];
   }
 }
@@ -153,12 +158,13 @@ export default function DashboardPage() {
             <>
               <div className="grid gap-6 lg:grid-cols-2">
                 <RegistrationsByChannelChart data={summary.data.registrationsByChannel} />
-                <ClaimsByBrandChart data={summary.data.claimsByBrand} />
+                <ClaimsByStatusChart data={summary.data.claimsByStatus} />
               </div>
               <div className="grid gap-6 lg:grid-cols-2">
+                <ClaimsByCategoryChart data={summary.data.claimsByCategory} />
                 <ExpiringSoonCard units={summary.data.expiringSoon} />
-                <RecentActivityCard items={summary.data.recentActivity} />
               </div>
+              <RecentActivityCard items={summary.data.recentActivity} />
             </>
           ) : null}
           {summary.data.role === "distributor" && !dealerId ? (

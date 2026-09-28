@@ -13,11 +13,10 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/feedback";
-import { Button, Card, MonoId, Timeline, type TimelineItem } from "@/components/ui";
+import { Button, Card, MonoId, Timeline, WarrantyStatusBadge, type TimelineItem } from "@/components/ui";
 import { printQrLabel, QrCode, registerUrl } from "@/features/qr";
 import { toApiError } from "@/lib/api-error";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { useCurrentRole } from "@/lib/session";
 import { unitsApi } from "../api";
 
 function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -29,36 +28,76 @@ function Field({ label, children, className }: { label: string; children: ReactN
   );
 }
 
-/** Model, installation and ownership facts for a unit (right-hand card on A05 / DL05 / CU03). */
+/** Product, purchase and ownership facts (right-hand card on A05 / DL05 / CU03). */
 export function UnitFactsCard({ unit, showOwner = true }: { unit: UnitView; showOwner?: boolean }) {
   const { t, i18n } = useTranslation();
   return (
     <Card title={t("units.facts")}>
       <dl className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("units.fields.model")}>
+        <Field label={t("units.fields.model")} className="sm:col-span-2">
           {unit.modelName} <MonoId>{unit.modelCode}</MonoId>
+          <span className="block text-sm text-text-muted">{unit.modelDescription}</span>
         </Field>
-        <Field label={t("units.fields.brand")}>{unit.brandName}</Field>
-        <Field label={t("units.fields.capacity")}>
-          {unit.capacity} · {unit.unitType}
+        <Field label={t("units.fields.category")}>{unit.categoryName}</Field>
+        <Field label={t("units.fields.batch")}>
+          {unit.batchNumber ? <MonoId>{unit.batchNumber}</MonoId> : "—"}
         </Field>
-        <Field label={t("units.fields.installed")}>
-          {formatDate(unit.installDate, i18n.language) || "—"}
+        <Field label={t("units.fields.purchased")}>
+          {formatDate(unit.purchaseDate, i18n.language) || "—"}
         </Field>
-        <Field label={t("units.fields.location")} className="sm:col-span-2">
-          {unit.location || "—"}
+        <Field label={t("units.fields.placeOfPurchase")}>
+          {unit.placeOfPurchase ?? unit.dealerName ?? "—"}
         </Field>
         {showOwner ? <Field label={t("units.fields.customer")}>{unit.customerName ?? "—"}</Field> : null}
         <Field label={t("units.fields.dealer")}>{unit.dealerName ?? "—"}</Field>
+        {unit.replacesSerial ? (
+          <Field label={t("units.fields.replaces")}>
+            <Link to={`/units/${unit.replacesSerial}`} className="underline-offset-2 hover:underline">
+              <MonoId>{unit.replacesSerial}</MonoId>
+            </Link>
+          </Field>
+        ) : null}
+        {unit.replacedBySerial ? (
+          <Field label={t("units.fields.replacedBy")}>
+            <Link to={`/units/${unit.replacedBySerial}`} className="underline-offset-2 hover:underline">
+              <MonoId>{unit.replacedBySerial}</MonoId>
+            </Link>
+          </Field>
+        ) : null}
       </dl>
     </Card>
   );
 }
 
-/** QR label (plan 3.4): the code opens customer self-registration with serial and model filled in. */
+/** The product's warranty: term, period and days left (one warranty per product, from the date of purchase). */
+export function WarrantySummary({ unit }: { unit: UnitView }) {
+  const { t, i18n } = useTranslation();
+  if (!unit.warrantyEnd) return <p className="text-sm text-text-muted">{t("units.notRegisteredLong")}</p>;
+  const running = unit.status === "ACTIVE" || unit.status === "EXPIRING_SOON";
+  return (
+    <dl className="grid gap-4 sm:grid-cols-2">
+      <Field label={t("units.fields.status")}>
+        <WarrantyStatusBadge status={unit.status} />
+      </Field>
+      <Field label={t("units.fields.term")}>{t("units.term")}</Field>
+      <Field label={t("units.fields.starts")}>{formatDate(unit.warrantyStart, i18n.language)}</Field>
+      <Field label={t("units.fields.ends")}>{formatDate(unit.warrantyEnd, i18n.language)}</Field>
+      {running ? (
+        <Field label={t("units.fields.daysLeft")}>
+          <span className="tabular-nums">{unit.daysRemaining}</span>
+        </Field>
+      ) : null}
+      <Field label={t("units.fields.covers")} className="sm:col-span-2">
+        {t("units.covers")}
+      </Field>
+    </dl>
+  );
+}
+
+/** QR label (plan 3.4): the code opens customer self-registration with serial, model and batch filled in. */
 export function QrLabelCard({ unit }: { unit: UnitView }) {
   const { t } = useTranslation();
-  const url = registerUrl(window.location.origin, unit.serial, unit.modelCode);
+  const url = registerUrl(window.location.origin, unit.serial, unit.modelCode, unit.batchNumber);
   return (
     <Card
       title={t("units.qrLabel")}
@@ -68,7 +107,13 @@ export function QrLabelCard({ unit }: { unit: UnitView }) {
           size="sm"
           icon={Printer}
           onClick={() =>
-            printQrLabel({ url, serial: unit.serial, model: unit.modelName, title: t("units.qrLabel") })
+            printQrLabel({
+              url,
+              serial: unit.serial,
+              batchNumber: unit.batchNumber,
+              model: unit.modelName,
+              title: t("units.qrLabel"),
+            })
           }
         >
           {t("units.printLabel")}
@@ -85,6 +130,11 @@ export function QrLabelCard({ unit }: { unit: UnitView }) {
       <p className="mt-2 text-center">
         <MonoId>{unit.serial}</MonoId>
       </p>
+      {unit.batchNumber ? (
+        <p className="text-center text-sm text-text-muted">
+          {t("units.batchLine", { batch: unit.batchNumber })}
+        </p>
+      ) : null}
       <p className="text-center text-sm text-text-muted">{unit.modelName}</p>
     </Card>
   );
@@ -99,7 +149,7 @@ export function CertificateButton({
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
-  if (!unit.parts.length) return null;
+  if (!unit.warrantyEnd) return null;
   return (
     <Button
       variant={variant}
@@ -120,26 +170,21 @@ export function CertificateButton({
 
 const eventIcon = {
   registered: ShieldCheck,
-  part_replaced: ArrowRightLeft,
   voided: Ban,
-  complaint_raised: MessageSquare,
-  claim_created: ClipboardList,
+  claim_filed: MessageSquare,
+  claim_closed: ClipboardList,
+  replaced: ArrowRightLeft,
   note: FilePlus2,
 } as const;
 
-/** Service, claim and registration history of a unit, newest first. */
+/** Registration, claim and warranty history of a product, newest first. */
 export function UnitHistory({ unit }: { unit: UnitView }) {
   const { t, i18n } = useTranslation();
-  const role = useCurrentRole();
-  // Claim and complaint events link to their record for the roles that can open it.
+  // Claim events (and a replacement under a claim) link to the claim.
   const linkFor = (type: string, ref?: string) =>
-    !ref
-      ? undefined
-      : type === "claim_created" && role === "admin"
-        ? `/claims/${ref}`
-        : type === "complaint_raised" && (role === "admin" || role === "customer")
-          ? `/complaints/${ref}`
-          : undefined;
+    ref && (type === "claim_filed" || type === "claim_closed" || type === "replaced")
+      ? `/claims/${ref}`
+      : undefined;
   const items: TimelineItem[] = [...unit.history]
     .sort((a, b) => b.at.localeCompare(a.at))
     .map((e, index) => {
@@ -160,7 +205,7 @@ export function UnitHistory({ unit }: { unit: UnitView }) {
           text
         ),
         timestamp: formatDateTime(e.at, i18n.language),
-        comment: e.text,
+        comment: e.type === "claim_closed" && e.text ? t(`claims.resolution.${e.text}`) : e.text,
       };
     });
   return items.length ? (

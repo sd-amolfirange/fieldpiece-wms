@@ -1,5 +1,13 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
-import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
 import {
   REGISTRATION_CHANNELS,
   REGISTRATION_FLAGS,
@@ -44,7 +52,7 @@ export class RegistrationsController {
   @HttpCode(200)
   @Roles(...ALL)
   @ApiOperation({
-    summary: "Register a unit (CU01, DL03)",
+    summary: "Register a product (CU01, DL03)",
     description:
       "Customer: always PENDING (needs purchaseDate and an invoice). Dealer, distributor, admin: approved at once " +
       "unless the serial is already registered; other problems answer 422 with `rowErrors.<code>` field errors.",
@@ -54,15 +62,17 @@ export class RegistrationsController {
       type: "object",
       properties: {
         serial: { type: "string" },
+        batchNumber: { type: "string" },
         modelCode: { type: "string" },
-        installDate: { type: "string", format: "date" },
         purchaseDate: { type: "string", format: "date" },
         customerName: { type: "string" },
         customerPhone: { type: "string" },
         customerEmail: { type: "string" },
         city: { type: "string" },
+        state: { type: "string", description: "Two-letter US state code" },
+        zip: { type: "string" },
         invoiceNumber: { type: "string" },
-        location: { type: "string" },
+        placeOfPurchase: { type: "string" },
         dealerId: { type: "string" },
         attachmentIds: { type: "array", items: { type: "string" } },
       },
@@ -76,7 +86,10 @@ export class RegistrationsController {
   @Post("bulk-approve")
   @HttpCode(200)
   @Roles("admin")
-  @ApiOperation({ summary: "Approve several pending registrations", description: "Skips duplicates, decided rows and unknown models." })
+  @ApiOperation({
+    summary: "Approve several pending registrations",
+    description: "Skips duplicates, decided rows and unknown models.",
+  })
   @ApiBody({ schema: { type: "object", properties: { ids: { type: "array", items: { type: "string" } } } } })
   @ApiOkResponse({ description: "`{ approved, skipped }`" })
   bulkApprove(@Ctx() ctx: RequestCtx, @Body() payload: unknown) {
@@ -85,7 +98,10 @@ export class RegistrationsController {
 
   @Get(":id")
   @Roles(...ALL)
-  @ApiOperation({ summary: "Registration (A03)", description: "Includes `duplicateOf` (admins) when the serial is registered." })
+  @ApiOperation({
+    summary: "Registration (A03)",
+    description: "Includes `duplicateOf` (admins) when the serial is registered.",
+  })
   @ApiOkResponse({ description: "RegistrationView" })
   get(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<RegistrationView> {
     return this.registrations.get(ctx, id);
@@ -94,7 +110,10 @@ export class RegistrationsController {
   @Post(":id/approve")
   @HttpCode(200)
   @Roles("admin")
-  @ApiOperation({ summary: "Approve", description: "`409 duplicate_serial`, `409 not_pending`, `409 unknown_model`." })
+  @ApiOperation({
+    summary: "Approve",
+    description: "`409 duplicate_serial`, `409 not_pending`, `409 unknown_model`.",
+  })
   @ApiOkResponse({ description: "RegistrationView" })
   approve(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<RegistrationView> {
     return this.registrations.approveOne(ctx, id);
@@ -106,14 +125,21 @@ export class RegistrationsController {
   @ApiOperation({ summary: "Reject with a reason", description: "`422` validation.reasonRequired." })
   @ApiBody({ schema: { type: "object", required: ["reason"], properties: { reason: { type: "string" } } } })
   @ApiOkResponse({ description: "RegistrationView" })
-  reject(@Ctx() ctx: RequestCtx, @Param("id") id: string, @Body() payload: unknown): Promise<RegistrationView> {
+  reject(
+    @Ctx() ctx: RequestCtx,
+    @Param("id") id: string,
+    @Body() payload: unknown,
+  ): Promise<RegistrationView> {
     return this.registrations.reject(ctx, id, body(payload).reason);
   }
 
   @Post(":id/merge")
   @HttpCode(200)
   @Roles("admin")
-  @ApiOperation({ summary: "Merge a duplicate into the existing unit", description: "`409 nothing_to_merge`." })
+  @ApiOperation({
+    summary: "Merge a duplicate into the existing unit",
+    description: "`409 nothing_to_merge`.",
+  })
   @ApiOkResponse({ description: "RegistrationView" })
   merge(@Ctx() ctx: RequestCtx, @Param("id") id: string): Promise<RegistrationView> {
     return this.registrations.merge(ctx, id);
@@ -152,7 +178,8 @@ export class BulkImportsController {
   @Roles("admin", "dealer", "distributor")
   @ApiOperation({
     summary: "Upload a sheet (DL02)",
-    description: "Multipart: `file` (.xlsx or .csv, 5 MB), optional `name`, `dealerId` (distributor or admin).",
+    description:
+      "Multipart: `file` (.xlsx or .csv, 5 MB), optional `name`, `dealerId` (distributor or admin).",
   })
   @ApiConsumes("multipart/form-data")
   @ApiCreatedResponse({ description: "BulkImportView" })
@@ -186,13 +213,20 @@ export class BulkImportsController {
       properties: {
         rows: {
           type: "array",
-          items: { type: "object", properties: { rowNumber: { type: "integer" }, values: { type: "object" } } },
+          items: {
+            type: "object",
+            properties: { rowNumber: { type: "integer" }, values: { type: "object" } },
+          },
         },
       },
     },
   })
   @ApiOkResponse({ description: "BulkImportView" })
-  resubmit(@Ctx() ctx: RequestCtx, @Param("id") id: string, @Body() payload: unknown): Promise<BulkImportView> {
+  resubmit(
+    @Ctx() ctx: RequestCtx,
+    @Param("id") id: string,
+    @Body() payload: unknown,
+  ): Promise<BulkImportView> {
     return this.bulk.resubmit(ctx, id, body(payload).rows);
   }
 }

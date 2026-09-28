@@ -30,7 +30,8 @@ export class FilesController {
   @HttpCode(201)
   @ApiOperation({
     summary: "Upload a file",
-    description: "Multipart: `file`, optional `name`. Photos, videos and PDF; 15 MB by default (UPLOAD_MAX_BYTES).",
+    description:
+      "Multipart: `file`, optional `name`. Photos, videos and PDF; 15 MB by default (UPLOAD_MAX_BYTES).",
   })
   @ApiConsumes("multipart/form-data")
   @ApiCreatedResponse({ description: "Attachment" })
@@ -50,11 +51,7 @@ export class FilesController {
       "token or the session cookie (for <img src> and plain links).",
   })
   @ApiOkResponse({ description: "The file, `Content-Disposition: inline`" })
-  async download(
-    @Ctx() ctx: RequestCtx,
-    @Param("id") id: string,
-    @Res() reply: FastifyReply,
-  ): Promise<void> {
+  async download(@Ctx() ctx: RequestCtx, @Param("id") id: string, @Res() reply: FastifyReply): Promise<void> {
     const { attachment, stream } = await this.files.open(ctx.user, id);
     fileHeaders(reply, attachment.mime, contentDisposition("inline", attachment.name), this.env.CORS_ORIGINS);
     await reply.send(stream);

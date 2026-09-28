@@ -31,7 +31,7 @@ export function GlobalSearch() {
     const q = query.trim();
     if (!q) return;
     if (/^CLM-/i.test(q)) navigate(`/claims/${encodeURIComponent(q.toUpperCase())}`);
-    else if (/^RMA-/i.test(q)) navigate(`/rma/${encodeURIComponent(q.toUpperCase())}`);
+    else if (/^\d{9}$/.test(q)) navigate(`/units/${q}`);
     else navigate(`/claims?q=${encodeURIComponent(q)}`);
   };
 

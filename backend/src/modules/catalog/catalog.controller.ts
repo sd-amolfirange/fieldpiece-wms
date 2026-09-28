@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import type { Brand, DealerView, ModelView, OrgStructure } from "@wms/domain";
+import type { DealerView, ModelView, OrgStructure, ProductCategory } from "@wms/domain";
 import type { Ctx as RequestCtx } from "../../common/auth/context";
 import { Ctx, Roles } from "../../common/auth/decorators";
 import { CatalogService } from "./catalog.service";
@@ -12,23 +12,29 @@ export class CatalogController {
 
   @Get("models")
   @Roles("admin", "dealer", "distributor", "customer")
-  @ApiOperation({ summary: "Models with their part templates", description: "A06 and every model picker." })
+  @ApiOperation({
+    summary: "Fieldpiece product models",
+    description: "A06 and every model picker, with warranty term and serial/batch formats.",
+  })
   @ApiOkResponse({ description: "ModelView[]" })
   models(): Promise<ModelView[]> {
     return this.catalog.models();
   }
 
-  @Get("brands")
+  @Get("categories")
   @Roles("admin", "dealer", "distributor", "customer")
-  @ApiOperation({ summary: "Brands" })
-  @ApiOkResponse({ description: "Brand[]" })
-  brands(): Promise<Brand[]> {
-    return this.catalog.brands();
+  @ApiOperation({ summary: "Product categories" })
+  @ApiOkResponse({ description: "ProductCategory[]" })
+  categories(): Promise<ProductCategory[]> {
+    return this.catalog.categories();
   }
 
   @Get("dealers")
   @Roles("admin", "dealer", "distributor")
-  @ApiOperation({ summary: "Dealers the caller may see", description: "Admin: all; distributor: its dealers; dealer: itself." })
+  @ApiOperation({
+    summary: "Dealers the caller may see",
+    description: "Admin: all; distributor: its dealers; dealer: itself.",
+  })
   @ApiOkResponse({ description: "DealerView[]" })
   dealers(@Ctx() ctx: RequestCtx): Promise<DealerView[]> {
     return this.catalog.dealers(ctx.user);

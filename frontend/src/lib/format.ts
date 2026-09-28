@@ -1,7 +1,7 @@
 import { format, isValid, parseISO } from "date-fns";
 import { enUS, es, fr } from "date-fns/locale";
 
-// UI formatting rules (Section 3.6). Dates show as "23 Sep 2026"; API payloads stay ISO 8601.
+// UI formatting rules (Section 3.6). Dates show in the US style, "Sep 23, 2026"; API payloads stay ISO 8601.
 
 const dateLocales = { en: enUS, es, fr } as const;
 type AppLanguage = keyof typeof dateLocales;
@@ -19,14 +19,14 @@ export function formatDate(value: string | Date | null | undefined, lang = "en")
   if (!value) return "";
   const date = toDate(value);
   if (!isValid(date)) return "";
-  return format(date, "d MMM yyyy", { locale: dateLocale(lang) });
+  return format(date, "PP", { locale: dateLocale(lang) });
 }
 
 export function formatDateTime(value: string | Date | null | undefined, lang = "en"): string {
   if (!value) return "";
   const date = toDate(value);
   if (!isValid(date)) return "";
-  return format(date, "d MMM yyyy, HH:mm", { locale: dateLocale(lang) });
+  return format(date, "PP, p", { locale: dateLocale(lang) });
 }
 
 /** ISO date (yyyy-MM-dd) for API payloads and <input type="date">. */
@@ -56,9 +56,6 @@ function padId(prefix: string, id: string | number): string {
 
 /** CLM-000123. Always render in the mono font. */
 export const formatClaimId = (id: string | number) => padId("CLM", id);
-
-/** RMA-000045. Always render in the mono font. */
-export const formatRmaId = (id: string | number) => padId("RMA", id);
 
 /** Serial numbers: trimmed, uppercased, inner whitespace removed. */
 export function normalizeSerial(value: string): string {

@@ -27,13 +27,12 @@ export const ERROR_CODES = [
   // units
   "already_void",
   "not_registered",
-  // complaints and service
-  "already_sent",
-  "not_with_service",
-  "no_such_part",
-  // claims and integrations
+  // warranty claims and integrations
+  "claim_open",
   "invalid_transition",
   "not_failed",
+  // partner API
+  "invalid_api_key",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

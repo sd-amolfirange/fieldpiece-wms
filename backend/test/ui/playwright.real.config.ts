@@ -17,7 +17,8 @@ const apiEnv = {
   NODE_ENV: "test",
   PORT: String(API_PORT),
   DATABASE_URL: process.env.TEST_DATABASE_URL ?? "postgresql://wms_app:localdev@localhost:5433/wms_hvac_test",
-  DATABASE_MIGRATION_URL: process.env.TEST_DATABASE_OWNER_URL ?? "postgresql://wms_owner:localdev@localhost:5433/wms_hvac_test",
+  DATABASE_MIGRATION_URL:
+    process.env.TEST_DATABASE_OWNER_URL ?? "postgresql://wms_owner:localdev@localhost:5433/wms_hvac_test",
   REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/2",
   STORAGE_DRIVER: "local",
   STORAGE_LOCAL_DIR: "var/storage-ui-tests",
@@ -35,7 +36,9 @@ export default {
   timeout: 120_000,
   expect: { timeout: 15_000 },
   retries: 0,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never", outputFolder: join(backend, "test-results", "ui-report") }]] : "list",
+  reporter: process.env.CI
+    ? [["github"], ["html", { open: "never", outputFolder: join(backend, "test-results", "ui-report") }]]
+    : "list",
   outputDir: join(backend, "test-results", "ui"),
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,

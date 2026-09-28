@@ -1,23 +1,25 @@
 import PDFDocument from "pdfkit";
 import type { UnitView } from "@wms/domain";
 
-// Warranty certificate PDF (A05, DL05, CU03), generated from the unit's current data on every download, so it
-// always shows replacements and voids. Readable on a phone.
-
-const PART_NAMES: Record<string, string> = { UNIT: "Unit", COMPRESSOR: "Compressor", PCB: "PCB" };
+// Warranty certificate PDF (A05, DL05, CU03), generated from the product's current data on every download, so it
+// always shows a void or a replacement. Readable on a phone.
 
 const longDate = (iso?: string) =>
   iso
-    ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
-        day: "numeric",
+    ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
         month: "short",
+        day: "numeric",
         year: "numeric",
         timeZone: "UTC",
       })
     : "-";
 
 export function certificatePdf(unit: UnitView): Promise<Buffer> {
-  const doc = new PDFDocument({ size: "A4", margin: 56, info: { Title: `Warranty certificate ${unit.serial}` } });
+  const doc = new PDFDocument({
+    size: "LETTER",
+    margin: 56,
+    info: { Title: `Warranty certificate ${unit.serial}` },
+  });
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -26,47 +28,38 @@ export function certificatePdf(unit: UnitView): Promise<Buffer> {
   });
 
   doc.fontSize(22).font("Helvetica-Bold").text("Warranty certificate");
-  doc.moveDown(0.3).fontSize(11).font("Helvetica").fillColor("#555555").text(`${unit.brandName} · ${unit.modelName}`);
+  doc
+    .moveDown(0.3)
+    .fontSize(11)
+    .font("Helvetica")
+    .fillColor("#555555")
+    .text(`Fieldpiece ${unit.modelCode} · ${unit.modelName}`);
   doc.moveDown(1).fillColor("#000000");
 
   const row = (label: string, value: string) => {
     doc.font("Helvetica-Bold").text(`${label}: `, { continued: true }).font("Helvetica").text(value);
   };
   row("Serial number", unit.serial);
-  row("Model", `${unit.modelCode} (${unit.capacity} ${unit.unitType})`);
+  row("Batch number", unit.batchNumber ?? "-");
+  row("Product", `${unit.modelCode}, ${unit.modelDescription}`);
   row("Owner", unit.customerName ?? "-");
-  row("Installed", `${longDate(unit.installDate)}${unit.location ? `, ${unit.location}` : ""}`);
-  row("Sold by", unit.dealerName ?? "-");
+  row(
+    "Purchased",
+    `${longDate(unit.purchaseDate)}${unit.dealerName ? ` from ${unit.dealerName}` : unit.placeOfPurchase ? ` from ${unit.placeOfPurchase}` : ""}`,
+  );
+  row("Warranty", `${longDate(unit.warrantyStart)} to ${longDate(unit.warrantyEnd)}`);
+  if (unit.replacesSerial) row("Replaces", unit.replacesSerial);
+  if (unit.replacedBySerial) row("Status", `Replaced by ${unit.replacedBySerial}`);
   if (unit.void) row("Status", `VOID (${unit.void.reason.replace(/_/g, " ").toLowerCase()})`);
 
-  doc.moveDown(1).font("Helvetica-Bold").fontSize(13).text("Part-wise warranty");
-  doc.moveDown(0.4).fontSize(10);
-  const cols = [56, 170, 290, 380, 470];
-  const header = ["Part", "Serial", "Starts", "Ends", "Covers"];
-  let y = doc.y;
-  header.forEach((h, i) => doc.font("Helvetica-Bold").text(h, cols[i], y));
-  y += 18;
-  for (const part of unit.parts.filter((p) => !p.replacedAt)) {
-    const cells = [
-      PART_NAMES[part.partType] ?? part.partType,
-      part.serial ?? "-",
-      longDate(part.warrantyStart),
-      longDate(part.warrantyEnd),
-      part.coversLabour ? "Parts and labour" : "Parts",
-    ];
-    cells.forEach((c, i) =>
-      doc.font("Helvetica").text(c, cols[i], y, { width: (cols[i + 1] ?? 540) - (cols[i] ?? 0) - 6 }),
-    );
-    y += 18;
-  }
-  doc.x = 56;
-  doc.y = y + 16;
+  doc.moveDown(1.5);
   doc
     .fontSize(9)
     .fillColor("#555555")
     .text(
-      "Each part is covered from its start date until its end date, inclusive. A replaced part gets a new warranty " +
-        "from the replacement date. Warranty is void after unauthorised repair or missed servicing.",
+      "This product is covered against defects in materials and workmanship from the purchase date until the end " +
+        "date above, inclusive. The warranty is void after misuse, alteration or repair by anyone other than an " +
+        "authorized service center. A replacement product carries the rest of the original warranty.",
       { width: 480 },
     );
   doc.end();

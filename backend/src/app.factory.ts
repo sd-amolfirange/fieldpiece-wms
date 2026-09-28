@@ -30,12 +30,22 @@ export async function createApp(env: Env, options: { clock?: Clock; logs?: boole
     },
   });
 
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule.forRoot(env, options.clock), adapter, {
-    bufferLogs: true,
-  });
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule.forRoot(env, options.clock),
+    adapter,
+    {
+      bufferLogs: true,
+    },
+  );
   if (options.logs !== false) app.useLogger(app.get(Logger));
 
   const fastify = app.getHttpAdapter().getInstance();
+  // Inbound registration emails carry their attachments base64-encoded in the JSON body: allow up to the upload limit
+  // (times 4/3 for base64, and a few attachments) on that route only.
+  const inboundEmailRoute = `/${env.API_PREFIX}/inbound/email`;
+  fastify.addHook("onRoute", (route) => {
+    if (route.url === inboundEmailRoute) route.bodyLimit = Math.ceil(env.UPLOAD_MAX_BYTES * 1.4) * 3;
+  });
   fastify.addHook("onSend", async (request, reply) => {
     void reply.header("X-Request-Id", request.id);
   });
@@ -78,8 +88,9 @@ export async function createApp(env: Env, options: { clock?: Clock; logs?: boole
     const config = new DocumentBuilder()
       .setTitle("Warranty Management API")
       .setDescription(
-        "Units with part-wise warranties, registrations from every channel, complaints, service hand-off, " +
-          "manufacturer claims and the integration log. Contract: frontend/docs/api-contract.md.",
+        "Fieldpiece product registrations from every channel (dealer, bulk, portal, web form, email, ERP, partner " +
+          "API, marketplace), product warranties with serial and batch numbers, warranty claims and the integration " +
+          "log. Contract: frontend/docs/api-contract.md.",
       )
       .setVersion(process.env.npm_package_version ?? "0.2.0")
       .addBearerAuth({ type: "http", scheme: "bearer", bearerFormat: "JWT" })

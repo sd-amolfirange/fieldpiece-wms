@@ -6,7 +6,15 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { LIVE_REFRESH_MS } from "@/lib/query-client";
-import { bulkImportsApi, registrationsApi, type NewRegistration, type RegistrationFilters } from "./api";
+import {
+  bulkImportsApi,
+  intakeApi,
+  registrationsApi,
+  type NewPartnerClient,
+  type NewRegistration,
+  type PublicRegistration,
+  type RegistrationFilters,
+} from "./api";
 
 export const registrationKeys = {
   all: ["registrations"] as const,
@@ -14,6 +22,9 @@ export const registrationKeys = {
   detail: (id: string) => ["registration", id] as const,
   bulk: ["bulk-imports"] as const,
   bulkDetail: (id: string) => ["bulk-import", id] as const,
+  intake: ["intake"] as const,
+  publicModels: ["public", "models"] as const,
+  partners: ["partner-clients"] as const,
 };
 
 /** A registration decision changes units, counts and the dashboard, so refresh all of them. */
@@ -96,5 +107,45 @@ export function useResubmitBulk(id: string) {
       qc.setQueryData(registrationKeys.bulkDetail(batch.id), batch);
       return refreshAfterChange(qc);
     },
+  });
+}
+
+export function useIntakeInfo() {
+  return useQuery({ queryKey: registrationKeys.intake, queryFn: intakeApi.info, staleTime: 5 * 60_000 });
+}
+
+/** The product catalog for the public form (no sign-in). */
+export function usePublicModels() {
+  return useQuery({
+    queryKey: registrationKeys.publicModels,
+    queryFn: intakeApi.publicModels,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function usePublicRegister() {
+  return useMutation({
+    mutationFn: ({ fields, proof }: { fields: PublicRegistration; proof: File }) =>
+      intakeApi.publicRegister(fields, proof),
+  });
+}
+
+export function usePartnerClients({ enabled }: { enabled: boolean }) {
+  return useQuery({ queryKey: registrationKeys.partners, queryFn: intakeApi.partnerClients, enabled });
+}
+
+export function useCreatePartnerClient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NewPartnerClient) => intakeApi.createPartnerClient(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: registrationKeys.partners }),
+  });
+}
+
+export function useSetPartnerActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => intakeApi.setPartnerActive(id, active),
+    onSuccess: () => qc.invalidateQueries({ queryKey: registrationKeys.partners }),
   });
 }

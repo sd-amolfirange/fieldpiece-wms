@@ -9,7 +9,12 @@ export function isoDateIn(timeZone: string, instant: Date): IsoDate {
   let formatter = formatters.get(timeZone);
   if (!formatter) {
     // en-CA formats as yyyy-MM-dd.
-    formatter = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
     formatters.set(timeZone, formatter);
   }
   return formatter.format(instant);

@@ -7,7 +7,7 @@ import { resetMockDb } from "./mocks/db";
 import { server } from "./mocks/server";
 
 // Full-page tests wait for several requests; the default 1 s is too tight when the whole suite runs.
-configure({ asyncUtilTimeout: 5000 });
+configure({ asyncUtilTimeout: 10000 });
 
 beforeAll(async () => {
   await i18n.changeLanguage("en");

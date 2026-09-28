@@ -5,7 +5,7 @@ import { AppError } from "../common/errors/app-error";
 // - admin: everything
 // - distributor: rows of every dealer linked to it
 // - dealer: only its own rows
-// - customer: only rows that belong to them, and never claims or integration messages
+// - customer: only rows that belong to them (their products, registrations and claims), never integration messages
 // A row outside the caller's scope answers 404, never 403, so ids can't be probed.
 
 export interface ScopedRow {
@@ -21,7 +21,6 @@ export function canSee(user: Actor, row: ScopedRow): boolean {
 }
 
 /** Claims: customers never see them; dealers and distributors see their own, read-only. */
-export const canSeeClaim = (user: Actor, row: ScopedRow) => user.role !== "customer" && canSee(user, row);
 
 /** Prisma `where` fragment for tables with dealer_id / customer_id columns. Same rules as `canSee`. */
 export function scopeWhere(user: Actor): { dealerId?: { in: string[] }; customerId?: string } {
@@ -32,7 +31,11 @@ export function scopeWhere(user: Actor): { dealerId?: { in: string[] }; customer
 }
 
 /** Dealer the caller may act for: a dealer's own; a distributor or admin must pick one they can see. */
-export function dealerIdFor(user: Actor, requested: string | undefined, knownDealerIds: readonly string[]): string {
+export function dealerIdFor(
+  user: Actor,
+  requested: string | undefined,
+  knownDealerIds: readonly string[],
+): string {
   if (user.role === "dealer" && user.dealerId) return user.dealerId;
   const allowed = user.visibleDealerIds;
   const ok =

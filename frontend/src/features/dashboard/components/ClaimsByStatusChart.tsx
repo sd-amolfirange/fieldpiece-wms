@@ -2,24 +2,16 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, Card } from "@/components/ui";
-import type { ClaimStatus } from "@/types";
+import type { ClaimStatus } from "@wms/domain";
 
 // Section 8.2: status charts use the status colours; axes/gridlines ink-200; labels text-xs ink-500.
 // Every chart has a "View data" table alternative (Sections 8.7 and 10).
 
 const statusColor: Record<ClaimStatus, string> = {
-  DRAFT: "var(--ink-400)",
   SUBMITTED: "var(--info)",
   IN_REVIEW: "var(--info)",
-  NEEDS_INFO: "var(--warning)",
   APPROVED: "var(--success)",
   REJECTED: "var(--danger)",
-  RMA_ISSUED: "var(--brand-500)",
-  IN_TRANSIT: "var(--info)",
-  RECEIVED: "var(--info)",
-  REPAIRED: "var(--success)",
-  REPLACED: "var(--success)",
-  CREDITED: "var(--success)",
   CLOSED: "var(--ink-400)",
 };
 

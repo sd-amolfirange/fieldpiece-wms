@@ -26,7 +26,9 @@ export async function readMultipart(
   if (!request.isMultipart()) return { fields: {} };
   const form: MultipartForm = { fields: {} };
   try {
-    for await (const part of request.parts({ limits: { fileSize: maxBytes, files: 1, fields: 20, fieldSize: 10_000 } })) {
+    for await (const part of request.parts({
+      limits: { fileSize: maxBytes, files: 1, fields: 20, fieldSize: 10_000 },
+    })) {
       if (part.type === "file") {
         const buffer = await part.toBuffer();
         if (part.fieldname === "file" && !form.file) {

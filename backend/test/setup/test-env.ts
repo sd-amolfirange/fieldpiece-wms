@@ -17,6 +17,8 @@ export function testEnv(overrides: Partial<Record<string, string>> = {}): Env {
     STORAGE_LOCAL_DIR: "var/storage-e2e",
     DEMO_FEATURES_ENABLED: "true",
     AUTH_LOGIN_LIMIT_PER_MINUTE: "1000",
+    PUBLIC_FORM_LIMIT_PER_HOUR: "1000",
+    INBOUND_EMAIL_SECRET: "e2e-inbound-secret-0123456789",
     LOG_LEVEL: "error",
     ...overrides,
   });

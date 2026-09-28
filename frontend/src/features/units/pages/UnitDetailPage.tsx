@@ -1,19 +1,25 @@
-import { Ban, MessageSquarePlus, Wrench } from "lucide-react";
+import { Ban, MessageSquarePlus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
-import { EmptyState, ErrorState, Skeleton, toast } from "@/components/feedback";
+import { ErrorState, Skeleton, toast } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
 import { Button, buttonVariants, Card, MonoId, Tabs, WarrantyStatusBadge } from "@/components/ui";
 import { toApiError } from "@/lib/api-error";
 import { formatDateTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { useCurrentRole } from "@/lib/session";
-import { PartWarrantyTable } from "../components/PartWarrantyTable";
-import { CertificateButton, QrLabelCard, UnitFactsCard, UnitHistory } from "../components/UnitCards";
+import { UnitClaims } from "@/features/claims";
+import {
+  CertificateButton,
+  QrLabelCard,
+  UnitFactsCard,
+  UnitHistory,
+  WarrantySummary,
+} from "../components/UnitCards";
 import { VoidWarrantyModal } from "../components/VoidWarrantyModal";
 import { useUnit, useVoidWarranty } from "../hooks";
-import { stillCoveredLine, unitStatusLine } from "../status-line";
+import { unitStatusLine } from "../status-line";
 
 // A05 (admin), DL05 (dealer / distributor, read-only) and CU03 (customer, phone layout).
 
@@ -52,7 +58,6 @@ export default function UnitDetailPage() {
       : isCustomer
         ? { label: t("nav.myUnits"), to: "/" }
         : { label: t("units.mySoldUnits"), to: "/units" };
-  const stillCovered = stillCoveredLine(unit, t, i18n.language);
 
   const header = (
     <PageHeader
@@ -62,24 +67,25 @@ export default function UnitDetailPage() {
         <>
           <WarrantyStatusBadge status={unit.status} />
           <span className="text-sm text-text-muted">
-            {unit.modelName} · {unitStatusLine(unit, t, i18n.language)}
+            {unit.modelName}
+            {unit.batchNumber ? ` · ${t("units.batchLine", { batch: unit.batchNumber })}` : ""} ·{" "}
+            {unitStatusLine(unit, t, i18n.language)}
           </span>
-          {stillCovered ? <span className="text-sm font-semibold text-success">{stillCovered}</span> : null}
         </>
       }
       actions={
         <>
-          {can(role, "complaints:create") ? (
+          {can(role, "claims:create") && unit.warrantyEnd && !unit.replacedBySerial ? (
             <Link
-              to={`/complaints/new?serial=${encodeURIComponent(unit.serial)}`}
+              to={`/claims/new?serial=${encodeURIComponent(unit.serial)}`}
               className={buttonVariants({ variant: "secondary" })}
             >
               <MessageSquarePlus size={20} strokeWidth={1.75} aria-hidden />
-              {t("complaints.raise")}
+              {t("claims.file")}
             </Link>
           ) : null}
           <CertificateButton unit={unit} variant={isCustomer ? "primary" : "secondary"} />
-          {can(role, "units:void") && !unit.void && unit.parts.length ? (
+          {can(role, "units:void") && !unit.void && unit.warrantyEnd ? (
             <Button variant="danger" icon={Ban} onClick={() => setVoidOpen(true)}>
               {t("units.void.button")}
             </Button>
@@ -124,15 +130,8 @@ export default function UnitDetailPage() {
     <Tabs
       label={t("units.tabsLabel")}
       items={[
-        {
-          value: "parts",
-          label: t("units.tabs.parts"),
-          content: unit.parts.length ? (
-            <PartWarrantyTable parts={unit.parts} />
-          ) : (
-            <EmptyState icon={Wrench} message={t("units.notRegisteredLong")} />
-          ),
-        },
+        { value: "warranty", label: t("units.tabs.warranty"), content: <WarrantySummary unit={unit} /> },
+        { value: "claims", label: t("units.tabs.claims"), content: <UnitClaims serial={unit.serial} /> },
         { value: "history", label: t("units.tabs.history"), content: <UnitHistory unit={unit} /> },
       ]}
     />

@@ -32,7 +32,11 @@ export const queryString = (query: RawQuery, key: string): string | undefined =>
 };
 
 /** A query value that must be one of `allowed`; anything else is treated as "no filter". */
-export function queryEnum<T extends string>(query: RawQuery, key: string, allowed: readonly T[]): T | undefined {
+export function queryEnum<T extends string>(
+  query: RawQuery,
+  key: string,
+  allowed: readonly T[],
+): T | undefined {
   const value = queryString(query, key);
   return value && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
 }

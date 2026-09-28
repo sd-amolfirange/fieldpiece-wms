@@ -1,12 +1,13 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { IsoDate } from "@wms/domain";
-import { toDbDate, toDbDateOpt } from "../../common/db/dates";
+import { toDbDateOpt } from "../../common/db/dates";
 import { COUNTER_SEQUENCES, ID_SEQUENCES, setSequence } from "../../common/db/ids";
-import { createSeed, type SeedState } from "./seed-data";
+import { hashApiKey } from "../intake";
+import { createSeed, DEMO_PARTNER_KEYS, type SeedState } from "./seed-data";
 
-// Writes the demo data set, replacing every business record. Used by `npm run db:seed` and by Admin -> Simulate ->
-// Reset. The seeded logins keep their ids (and signed-in sessions keep working, as with the mock server); any
-// other login is removed. Runs in one transaction: a failed reset changes nothing.
+// Writes the starting data set, replacing every business record. Used by `npm run db:seed` and by Admin -> System
+// events -> Reset. The seeded logins keep their ids (and signed-in sessions keep working); any other login is
+// removed. Runs in one transaction: a failed reset changes nothing.
 
 type Tx = Prisma.TransactionClient;
 
@@ -21,7 +22,9 @@ export async function writeSeed(
   const seed = createSeed(options.today);
   return db.$transaction(
     async (tx) => {
-      const removedFileKeys = (await tx.attachment.findMany({ select: { storageKey: true } })).map((a) => a.storageKey);
+      const removedFileKeys = (await tx.attachment.findMany({ select: { storageKey: true } })).map(
+        (a) => a.storageKey,
+      );
       await clearBusinessData(tx, seed);
       await writeMasterData(tx, seed, options);
       await writeRecords(tx, seed);
@@ -33,50 +36,61 @@ export async function writeSeed(
 }
 
 async function clearBusinessData(tx: Tx, seed: SeedState): Promise<void> {
-  // Children first (most also cascade, but explicit order keeps FK checks cheap and obvious).
   await tx.notification.deleteMany();
-  await tx.claimEvent.deleteMany();
-  await tx.claim.deleteMany();
-  await tx.jobResult.deleteMany();
-  await tx.complaintEvent.deleteMany();
-  await tx.complaint.deleteMany();
+  await tx.warrantyClaimEvent.deleteMany();
+  await tx.warrantyClaim.deleteMany();
   await tx.registration.deleteMany();
   await tx.bulkImportRow.deleteMany();
   await tx.bulkImport.deleteMany();
   await tx.unitEvent.deleteMany();
-  await tx.unitPart.deleteMany();
   await tx.unit.deleteMany();
   await tx.integrationMessage.deleteMany();
   await tx.attachment.deleteMany();
+  await tx.partnerClient.deleteMany();
   // Logins that aren't part of the seed (their sessions cascade).
   await tx.user.deleteMany({ where: { id: { notIn: seed.users.map((u) => u.id) } } });
 }
 
-async function writeMasterData(tx: Tx, seed: SeedState, options: { now: Date; passwordHash: string }): Promise<void> {
+async function writeMasterData(
+  tx: Tx,
+  seed: SeedState,
+  options: { now: Date; passwordHash: string },
+): Promise<void> {
   // Seeded logins drop their organisation links first, so organisations can be replaced.
-  await tx.user.updateMany({ data: { role: "admin", dealerId: null, distributorId: null, customerId: null } });
+  await tx.user.updateMany({
+    data: { role: "admin", dealerId: null, distributorId: null, customerId: null },
+  });
 
   await tx.customer.deleteMany({ where: { id: { notIn: seed.customers.map((c) => c.id) } } });
   await tx.dealer.deleteMany({ where: { id: { notIn: seed.dealers.map((d) => d.id) } } });
   await tx.distributor.deleteMany({ where: { id: { notIn: seed.distributors.map((d) => d.id) } } });
-  await tx.modelPart.deleteMany();
   await tx.model.deleteMany({ where: { id: { notIn: seed.models.map((m) => m.id) } } });
-  await tx.brand.deleteMany({ where: { id: { notIn: seed.brands.map((b) => b.id) } } });
+  await tx.productCategory.deleteMany({ where: { id: { notIn: seed.categories.map((c) => c.id) } } });
 
-  for (const [position, b] of seed.brands.entries()) {
-    await tx.brand.upsert({ where: { id: b.id }, create: { ...b, position }, update: { name: b.name, position } });
+  for (const [position, c] of seed.categories.entries()) {
+    await tx.productCategory.upsert({
+      where: { id: c.id },
+      create: { ...c, position },
+      update: { name: c.name, position },
+    });
   }
   for (const [position, m] of seed.models.entries()) {
-    const data = { code: m.code, brandId: m.brandId, name: m.name, capacity: m.capacity, type: m.type, position };
-    await tx.model.upsert({ where: { id: m.id }, create: { id: m.id, ...data }, update: data });
-    await tx.modelPart.createMany({ data: m.parts.map((p, i) => ({ modelId: m.id, position: i, ...p })) });
+    const { id, ...rest } = m;
+    const data = { ...rest, position };
+    await tx.model.upsert({ where: { id }, create: { id, ...data }, update: data });
   }
   for (const [position, d] of seed.distributors.entries()) {
-    const data = { name: d.name, city: d.city, position };
+    const data = { name: d.name, city: d.city, state: d.state, position };
     await tx.distributor.upsert({ where: { id: d.id }, create: { id: d.id, ...data }, update: data });
   }
   for (const [position, d] of seed.dealers.entries()) {
-    const data = { name: d.name, city: d.city, distributorId: d.distributorId ?? null, position };
+    const data = {
+      name: d.name,
+      city: d.city,
+      state: d.state,
+      distributorId: d.distributorId ?? null,
+      position,
+    };
     await tx.dealer.upsert({ where: { id: d.id }, create: { id: d.id, ...data }, update: data });
   }
   for (const [i, c] of seed.customers.entries()) {
@@ -85,6 +99,8 @@ async function writeMasterData(tx: Tx, seed: SeedState, options: { now: Date; pa
       phone: c.phone,
       email: c.email ?? null,
       city: c.city,
+      state: c.state,
+      zip: c.zip,
       phoneKey: phoneKey(c.phone),
       emailKey: c.email?.toLowerCase() ?? null,
       createdAt: new Date(options.now.getTime() - (seed.customers.length - i) * 1000),
@@ -106,10 +122,23 @@ async function writeMasterData(tx: Tx, seed: SeedState, options: { now: Date; pa
     };
     await tx.user.upsert({ where: { id: u.id }, create: { id: u.id, ...data }, update: data });
   }
+  for (const p of seed.partnerClients) {
+    const apiKey = DEMO_PARTNER_KEYS[p.id];
+    await tx.partnerClient.create({
+      data: {
+        id: p.id,
+        name: p.name,
+        channel: p.channel,
+        dealerId: p.dealerId,
+        keyHash: hashApiKey(apiKey),
+        keyPrefix: apiKey.slice(0, 12),
+        createdAt: options.now,
+      },
+    });
+  }
 }
 
 async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
-  // Registrations first: units reference them by id.
   await tx.registration.createMany({
     data: seed.registrations.map((r) => ({
       id: r.id,
@@ -117,17 +146,19 @@ async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
       status: r.status,
       flags: r.flags,
       serial: r.serial,
+      batchNumber: r.batchNumber ?? null,
       modelCode: r.modelCode,
       customerName: r.customer.name,
       customerPhone: r.customer.phone ?? null,
       customerEmail: r.customer.email ?? null,
       customerCity: r.customer.city ?? null,
+      customerState: r.customer.state ?? null,
+      customerZip: r.customer.zip ?? null,
       customerId: r.customerId ?? null,
       dealerId: r.dealerId ?? null,
-      installDate: toDbDateOpt(r.installDate),
       purchaseDate: toDbDateOpt(r.purchaseDate),
       invoiceNumber: r.invoiceNumber ?? null,
-      location: r.location ?? null,
+      placeOfPurchase: r.placeOfPurchase ?? null,
       attachmentIds: r.attachmentIds,
       submittedBy: r.submittedBy,
       submittedByName: r.submittedByName,
@@ -139,56 +170,42 @@ async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
     })),
   });
 
-  for (const u of seed.units) {
-    await tx.unit.create({
-      data: {
-        serial: u.serial,
-        modelId: u.modelId,
-        brandId: u.brandId,
-        dealerId: u.dealerId ?? null,
-        customerId: u.customerId ?? null,
-        location: u.location ?? null,
-        installDate: toDbDateOpt(u.installDate),
-        purchaseDate: toDbDateOpt(u.purchaseDate),
-        registrationId: u.registrationId ?? null,
-        attachmentIds: u.attachmentIds,
-        parts: {
-          createMany: {
-            data: u.parts.map((p, position) => ({
-              id: p.id,
-              position,
-              partType: p.partType,
-              serial: p.serial ?? null,
-              warrantyStart: toDbDate(p.warrantyStart),
-              warrantyEnd: toDbDate(p.warrantyEnd),
-              coversParts: p.coversParts,
-              coversLabour: p.coversLabour,
-              replacedAt: toDbDateOpt(p.replacedAt),
-              replacedBySerial: p.replacedBySerial ?? null,
-              replacesSerial: p.replacesSerial ?? null,
-            })),
-          },
-        },
-      },
-    });
-  }
-  // Unit events in the order they were recorded, unit by unit (ids keep that order for ties in time).
+  await tx.unit.createMany({
+    data: seed.units.map((u) => ({
+      serial: u.serial,
+      batchNumber: u.batchNumber ?? null,
+      modelId: u.modelId,
+      dealerId: u.dealerId ?? null,
+      customerId: u.customerId ?? null,
+      purchaseDate: toDbDateOpt(u.purchaseDate),
+      placeOfPurchase: u.placeOfPurchase ?? null,
+      warrantyStart: toDbDateOpt(u.warrantyStart),
+      warrantyEnd: toDbDateOpt(u.warrantyEnd),
+      registrationId: u.registrationId ?? null,
+      replacesSerial: u.replacesSerial ?? null,
+      replacedBySerial: u.replacedBySerial ?? null,
+      attachmentIds: u.attachmentIds,
+    })),
+  });
+  // Product events in the order they were recorded, product by product (ids keep that order for ties in time).
   await tx.unitEvent.createMany({
     data: seed.units.flatMap((u) =>
-      u.history.map((e) => ({
-        unitSerial: u.serial,
-        at: new Date(e.at),
-        type: e.type,
-        byName: e.byName,
-        text: e.text ?? null,
-        reason: e.reason ?? null,
-        refId: e.refId ?? null,
-      })),
+      [...u.history]
+        .sort((a, b) => a.at.localeCompare(b.at))
+        .map((e) => ({
+          unitSerial: u.serial,
+          at: new Date(e.at),
+          type: e.type,
+          byName: e.byName,
+          text: e.text ?? null,
+          reason: e.reason ?? null,
+          refId: e.refId ?? null,
+        })),
     ),
   });
 
-  for (const c of seed.complaints) {
-    await tx.complaint.create({
+  for (const c of seed.claims) {
+    await tx.warrantyClaim.create({
       data: {
         id: c.id,
         unitSerial: c.unitSerial,
@@ -197,55 +214,28 @@ async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
         raisedByName: c.raisedByName,
         dealerId: c.dealerId ?? null,
         customerId: c.customerId ?? null,
+        issueType: c.issueType,
         description: c.description,
         attachmentIds: c.attachmentIds,
         status: c.status,
-        entitlement: json(c.entitlement),
-        serviceRequestId: c.serviceRequestId ?? null,
-        jobResultId: c.jobResultId ?? null,
-        claimId: c.claimId ?? null,
-        createdAt: new Date(c.createdAt),
-        events: {
-          createMany: {
-            data: c.history.map((e) => ({ at: new Date(e.at), status: e.status, byName: e.byName, text: e.text ?? null })),
-          },
-        },
-      },
-    });
-  }
-  await tx.jobResult.createMany({
-    data: seed.jobResults.map((j) => ({
-      id: j.id,
-      complaintId: j.complaintId,
-      technician: j.technician,
-      completedAt: new Date(j.completedAt),
-      partsReplaced: json(j.partsReplaced),
-      photoIds: j.photoIds,
-      signOffName: j.signOffName,
-      notes: j.notes ?? null,
-    })),
-  });
-  for (const c of seed.claims) {
-    await tx.claim.create({
-      data: {
-        id: c.id,
-        complaintId: c.complaintId ?? null,
-        unitSerial: c.unitSerial,
-        brandId: c.brandId,
-        dealerId: c.dealerId ?? null,
-        status: c.status,
-        rmaNumber: c.rmaNumber ?? null,
-        amount: c.amount ?? null,
-        jobResultId: c.jobResultId ?? null,
-        photoIds: c.photoIds,
-        partsReplaced: json(c.partsReplaced),
-        financePosting: c.financePosting,
+        coverage: json(c.coverage),
+        resolution: c.resolution ?? null,
+        creditAmount: c.creditAmount === undefined ? null : new Prisma.Decimal(c.creditAmount),
+        replacementSerial: c.replacementSerial ?? null,
+        replacementBatchNumber: c.replacementBatchNumber ?? null,
+        decisionNote: c.decisionNote ?? null,
         rejectReason: c.rejectReason ?? null,
+        reviewedByName: c.reviewedByName ?? null,
         createdAt: new Date(c.createdAt),
         updatedAt: new Date(c.updatedAt),
         events: {
           createMany: {
-            data: c.history.map((e) => ({ at: new Date(e.at), status: e.status, byName: e.byName, text: e.text ?? null })),
+            data: c.history.map((e) => ({
+              at: new Date(e.at),
+              status: e.status,
+              byName: e.byName,
+              text: e.text ?? null,
+            })),
           },
         },
       },
@@ -268,7 +258,7 @@ async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
   });
 }
 
-/** Ids continue after the seed's (REG-1017 -> REG-1018); unused prefixes start at 1001. */
+/** Ids continue after the seed's (REG-1014 -> REG-1015); unused prefixes start at 1001. */
 async function resetSequences(tx: Tx, seed: SeedState): Promise<void> {
   for (const [prefix, sequence] of Object.entries(ID_SEQUENCES)) {
     await setSequence(tx, sequence, seed.counters[prefix] ?? 1000);

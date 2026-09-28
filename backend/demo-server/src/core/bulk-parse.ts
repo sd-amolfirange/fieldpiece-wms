@@ -1,24 +1,34 @@
 import type { RegistrationRowInput } from "@wms/domain";
 
-// Turns an uploaded sheet (already read into a string matrix) into registration rows. Columns are matched by
-// header name, so the order in the file doesn't matter.
+// Bulk registration sheets (DL02), as backend/src/modules/registrations/sheets.ts: the template columns and turning an
+// uploaded sheet (already read into a string matrix) into rows. Columns are matched by header name, so their order in
+// the file doesn't matter. Reading .xlsx needs exceljs and lives in the server adapter (src/documents.ts).
 
 export const TEMPLATE_HEADERS = [
   "Serial number",
-  "Model code",
+  "Batch number",
+  "Model",
+  "Purchase date",
   "Customer name",
   "Customer phone",
   "Customer email",
   "City",
-  "Install date",
+  "State",
+  "ZIP",
   "Invoice number",
 ] as const;
 
 const FIELD_BY_HEADER: Record<string, keyof RegistrationRowInput> = {
   "serial number": "serial",
   serial: "serial",
-  "model code": "modelCode",
+  "batch number": "batchNumber",
+  batch: "batchNumber",
+  "lot number": "batchNumber",
   model: "modelCode",
+  "model number": "modelCode",
+  "model code": "modelCode",
+  "purchase date": "purchaseDate",
+  "date of purchase": "purchaseDate",
   "customer name": "customerName",
   customer: "customerName",
   "customer phone": "customerPhone",
@@ -26,12 +36,29 @@ const FIELD_BY_HEADER: Record<string, keyof RegistrationRowInput> = {
   "customer email": "customerEmail",
   email: "customerEmail",
   city: "city",
-  "install date": "installDate",
-  "installation date": "installDate",
+  state: "state",
+  zip: "zip",
+  "zip code": "zip",
   "invoice number": "invoiceNumber",
   invoice: "invoiceNumber",
 };
 
+/** The template's example row. */
+export const TEMPLATE_SAMPLE_ROW = [
+  "243500101",
+  "2435-L02",
+  "SC680",
+  "2026-09-15",
+  "Alex Rivera",
+  "(713) 555-0100",
+  "",
+  "Houston",
+  "TX",
+  "77002",
+  "INV-10001",
+] as const;
+
+/** Rows from a string matrix (header row first). Blank rows are skipped. */
 export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
   const [header, ...body] = matrix;
   if (!header) return [];
@@ -41,19 +68,19 @@ export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
     .map((cells) => {
       const row: RegistrationRowInput = {};
       fields.forEach((field, i) => {
-        if (field) row[field] = (cells[i] ?? "").trim();
+        if (field) row[field] = (cells[i] ?? "").trim().slice(0, 200);
       });
       return row;
     });
 }
 
-/** Minimal CSV reader: commas, double-quoted fields with "" escapes, CRLF or LF line ends. */
+/** Minimal CSV reader: commas, double-quoted fields with "" escapes, CRLF or LF line ends, optional BOM. */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let quoted = false;
-  const input = text.replace(/^\uFEFF/, "");
+  const input = text.startsWith("\u{FEFF}") ? text.slice(1) : text; // byte-order mark
   for (let i = 0; i < input.length; i += 1) {
     const ch = input[i];
     if (quoted) {
@@ -81,5 +108,4 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
-export const templateCsv = () =>
-  `${TEMPLATE_HEADERS.join(",")}\r\nAER-SPL15-260999,AER-SPL15,A. Sample,+91 90000 00000,,Pune,2026-09-15,INV-0001\r\n`;
+export const templateCsv = () => `${TEMPLATE_HEADERS.join(",")}\r\n${TEMPLATE_SAMPLE_ROW.join(",")}\r\n`;

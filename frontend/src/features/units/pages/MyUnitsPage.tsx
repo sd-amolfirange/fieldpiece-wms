@@ -7,9 +7,9 @@ import { buttonVariants, Card, MonoId, RegistrationStatusBadge, WarrantyStatusBa
 import { formatDate } from "@/lib/format";
 import { useCurrentUser } from "@/lib/session";
 import { useMyPendingRegistrations, useUnits } from "../hooks";
-import { stillCoveredLine, unitStatusLine } from "../status-line";
+import { unitStatusLine } from "../status-line";
 
-// CU02 My units (customer home, phone layout): one card per unit with its overall status and a countdown,
+// CU02 My products (customer home, phone layout): one card per product with its warranty status and a countdown,
 // plus self-registrations still waiting for approval.
 
 export default function MyUnitsPage() {
@@ -60,34 +60,34 @@ export default function MyUnitsPage() {
               </Card>
             </li>
           ))}
-          {units.data?.items.map((unit) => {
-            const covered = stillCoveredLine(unit, t, i18n.language);
-            return (
-              <li key={unit.serial}>
-                <Link
-                  to={`/units/${unit.serial}`}
-                  aria-label={`${unit.modelName} ${unit.serial}: ${unitStatusLine(unit, t, i18n.language)}`}
-                  className="block rounded-lg hover:ring-2 hover:ring-ink-1000"
-                >
-                  <Card as="article" className="flex gap-4">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-ink-50">
-                      <Package size={24} strokeWidth={1.75} className="text-ink-400" aria-hidden />
+          {units.data?.items.map((unit) => (
+            <li key={unit.serial}>
+              <Link
+                to={`/units/${unit.serial}`}
+                aria-label={`${unit.modelName} ${unit.serial}: ${unitStatusLine(unit, t, i18n.language)}`}
+                className="block rounded-lg hover:ring-2 hover:ring-ink-1000"
+              >
+                <Card as="article" className="flex gap-4">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded bg-ink-50">
+                    <Package size={24} strokeWidth={1.75} className="text-ink-400" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-h3">{unit.modelName}</h3>
+                    <MonoId>{unit.serial}</MonoId>
+                    {unit.batchNumber ? (
+                      <p className="text-sm text-text-muted">
+                        {t("units.batchLine", { batch: unit.batchNumber })}
+                      </p>
+                    ) : null}
+                    <div className="mt-2">
+                      <WarrantyStatusBadge status={unit.status} />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-h3">{unit.modelName}</h3>
-                      <MonoId>{unit.serial}</MonoId>
-                      {unit.location ? <p className="text-sm text-text-muted">{unit.location}</p> : null}
-                      <div className="mt-2">
-                        <WarrantyStatusBadge status={unit.status} />
-                      </div>
-                      <p className="mt-1 text-sm">{unitStatusLine(unit, t, i18n.language)}</p>
-                      {covered ? <p className="text-sm font-semibold text-success">{covered}</p> : null}
-                    </div>
-                  </Card>
-                </Link>
-              </li>
-            );
-          })}
+                    <p className="mt-1 text-sm">{unitStatusLine(unit, t, i18n.language)}</p>
+                  </div>
+                </Card>
+              </Link>
+            </li>
+          ))}
           {!units.data?.items.length && !pending.data?.items.length ? (
             <li>
               <Card>

@@ -27,7 +27,7 @@ import { bulkImportsApi } from "../api";
 import { useBulkImport, useBulkImports, useResubmitBulk, useUploadBulk } from "../hooks";
 
 // DL02 Bulk import: download the template, upload a week's sales, every row is checked against the product
-// master. Clean rows are registered at once; rows with problems are fixed inline and resubmitted (no re-upload);
+// catalog (model, serial and batch format). Clean rows are registered at once; rows with problems are fixed inline and resubmitted (no re-upload);
 // a duplicate serial goes to the admin.
 
 const SHEET_TYPES = {
@@ -55,7 +55,8 @@ function useRowColumns(
         header: label,
         cell: ({ row: { original: row } }) => {
           const value = valueOf(row, field);
-          if (row.status !== "ERROR") return field === "serial" ? <MonoId>{value}</MonoId> : value || "—";
+          if (row.status !== "ERROR")
+            return field === "serial" || field === "batchNumber" ? <MonoId>{value}</MonoId> : value || "—";
           const invalid = !!row.errors[field];
           const aria = t("bulk.editCell", { field: label, row: row.rowNumber });
           if (field === "modelCode") {
@@ -82,8 +83,8 @@ function useRowColumns(
             <Input
               aria-label={aria}
               aria-invalid={invalid || undefined}
-              type={field === "installDate" ? "date" : "text"}
-              className={field === "serial" ? "font-mono" : undefined}
+              type={field === "purchaseDate" ? "date" : "text"}
+              className={field === "serial" || field === "batchNumber" ? "font-mono" : undefined}
               value={value}
               onChange={(e) => setEdit(row.rowNumber, field, e.target.value)}
             />
@@ -97,9 +98,10 @@ function useRowColumns(
         cell: (i) => <span className="tabular-nums">{i.getValue()}</span>,
       }),
       editable("serial", t("bulk.columns.serial")),
+      editable("batchNumber", t("bulk.columns.batch")),
       editable("modelCode", t("bulk.columns.model")),
       editable("customerName", t("bulk.columns.customer")),
-      editable("installDate", t("bulk.columns.installDate")),
+      editable("purchaseDate", t("bulk.columns.purchaseDate")),
       rowCol.accessor("status", {
         header: t("bulk.columns.status"),
         cell: (i) => <BulkRowStatusBadge status={i.getValue()} />,

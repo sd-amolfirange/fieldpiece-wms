@@ -23,7 +23,7 @@ export function DealerComparisonCard({ dealers }: { dealers: DealerStats[] }) {
               {t("dashboard.tiles.pending")}
             </th>
             <th scope="col" className="py-2 text-end">
-              {t("dashboard.tiles.openComplaints")}
+              {t("dashboard.tiles.openClaims")}
             </th>
           </tr>
         </thead>
@@ -33,7 +33,7 @@ export function DealerComparisonCard({ dealers }: { dealers: DealerStats[] }) {
               <td className="py-2">{d.dealerName}</td>
               <td className="py-2 text-end font-mono">{d.registrationsThisMonth}</td>
               <td className="py-2 text-end font-mono">{d.pending}</td>
-              <td className="py-2 text-end font-mono">{d.openComplaints}</td>
+              <td className="py-2 text-end font-mono">{d.openClaims}</td>
             </tr>
           ))}
         </tbody>

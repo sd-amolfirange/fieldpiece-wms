@@ -11,8 +11,11 @@ import { Button, Card } from "@/components/ui";
 const channelColor: Record<ChannelCount["channel"], string> = {
   DEALER: "var(--brand-500)",
   PORTAL: "var(--info)",
+  WEB: "var(--info)",
   EMAIL: "var(--ink-400)",
   ERP: "var(--ink-400)",
+  API: "var(--ink-400)",
+  RETAIL: "var(--warning)",
 };
 
 export function RegistrationsByChannelChart({ data }: { data: ChannelCount[] }) {

@@ -1,9 +1,9 @@
 // Data model for the warranty API. Shapes follow shared/wms-domain (the types the frontend reads) and
-// frontend/docs/api-contract.md. Enumerations are text columns with CHECK constraints (see the migration), so
+// frontend/docs/api-contract.md. Enumerations are text columns with CHECK constraints (see the migrations), so
 // the values are exactly the domain's string unions.
-// Objects Prisma can't express (CHECK constraints, partial unique indexes, GIN indexes, sequences for the
-// "REG-1001" style ids, grants) are hand-written in the migration SQL. When `prisma migrate dev` generates a new
-// migration, remove any DROP statements it adds for those.
+// Objects Prisma can't express (CHECK constraints, partial unique indexes, sequences for the "REG-1001" style ids,
+// grants) are hand-written in the migration SQL. When `prisma migrate dev` generates a new migration, remove any
+// DROP statements it adds for those.
 
 generator client {
   provider = "prisma-client-js"
@@ -17,51 +17,37 @@ datasource db {
 
 // ── Catalogue ────────────────────────────────────────────────────────────────
 
-model Brand {
+/// Product category from the Fieldpiece catalogue (Clamp meters, Digital manifolds, ...).
+model ProductCategory {
   id       String  @id
   name     String
   /// Display order in lists and charts.
   position Int     @default(0)
   models   Model[]
-  units  Unit[]
-  claims Claim[]
 
-  @@map("brands")
+  @@map("product_categories")
 }
 
-/// Product master: a model and its part template (A06).
+/// A Fieldpiece product model (A06), e.g. SC680.
 model Model {
-  id       String      @id
-  /// e.g. "AER-SPL15"
-  code     String      @unique
-  brandId  String      @map("brand_id")
-  name     String
-  capacity String
-  type     String
+  id             String          @id
+  /// Model number as printed on the product.
+  code           String          @unique
+  categoryId     String          @map("category_id")
+  name           String
+  description    String
+  /// Warranty from the date of purchase.
+  warrantyMonths Int             @map("warranty_months")
+  /// Regular expressions the serial and batch numbers of this model must match. [CONFIRM real label formats]
+  serialPattern  String          @map("serial_pattern")
+  batchPattern   String          @map("batch_pattern")
   /// Display order in lists and pickers.
-  position Int         @default(0)
-  brand    Brand       @relation(fields: [brandId], references: [id])
-  parts    ModelPart[]
-  units    Unit[]
+  position       Int             @default(0)
+  category       ProductCategory @relation(fields: [categoryId], references: [id])
+  units          Unit[]
 
-  @@index([brandId])
+  @@index([categoryId])
   @@map("models")
-}
-
-/// One line of a model template: which part, how long it's covered and what the cover includes.
-model ModelPart {
-  modelId        String  @map("model_id")
-  partType       String  @map("part_type")
-  /// Template order (UNIT first).
-  position       Int
-  warrantyMonths Int     @map("warranty_months")
-  coversParts    Boolean @map("covers_parts")
-  coversLabour   Boolean @map("covers_labour")
-  serialised     Boolean
-  model          Model   @relation(fields: [modelId], references: [id], onDelete: Cascade)
-
-  @@id([modelId, partType])
-  @@map("model_parts")
 }
 
 // ── Organisation ─────────────────────────────────────────────────────────────
@@ -70,47 +56,52 @@ model Distributor {
   id       String   @id
   name     String
   city     String
+  state    String
   position Int      @default(0)
   dealers  Dealer[]
-  users   User[]
+  users    User[]
 
   @@map("distributors")
 }
 
 model Dealer {
-  id            String         @id
-  name          String
-  city          String
-  distributorId String?        @map("distributor_id")
+  id             String          @id
+  name           String
+  city           String
+  state          String
+  distributorId  String?         @map("distributor_id")
   /// Display order (dealer comparison, filters).
-  position      Int            @default(0)
-  distributor   Distributor?   @relation(fields: [distributorId], references: [id])
-  users         User[]
-  units         Unit[]
-  registrations Registration[]
-  complaints    Complaint[]
-  claims        Claim[]
-  bulkImports   BulkImport[]
+  position       Int             @default(0)
+  distributor    Distributor?    @relation(fields: [distributorId], references: [id])
+  users          User[]
+  units          Unit[]
+  registrations  Registration[]
+  claims         WarrantyClaim[]
+  bulkImports    BulkImport[]
+  partnerClients PartnerClient[]
 
   @@index([distributorId])
   @@map("dealers")
 }
 
 model Customer {
-  id            String         @id
+  id            String          @id
   name          String
   phone         String
   email         String?
   city          String
+  /// Two-letter US state code.
+  state         String
+  zip           String
   /// Last 10 digits of the phone, for matching registrations to an existing customer.
-  phoneKey      String?        @map("phone_key")
+  phoneKey      String?         @map("phone_key")
   /// Lower-cased email, for the same matching.
-  emailKey      String?        @map("email_key")
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  emailKey      String?         @map("email_key")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   users         User[]
   units         Unit[]
   registrations Registration[]
-  complaints    Complaint[]
+  claims        WarrantyClaim[]
 
   @@index([phoneKey])
   @@index([emailKey])
@@ -159,61 +150,66 @@ model AuthSession {
   @@map("auth_sessions")
 }
 
-// ── Units and warranties ─────────────────────────────────────────────────────
+/// A partner system (distributor ERP, online marketplace, retailer) allowed to send registrations through the partner
+/// API. The API key is shown once when created; only its SHA-256 is stored.
+model PartnerClient {
+  id         String    @id
+  name       String
+  /// Channel its registrations get: API, RETAIL or ERP.
+  channel    String
+  /// Dealer the registrations belong to (a distributor's or retailer's own account), if any.
+  dealerId   String?   @map("dealer_id")
+  keyHash    String    @unique @map("key_hash")
+  /// First characters of the key, to recognise it in lists.
+  keyPrefix  String    @map("key_prefix")
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+  dealer     Dealer?   @relation(fields: [dealerId], references: [id])
 
-/// A physical unit. Known before registration (QR label printed) with no parts; registration attaches the parts.
+  @@map("partner_clients")
+}
+
+// ── Registered products and warranties ───────────────────────────────────────
+
+/// One physical product. Known before registration (e.g. from an ERP invoice) with no warranty dates; registration
+/// sets them. One warranty per product, from the purchase date.
 model Unit {
-  serial         String       @id
-  modelId        String       @map("model_id")
-  brandId        String       @map("brand_id")
-  dealerId       String?      @map("dealer_id")
-  customerId     String?      @map("customer_id")
-  location       String?
-  installDate    DateTime?    @map("install_date") @db.Date
-  purchaseDate   DateTime?    @map("purchase_date") @db.Date
-  registrationId String?      @map("registration_id")
-  attachmentIds  String[]     @default([]) @map("attachment_ids")
-  voidReason     String?      @map("void_reason")
-  voidNote       String?      @map("void_note")
-  voidedBy       String?      @map("voided_by")
-  voidedByName   String?      @map("voided_by_name")
-  voidedAt       DateTime?    @map("voided_at") @db.Timestamptz(3)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  model          Model        @relation(fields: [modelId], references: [id])
-  brand          Brand        @relation(fields: [brandId], references: [id])
-  dealer         Dealer?      @relation(fields: [dealerId], references: [id])
-  customer       Customer?    @relation(fields: [customerId], references: [id])
-  parts          UnitPart[]
-  events         UnitEvent[]
-  complaints     Complaint[]
-  claims         Claim[]
+  serial           String          @id
+  /// Production lot, printed next to the serial number.
+  batchNumber      String?         @map("batch_number")
+  modelId          String          @map("model_id")
+  dealerId         String?         @map("dealer_id")
+  customerId       String?         @map("customer_id")
+  purchaseDate     DateTime?       @map("purchase_date") @db.Date
+  /// Where it was bought when not from a dealer in the system (online marketplace, retailer).
+  placeOfPurchase  String?         @map("place_of_purchase")
+  warrantyStart    DateTime?       @map("warranty_start") @db.Date
+  warrantyEnd      DateTime?       @map("warranty_end") @db.Date
+  registrationId   String?         @map("registration_id")
+  replacesSerial   String?         @map("replaces_serial")
+  replacedBySerial String?         @map("replaced_by_serial")
+  attachmentIds    String[]        @default([]) @map("attachment_ids")
+  voidReason       String?         @map("void_reason")
+  voidNote         String?         @map("void_note")
+  voidedBy         String?         @map("voided_by")
+  voidedByName     String?         @map("voided_by_name")
+  voidedAt         DateTime?       @map("voided_at") @db.Timestamptz(3)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  model            Model           @relation(fields: [modelId], references: [id])
+  dealer           Dealer?         @relation(fields: [dealerId], references: [id])
+  customer         Customer?       @relation(fields: [customerId], references: [id])
+  events           UnitEvent[]
+  claims           WarrantyClaim[]
 
   @@index([dealerId])
   @@index([customerId])
   @@index([modelId])
+  @@index([warrantyEnd])
+  @@index([batchNumber])
   @@index([attachmentIds], map: "units_attachment_ids_idx", type: Gin)
   @@map("units")
-}
-
-/// One part's warranty. A replaced part stays as history (replacedAt set) next to its replacement.
-model UnitPart {
-  id               String    @id
-  unitSerial       String    @map("unit_serial")
-  position         Int
-  partType         String    @map("part_type")
-  serial           String?
-  warrantyStart    DateTime  @map("warranty_start") @db.Date
-  warrantyEnd      DateTime  @map("warranty_end") @db.Date
-  coversParts      Boolean   @map("covers_parts")
-  coversLabour     Boolean   @map("covers_labour")
-  replacedAt       DateTime? @map("replaced_at") @db.Date
-  replacedBySerial String?   @map("replaced_by_serial")
-  replacesSerial   String?   @map("replaces_serial")
-  unit             Unit      @relation(fields: [unitSerial], references: [serial], onDelete: Cascade)
-
-  @@index([unitSerial])
-  @@map("unit_parts")
 }
 
 model UnitEvent {
@@ -234,26 +230,28 @@ model UnitEvent {
 
 // ── Registrations and bulk import ────────────────────────────────────────────
 
-/// A request to register a unit, from any channel. The A02 inbox.
+/// A request to register a product, from any channel. The A02 inbox.
 model Registration {
   id                String      @id
   channel           String
   status            String
   flags             String[]    @default([])
   serial            String
+  batchNumber       String?     @map("batch_number")
   modelCode         String      @map("model_code")
   customerName      String      @map("customer_name")
   customerPhone     String?     @map("customer_phone")
   customerEmail     String?     @map("customer_email")
   customerCity      String?     @map("customer_city")
+  customerState     String?     @map("customer_state")
+  customerZip       String?     @map("customer_zip")
   customerId        String?     @map("customer_id")
   dealerId          String?     @map("dealer_id")
-  installDate       DateTime?   @map("install_date") @db.Date
   purchaseDate      DateTime?   @map("purchase_date") @db.Date
   invoiceNumber     String?     @map("invoice_number")
-  location          String?
+  placeOfPurchase   String?     @map("place_of_purchase")
   attachmentIds     String[]    @default([]) @map("attachment_ids")
-  /// User id, or "system" for ERP / email intake.
+  /// User id, "system" for ERP / email intake, or "partner:<id>" for the partner API.
   submittedBy       String      @map("submitted_by")
   submittedByName   String      @map("submitted_by_name")
   submittedAt       DateTime    @map("submitted_at") @db.Timestamptz(3)
@@ -261,10 +259,10 @@ model Registration {
   rejectReason      String?     @map("reject_reason")
   reviewedByName    String?     @map("reviewed_by_name")
   reviewedAt        DateTime?   @map("reviewed_at") @db.Timestamptz(3)
-  batchId           String?     @map("batch_id")
+  importId          String?     @map("import_id")
   customer          Customer?   @relation(fields: [customerId], references: [id])
   dealer            Dealer?     @relation(fields: [dealerId], references: [id])
-  batch             BulkImport? @relation(fields: [batchId], references: [id])
+  bulkImport        BulkImport? @relation(fields: [importId], references: [id])
 
   @@index([status, submittedAt(sort: Desc)])
   @@index([submittedAt(sort: Desc)])
@@ -308,117 +306,64 @@ model BulkImportRow {
   @@map("bulk_import_rows")
 }
 
-// ── Complaints, service jobs and claims ──────────────────────────────────────
+// ── Warranty claims ──────────────────────────────────────────────────────────
 
-model Complaint {
-  id               String           @id
-  unitSerial       String           @map("unit_serial")
-  source           String
-  raisedBy         String           @map("raised_by")
-  raisedByName     String           @map("raised_by_name")
-  dealerId         String?          @map("dealer_id")
-  customerId       String?          @map("customer_id")
-  description      String
-  attachmentIds    String[]         @default([]) @map("attachment_ids")
-  status           String
-  /// Entitlement decided when the complaint was raised (re-checked if the unit is voided later).
-  entitlement      Json
-  serviceRequestId String?          @map("service_request_id")
-  jobResultId      String?          @map("job_result_id")
-  claimId          String?          @map("claim_id")
-  createdAt        DateTime         @map("created_at") @db.Timestamptz(3)
-  unit             Unit             @relation(fields: [unitSerial], references: [serial])
-  dealer           Dealer?          @relation(fields: [dealerId], references: [id])
-  customer         Customer?        @relation(fields: [customerId], references: [id])
-  events           ComplaintEvent[]
-  jobResult        JobResult?
+/// A warranty claim on a registered product, decided by the Fieldpiece warranty desk.
+/// Status steps are defined once, in shared/wms-domain/src/claim-transitions.ts.
+model WarrantyClaim {
+  id                     String               @id
+  unitSerial             String               @map("unit_serial")
+  source                 String
+  raisedBy               String               @map("raised_by")
+  raisedByName           String               @map("raised_by_name")
+  dealerId               String?              @map("dealer_id")
+  customerId             String?              @map("customer_id")
+  issueType              String               @map("issue_type")
+  description            String
+  attachmentIds          String[]             @default([]) @map("attachment_ids")
+  status                 String
+  /// Coverage when filed (re-checked if the product is voided later).
+  coverage               Json
+  resolution             String?
+  /// Credit issued, in the account currency.
+  creditAmount           Decimal?             @map("credit_amount") @db.Decimal(12, 2)
+  replacementSerial      String?              @map("replacement_serial")
+  replacementBatchNumber String?              @map("replacement_batch_number")
+  decisionNote           String?              @map("decision_note")
+  rejectReason           String?              @map("reject_reason")
+  reviewedByName         String?              @map("reviewed_by_name")
+  createdAt              DateTime             @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime             @map("updated_at") @db.Timestamptz(3)
+  unit                   Unit                 @relation(fields: [unitSerial], references: [serial])
+  dealer                 Dealer?              @relation(fields: [dealerId], references: [id])
+  customer               Customer?            @relation(fields: [customerId], references: [id])
+  events                 WarrantyClaimEvent[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@index([dealerId])
   @@index([customerId])
   @@index([unitSerial])
-  @@index([attachmentIds], map: "complaints_attachment_ids_idx", type: Gin)
-  @@map("complaints")
+  @@index([attachmentIds], map: "warranty_claims_attachment_ids_idx", type: Gin)
+  @@map("warranty_claims")
 }
 
-model ComplaintEvent {
-  id          BigInt    @id @default(autoincrement())
-  complaintId String    @map("complaint_id")
-  at          DateTime  @db.Timestamptz(3)
-  status      String
-  byName      String    @map("by_name")
-  text        String?
-  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
-
-  @@index([complaintId, at])
-  @@map("complaint_events")
-}
-
-/// The service system's report of a completed visit.
-model JobResult {
-  id            String    @id
-  complaintId   String    @unique @map("complaint_id")
-  technician    String
-  completedAt   DateTime  @map("completed_at") @db.Timestamptz(3)
-  /// ReplacedPart[]
-  partsReplaced Json      @map("parts_replaced")
-  photoIds      String[]  @default([]) @map("photo_ids")
-  signOffName   String    @map("sign_off_name")
-  notes         String?
-  complaint     Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
-
-  @@index([photoIds], map: "job_results_photo_ids_idx", type: Gin)
-  @@map("job_results")
-}
-
-/// Manufacturer claim. Status steps are defined once, in shared/wms-domain/src/claim-transitions.ts.
-model Claim {
-  id             String       @id
-  complaintId    String?      @map("complaint_id")
-  unitSerial     String       @map("unit_serial")
-  brandId        String       @map("brand_id")
-  dealerId       String?      @map("dealer_id")
-  status         String
-  rmaNumber      String?      @map("rma_number")
-  /// Whole units of the account currency.
-  amount         Int?
-  jobResultId    String?      @map("job_result_id")
-  photoIds       String[]     @default([]) @map("photo_ids")
-  /// ReplacedPart[]
-  partsReplaced  Json         @map("parts_replaced")
-  financePosting String       @map("finance_posting")
-  rejectReason   String?      @map("reject_reason")
-  createdAt      DateTime     @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @map("updated_at") @db.Timestamptz(3)
-  unit           Unit         @relation(fields: [unitSerial], references: [serial])
-  brand          Brand        @relation(fields: [brandId], references: [id])
-  dealer         Dealer?      @relation(fields: [dealerId], references: [id])
-  events         ClaimEvent[]
-
-  @@index([status, createdAt(sort: Desc)])
-  @@index([createdAt(sort: Desc)])
-  @@index([brandId])
-  @@index([dealerId])
-  @@map("claims")
-}
-
-model ClaimEvent {
-  id      BigInt   @id @default(autoincrement())
-  claimId String   @map("claim_id")
-  at      DateTime @db.Timestamptz(3)
+model WarrantyClaimEvent {
+  id      BigInt        @id @default(autoincrement())
+  claimId String        @map("claim_id")
+  at      DateTime      @db.Timestamptz(3)
   status  String
-  byName  String   @map("by_name")
+  byName  String        @map("by_name")
   text    String?
-  claim   Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  claim   WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
 
   @@index([claimId, at])
-  @@map("claim_events")
+  @@map("warranty_claim_events")
 }
 
 // ── Integrations, notifications, files ───────────────────────────────────────
 
-/// Every message exchanged with CRM, ERP, Finance, the service system, the OEM and the mailbox (A12).
+/// Every message exchanged with ERP, the registration mailbox, partner systems, CRM and Finance (A12).
 model IntegrationMessage {
   id        String   @id
   system    String
@@ -459,6 +404,7 @@ model Attachment {
   mime       String
   size       Int
   storageKey String   @map("storage_key")
+  /// User id, or "public" / "partner:<id>" / "system" for files that came in without a login.
   uploadedBy String   @map("uploaded_by")
   createdAt  DateTime @map("created_at") @db.Timestamptz(3)
 
