@@ -1,5 +1,5 @@
 import {
-  normalizeSerialValue,
+  modelSerial,
   type IntakeInfo,
   type PartnerClientView,
   type RegistrationRowInput,
@@ -102,7 +102,7 @@ export function publicRegistration(
   const registrationId = submitForReview(
     ctx,
     {
-      serial: normalizeSerialValue(fields.serial),
+      serial: modelSerial(fields.modelCode, fields.serial),
       batchNumber: fields.batchNumber?.trim().toUpperCase() || undefined,
       modelCode: (fields.modelCode ?? "").trim().toUpperCase(),
       customer: {
@@ -195,7 +195,7 @@ export function partnerRegistrations(
         reviewer: `Auto-approved (${client.name})`,
       }),
     );
-    const serial = normalizeSerialValue(row.serial);
+    const serial = modelSerial(row.modelCode, row.serial);
     if (result.status !== "ERROR") seen.add(serial);
     results.push(
       result.status === "ERROR"
@@ -377,7 +377,7 @@ export function inboundEmail(
   const from = str(email.from, 300) ?? "";
   const subject = str(email.subject, 300);
   const row = parseRegistrationEmail({ from, subject, text: str(email.text, 20_000) });
-  const serial = normalizeSerialValue(row.serial);
+  const serial = modelSerial(row.modelCode, row.serial);
   const logPayload = { from, to: str(email.to, 300), subject, read: row };
 
   if (!serial) {

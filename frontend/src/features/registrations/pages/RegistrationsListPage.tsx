@@ -26,7 +26,7 @@ import {
   RegistrationStatusBadge,
 } from "@/components/ui";
 import { toApiError } from "@/lib/api-error";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatModelSerial } from "@/lib/format";
 import { useTableParams } from "@/lib/use-table-params";
 import { useBulkApprove, useRegistrations } from "../hooks";
 
@@ -65,7 +65,7 @@ export default function RegistrationsListPage() {
         header: t("inbox.columns.serial"),
         cell: (i) => (
           <Link to={`/registrations/${i.row.original.id}`} className="underline-offset-2 hover:underline">
-            <MonoId>{i.getValue()}</MonoId>
+            <MonoId>{formatModelSerial(i.row.original.modelCode, i.getValue())}</MonoId>
           </Link>
         ),
       }),

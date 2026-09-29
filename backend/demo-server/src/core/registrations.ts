@@ -5,7 +5,9 @@ import {
   modelFormat,
   needsAdminReview,
   normalizeBatchValue,
-  normalizeSerialValue,
+  isModelSerial,
+  modelSerial,
+  serialNumberPart,
   REGISTRATION_CHANNELS,
   REGISTRATION_FLAGS,
   REGISTRATION_STATUSES,
@@ -137,9 +139,9 @@ function createBody(body: unknown): CreateRegistrationBody {
   };
 }
 
-/** A row's values as registration fields (serial and batch normalised, blanks dropped). */
+/** A row's values as registration fields (serial as MODEL-NUMBER, batch normalised, blanks dropped). */
 export const rowToFields = (values: RegistrationRowInput) => ({
-  serial: normalizeSerialValue(values.serial),
+  serial: modelSerial(values.modelCode, values.serial),
   batchNumber: normalizeBatchValue(values.batchNumber) || undefined,
   modelCode: (values.modelCode ?? "").trim().toUpperCase(),
   customer: {
@@ -291,14 +293,14 @@ export function selfServiceErrors(
   { proofRequired }: { proofRequired: boolean },
 ): Record<string, string> {
   const errors: Record<string, string> = {};
-  const serial = normalizeSerialValue(body.serial);
-  const batch = normalizeBatchValue(body.batchNumber);
   const modelCode = (body.modelCode ?? "").trim().toUpperCase();
+  const serial = modelSerial(modelCode, body.serial);
+  const batch = normalizeBatchValue(body.batchNumber);
   const format = modelFormats(state).get(modelCode);
   if (!modelCode) errors.modelCode = "validation.required";
   else if (!format) errors.modelCode = "rowErrors.unknown_model";
   if (!serial) errors.serial = "validation.required";
-  else if (!SERIAL_PATTERN.test(serial) || (format && !format.serial.test(serial)))
+  else if (!SERIAL_PATTERN.test(serial) || (format && !isModelSerial(serial, modelCode, format)))
     errors.serial = "rowErrors.invalid_serial";
   if (batch && format && !format.batch.test(batch)) errors.batchNumber = "rowErrors.invalid_batch";
   if (!isIsoDate(body.purchaseDate)) errors.purchaseDate = "validation.date";
@@ -314,9 +316,10 @@ function rowContext(
   state: DemoState,
   today: IsoDate,
   serialInput: string | undefined,
+  modelCode: string | undefined,
   seenInFile?: ReadonlySet<string>,
 ): RowContext {
-  const serial = normalizeSerialValue(serialInput);
+  const serial = modelSerial(modelCode, serialInput);
   const registered = state.units.some((u) => u.serial === serial && !!u.warrantyEnd);
   return {
     models: modelFormats(state),
@@ -347,7 +350,7 @@ export function registerTrusted(
 ): TrustedResult {
   const errors = validateRegistrationRow(
     values,
-    rowContext(ctx.state, ctx.today, values.serial, extra.seenInFile),
+    rowContext(ctx.state, ctx.today, values.serial, values.modelCode, extra.seenInFile),
   );
   const fields = rowToFields(values);
   const common = {
@@ -395,7 +398,10 @@ export function submitForReview(
   return reg.id;
 }
 
-/** EXCEPTION when the serial is unknown; DUPLICATE when already registered; MODEL_MISMATCH when the model differs. */
+/**
+ * EXCEPTION when the serial is unknown; DUPLICATE when already registered; MODEL_MISMATCH when we know this label
+ * number under another model (the serial is MODEL-NUMBER, so a wrongly picked model gives an unknown serial).
+ */
 export function reviewFlags(state: DemoState, serial: string, modelCode: string): RegistrationFlag[] {
   const unit = state.units.find((u) => u.serial === serial);
   const flags: RegistrationFlag[] = [];
@@ -403,6 +409,10 @@ export function reviewFlags(state: DemoState, serial: string, modelCode: string)
   else if (unit.warrantyEnd) flags.push("DUPLICATE", "EXCEPTION");
   if (unit && state.models.find((m) => m.id === unit.modelId)?.code !== modelCode)
     flags.push("MODEL_MISMATCH");
+  if (!unit) {
+    const number = serialNumberPart(serial);
+    if (state.units.some((u) => u.serial !== serial && u.serial.endsWith(`-${number}`))) flags.push("MODEL_MISMATCH");
+  }
   return flags;
 }
 
@@ -647,7 +657,7 @@ function processRows(
   const seen = new Set(
     batchOf()
       .rows.filter((r) => r.status !== "ERROR" && !numbers.has(r.rowNumber))
-      .map((r) => normalizeSerialValue(r.values.serial)),
+      .map((r) => modelSerial(r.values.modelCode, r.values.serial)),
   );
   for (const input of rows) {
     // Each row stands on its own, like the backend's per-row transaction.
@@ -668,7 +678,7 @@ function processRows(
       if (result.status === "ERROR") delete row.registrationId;
       else row.registrationId = result.registrationId;
     });
-    seen.add(normalizeSerialValue(input.values.serial));
+    seen.add(modelSerial(input.values.modelCode, input.values.serial));
   }
   const batch = batchOf();
   batch.updatedAt = ctx.now;

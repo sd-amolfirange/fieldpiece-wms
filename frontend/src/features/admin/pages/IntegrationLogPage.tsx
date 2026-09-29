@@ -24,11 +24,13 @@ import {
 import { toApiError } from "@/lib/api-error";
 import { formatDateTime } from "@/lib/format";
 import { useTableParams } from "@/lib/use-table-params";
+import { PartnerClientsCard } from "@/features/registrations/components/PartnerClientsCard";
 import { AdminTabs } from "../components/AdminTabs";
 import { useIntegrations, useRetryIntegration } from "../hooks";
 
 // A12 Integration log: every message in and out (system, direction, status, time), the payload behind each
-// one, and Retry for failed messages.
+// one, and Retry for failed messages. Partner API keys (the systems allowed to send inbound registrations)
+// are managed here too, since they're the source of the "Partner API" rows in this same log.
 
 const DIRECTIONS: IntegrationDirection[] = ["IN", "OUT"];
 const col = createColumnHelper<IntegrationMessage>();
@@ -219,6 +221,10 @@ export default function IntegrationLogPage() {
           </div>
         ) : null}
       </Modal>
+
+      <div className="mt-6">
+        <PartnerClientsCard />
+      </div>
     </>
   );
 }

@@ -19,7 +19,7 @@ describe("W3: warranty claim settled by replacement", () => {
     async () => {
       // CU04: the customer picks the product, sees the coverage and describes the problem.
       await signInAs("customer.mreed@wms.local");
-      const cu04 = renderApp("/claims/new?serial=251406233");
+      const cu04 = renderApp("/claims/new?serial=SC680-251406233");
       expect(await screen.findByText(/In warranty until .+\. The claim is covered\./)).toBeInTheDocument();
       await cu04.user.selectOptions(screen.getByLabelText(/What's wrong/), "DISPLAY");
       await cu04.user.type(
@@ -29,13 +29,13 @@ describe("W3: warranty claim settled by replacement", () => {
       await cu04.user.click(screen.getByRole("button", { name: "Submit claim" }));
       expect(await screen.findByRole("heading", { name: "Progress" })).toBeInTheDocument();
       cu04.unmount();
-      const [claim] = (await claimsApi.list({ q: "251406233" })).items;
+      const [claim] = (await claimsApi.list({ q: "SC680-251406233" })).items;
       expect(claim).toMatchObject({ status: "SUBMITTED", source: "CUSTOMER", issueType: "DISPLAY" });
 
       // One open claim per product.
       await expect(
         claimsApi.create({
-          unitSerial: "251406233",
+          unitSerial: "SC680-251406233",
           issueType: "OTHER",
           description: "Second claim attempt.",
           attachmentIds: [],
@@ -57,14 +57,14 @@ describe("W3: warranty claim settled by replacement", () => {
       await a10.user.type(within(close).getByLabelText(/Replacement serial number/), "263899901");
       await a10.user.type(within(close).getByLabelText(/Replacement batch number/), "2638-L01");
       await a10.user.click(within(close).getByRole("button", { name: "Close claim" }));
-      expect(await screen.findByText("Replaced under warranty with 263899901.")).toBeInTheDocument();
+      expect(await screen.findByText("Replaced under warranty with SC680-263899901.")).toBeInTheDocument();
       a10.unmount();
 
       // The customer owns the replacement, with the rest of the warranty.
       await signInAs("customer.mreed@wms.local");
       renderApp("/");
-      expect(await screen.findByText("263899901")).toBeInTheDocument();
-      expect(screen.getByText("Replaced under warranty by 263899901")).toBeInTheDocument();
+      expect(await screen.findByText("SC680-263899901")).toBeInTheDocument();
+      expect(screen.getByText("Replaced under warranty by SC680-263899901")).toBeInTheDocument();
     },
     WORKFLOW_TIMEOUT,
   );
@@ -76,7 +76,7 @@ describe("W4: dealer claim settled by credit", () => {
     async () => {
       await signInAs("dealer.lonestar@wms.local");
       const claim = await claimsApi.create({
-        unitSerial: "252811902",
+        unitSerial: "MG44-252811902",
         issueType: "CONNECTIVITY",
         description: "Gauge drops the Job Link connection every few minutes.",
         attachmentIds: [],
@@ -121,7 +121,7 @@ describe("W5: void warranty", () => {
     "voids the warranty with a reason, and a later claim is recorded as not covered",
     async () => {
       await signInAs("admin@wms.local");
-      const a05 = renderApp("/units/252207119");
+      const a05 = renderApp("/units/DR82-252207119");
       await a05.user.click(await screen.findByRole("button", { name: "Void warranty" }));
       const dialog = await screen.findByRole("dialog");
       await a05.user.selectOptions(within(dialog).getByLabelText(/Reason/), "UNAUTHORIZED_REPAIR");
@@ -130,11 +130,11 @@ describe("W5: void warranty", () => {
       a05.unmount();
 
       await signInAs("customer.mreed@wms.local");
-      const cu04 = renderApp("/claims/new?serial=252207119");
+      const cu04 = renderApp("/claims/new?serial=DR82-252207119");
       expect(await screen.findByText(/warranty on this product is void/)).toBeInTheDocument();
       cu04.unmount();
       const claim = await claimsApi.create({
-        unitSerial: "252207119",
+        unitSerial: "DR82-252207119",
         issueType: "INACCURATE_READING",
         description: "No longer alarms on a known R-410A leak.",
         attachmentIds: [],

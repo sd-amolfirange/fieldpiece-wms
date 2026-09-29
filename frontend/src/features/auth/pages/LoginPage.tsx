@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LogIn } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { toast } from "@/components/feedback";
 import { AuthLayout } from "@/components/layout";
 import { Button, Card, FormField, Input, NativeSelect } from "@/components/ui";
@@ -19,7 +19,6 @@ const showDemoAccounts = env.demoMode;
 export default function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
   const status = useSession((s) => s.status);
   const login = useLogin();
   const demoAccounts = useQuery({
@@ -29,7 +28,6 @@ export default function LoginPage() {
     staleTime: Infinity,
     retry: false,
   });
-  const from = (location.state as { from?: string } | null)?.from ?? "/";
 
   const {
     register,
@@ -48,11 +46,12 @@ export default function LoginPage() {
     setValue("password", account?.password ?? "", { shouldValidate: !!account });
   };
 
-  if (status === "authenticated") return <Navigate to={from} replace />;
+  if (status === "authenticated") return <Navigate to="/" replace />;
 
   const onSubmit = handleSubmit((values) =>
     login.mutate(values, {
-      onSuccess: () => navigate(from, { replace: true }),
+      // Always land on the home page for the signed-in role, not the page that asked for sign-in.
+      onSuccess: () => navigate("/", { replace: true }),
       onError: (error) => {
         if (!applyFieldErrors(error, setError)) toast.error(toApiError(error).message);
       },

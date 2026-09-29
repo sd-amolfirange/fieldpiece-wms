@@ -4,8 +4,8 @@ import { appUrl, expect, present, receiptPhoto, resetDemoData, rolePage, test } 
 // The customer files a claim on an in-warranty clamp meter; the warranty desk reviews, approves a replacement and
 // closes the claim with the new serial, which is registered to the customer with the rest of the warranty.
 
-const UNIT = "251406233";
-const REPLACEMENT = "263899901";
+const UNIT = "SC680-251406233";
+const REPLACEMENT = "SC680-263899901";
 
 test("W3: warranty claim settled by replacement", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));

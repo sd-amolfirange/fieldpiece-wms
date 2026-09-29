@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
-  normalizeSerialValue,
+  modelSerial,
   type IntakeInfo,
   type RegistrationRowInput,
   type RowErrors,
@@ -140,7 +140,7 @@ export class IntakeService {
       return this.registrations.submitForReview(
         tx,
         {
-          serial: normalizeSerialValue(fields.serial),
+          serial: modelSerial(fields.modelCode, fields.serial),
           batchNumber: fields.batchNumber?.trim().toUpperCase() || undefined,
           modelCode: (fields.modelCode ?? "").trim().toUpperCase(),
           customer: {
@@ -191,7 +191,7 @@ export class IntakeService {
           reviewer: `Auto-approved (${client.name})`,
         }),
       );
-      const serial = normalizeSerialValue(row.serial);
+      const serial = modelSerial(row.modelCode, row.serial);
       if (result.status !== "ERROR") seen.add(serial);
       results.push(
         result.status === "ERROR"
@@ -245,7 +245,7 @@ export class IntakeService {
     const subject = str(email.subject, 300);
     const text = str(email.text, 20_000);
     const row = parseRegistrationEmail({ from, subject, text });
-    const serial = normalizeSerialValue(row.serial);
+    const serial = modelSerial(row.modelCode, row.serial);
     const logPayload = { from, to: str(email.to, 300), subject, read: row };
 
     if (!serial) {

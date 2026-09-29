@@ -25,7 +25,7 @@ test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
     await expect(dealer.getByText("Registrations this month")).toBeVisible();
     await expect(dealer.getByText("Open claims")).toBeVisible();
     const nav = dealer.getByRole("navigation", { name: "Main navigation" });
-    await expect(nav.getByRole("link", { name: "Products I sold" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Sold products" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Registration channels" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Product catalog" })).toHaveCount(0);
   });
@@ -49,25 +49,25 @@ test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
     ).toBeVisible();
   });
 
-  await test.step("4. DL04 Products I sold: the new products are Active with serial and batch", async () => {
+  await test.step("4. DL04 Sold products: the new products are Active with serial and batch", async () => {
     await dealer.goto("/units?q=2635&pageSize=50");
     const table = dealer.getByRole("table");
     await expect(table.getByText("263510101")).toBeVisible();
     await expect(table.locator("tbody tr", { hasText: "Active" })).toHaveCount(24);
     await expect(table.locator("tbody tr", { hasText: "263510101" })).toContainText("2635-L01");
-    await dealer.goto("/units/263510101");
+    await dealer.goto("/units/SC680-263510101");
     await expect(dealer.getByText("1 year from the date of purchase")).toBeVisible();
   });
 
   await test.step("5. A02 Registration inbox, Duplicates: only the known serial needs a human", async () => {
     await admin.goto("/registrations");
     await admin.getByLabel("Filter by exception").selectOption("DUPLICATE");
-    await expect(admin.getByRole("table").getByText("252811902")).toBeVisible();
+    await expect(admin.getByRole("table").getByText("MG44-252811902")).toBeVisible();
     await expect(admin.getByRole("table").locator("tbody tr")).toHaveCount(1);
   });
 
   await test.step("6. A03: compare with the existing record and reject with a reason", async () => {
-    await admin.getByRole("table").getByRole("link", { name: "252811902" }).click();
+    await admin.getByRole("table").getByRole("link", { name: "MG44-252811902" }).click();
     const existing = admin.locator("section", {
       has: admin.getByRole("heading", { name: "Existing record" }),
     });

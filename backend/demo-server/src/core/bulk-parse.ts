@@ -1,4 +1,4 @@
-import type { RegistrationRowInput } from "@wms/domain";
+import { isIsoDate, type RegistrationRowInput } from "@wms/domain";
 
 // Bulk registration sheets (DL02), as backend/src/modules/registrations/sheets.ts: the template columns and turning an
 // uploaded sheet (already read into a string matrix) into rows. Columns are matched by header name, so their order in
@@ -45,7 +45,7 @@ const FIELD_BY_HEADER: Record<string, keyof RegistrationRowInput> = {
 
 /** The template's example row. */
 export const TEMPLATE_SAMPLE_ROW = [
-  "243500101",
+  "SC680-243500101",
   "2435-L02",
   "SC680",
   "2026-09-15",
@@ -58,6 +58,25 @@ export const TEMPLATE_SAMPLE_ROW = [
   "INV-10001",
 ] as const;
 
+// As backend/src/modules/registrations/sheets.ts: a US dealer's own spreadsheet is usually M/D/YYYY or
+// MM-DD-YYYY, not ISO — accept that in an uploaded sheet's Purchase date column and convert to yyyy-MM-dd
+// before validation sees it. Four-digit years only, so it's never ambiguous with ISO or day-first (DD/MM/YYYY).
+const US_DATE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/;
+
+/** "9/15/2026" or "09-15-2026" -> "2026-09-15"; anything already ISO, or not a recognised US date, is unchanged. */
+export function normalizeSheetDate(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || isIsoDate(trimmed)) return trimmed;
+  const m = US_DATE.exec(trimmed);
+  if (!m) return trimmed;
+  const [, monthStr, dayStr, year] = m;
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return trimmed;
+  const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return isIsoDate(iso) ? iso : trimmed;
+}
+
 /** Rows from a string matrix (header row first). Blank rows are skipped. */
 export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
   const [header, ...body] = matrix;
@@ -68,7 +87,9 @@ export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
     .map((cells) => {
       const row: RegistrationRowInput = {};
       fields.forEach((field, i) => {
-        if (field) row[field] = (cells[i] ?? "").trim().slice(0, 200);
+        if (!field) return;
+        const text = (cells[i] ?? "").trim().slice(0, 200);
+        row[field] = field === "purchaseDate" ? normalizeSheetDate(text) : text;
       });
       return row;
     });

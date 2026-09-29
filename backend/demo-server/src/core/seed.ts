@@ -441,7 +441,7 @@ export function createSeedData(today: IsoDate): SeedState {
   // ── Named products ──────────────────────────────────────────────────────────
   // Shipped to Lone Star on an ERP invoice and not registered yet: the customer registers it from the QR label (W2).
   state.units.push({
-    serial: "261804517",
+    serial: "SM482V-261804517",
     batchNumber: "2618-L02",
     modelId: "m-sm482v",
     dealerId: "d-lonestar",
@@ -458,7 +458,7 @@ export function createSeedData(today: IsoDate): SeedState {
   // Marcus Reed (customer login): an active clamp meter, an expired vacuum pump, a leak detector opened by a
   // third party (voided in W5).
   register({
-    serial: "251406233",
+    serial: "SC680-251406233",
     batchNumber: "2514-L01",
     model: "SC680",
     dealerId: "d-lonestar",
@@ -467,7 +467,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "DEALER",
   });
   register({
-    serial: "243208841",
+    serial: "VP87-243208841",
     batchNumber: "2432-L03",
     model: "VP87",
     dealerId: "d-lonestar",
@@ -476,7 +476,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "DEALER",
   });
   const voidCandidate = register({
-    serial: "252207119",
+    serial: "DR82-252207119",
     batchNumber: "2522-L01",
     model: "DR82",
     dealerId: "d-lonestar",
@@ -493,7 +493,7 @@ export function createSeedData(today: IsoDate): SeedState {
 
   // ── Other registered products ───────────────────────────────────────────────
   register({
-    serial: "252510384",
+    serial: "SC480-252510384",
     batchNumber: "2525-L02",
     model: "SC480",
     dealerId: "d-lonestar",
@@ -502,7 +502,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "BULK",
   });
   register({
-    serial: "252811902",
+    serial: "MG44-252811902",
     batchNumber: "2528-L01",
     model: "MG44",
     dealerId: "d-lonestar",
@@ -511,7 +511,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "DEALER",
   });
   register({
-    serial: "251902645",
+    serial: "MR45-251902645",
     batchNumber: "2519-L03",
     model: "MR45",
     dealerId: "d-lonestar",
@@ -520,7 +520,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "WEB",
   });
   register({
-    serial: "252005531",
+    serial: "SM382V-252005531",
     batchNumber: "2520-L01",
     model: "SM382V",
     dealerId: "d-bayou",
@@ -529,7 +529,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "DEALER",
   });
   register({
-    serial: "252309478",
+    serial: "SC260-252309478",
     batchNumber: "2523-L02",
     model: "SC260",
     dealerId: "d-bayou",
@@ -538,7 +538,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "EMAIL",
   });
   register({
-    serial: "242704412",
+    serial: "JL3KH6-242704412",
     batchNumber: "2427-L01",
     model: "JL3KH6",
     dealerId: "d-bayou",
@@ -547,7 +547,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "DEALER",
   });
   register({
-    serial: "252612087",
+    serial: "SRS1-252612087",
     batchNumber: "2526-L04",
     model: "SRS1",
     dealerId: "d-desertpeak",
@@ -557,7 +557,7 @@ export function createSeedData(today: IsoDate): SeedState {
     placeOfPurchase: "Online marketplace",
   });
   register({
-    serial: "252103356",
+    serial: "STA2-252103356",
     batchNumber: "2521-L02",
     model: "STA2",
     dealerId: "d-desertpeak",
@@ -566,7 +566,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "ERP",
   });
   register({
-    serial: "252409963",
+    serial: "SC680-252409963",
     batchNumber: "2524-L01",
     model: "SC680",
     dealerId: "d-desertpeak",
@@ -575,7 +575,7 @@ export function createSeedData(today: IsoDate): SeedState {
     channel: "API",
   });
   register({
-    serial: "243011270",
+    serial: "VP87-243011270",
     batchNumber: "2430-L02",
     model: "VP87",
     dealerId: "d-desertpeak",
@@ -705,7 +705,7 @@ export function createSeedData(today: IsoDate): SeedState {
   }
 
   claim({
-    serial: "252510384",
+    serial: "SC480-252510384",
     source: "DEALER",
     issueType: "INACCURATE_READING",
     description: "Amp readings drift about 8% high against our reference meter on a 40A load.",
@@ -719,14 +719,14 @@ export function createSeedData(today: IsoDate): SeedState {
     ],
   });
   claim({
-    serial: "252005531",
+    serial: "SM382V-252005531",
     source: "DEALER",
     issueType: "CONNECTIVITY",
     description:
       "Bluetooth pairing fails with the Job Link app on two different phones after the latest update.",
     filedDaysAgo: 40,
     resolution: "REPLACE",
-    replacement: { serial: "252707701", batchNumber: "2527-L02" },
+    replacement: { serial: "SM382V-252707701", batchNumber: "2527-L02" },
     steps: [
       { status: "IN_REVIEW", daysAgo: 39 },
       { status: "APPROVED", daysAgo: 36, text: "Radio module fault confirmed; replace the manifold." },
@@ -734,7 +734,7 @@ export function createSeedData(today: IsoDate): SeedState {
     ],
   });
   claim({
-    serial: "252309478",
+    serial: "SC260-252309478",
     source: "DEALER",
     issueType: "DISPLAY",
     description: "Display segments missing on the main reading after two weeks of use.",
@@ -748,7 +748,7 @@ export function createSeedData(today: IsoDate): SeedState {
     ],
   });
   claim({
-    serial: "242704412",
+    serial: "JL3KH6-242704412",
     source: "CUSTOMER",
     issueType: "NO_POWER",
     description: "The airflow probe no longer turns on, even with fresh batteries.",
@@ -763,7 +763,7 @@ export function createSeedData(today: IsoDate): SeedState {
     ],
   });
   claim({
-    serial: "243011270",
+    serial: "VP87-243011270",
     source: "DEALER",
     issueType: "LEAK_OR_PRESSURE",
     description: "Oil leaking at the shaft seal; the pump won't pull below 800 microns.",
@@ -775,7 +775,7 @@ export function createSeedData(today: IsoDate): SeedState {
     ],
   });
   claim({
-    serial: "251902645",
+    serial: "MR45-251902645",
     source: "CUSTOMER",
     issueType: "MECHANICAL",
     description: "The recovery machine hums on start-up and then trips the breaker.",
@@ -783,7 +783,7 @@ export function createSeedData(today: IsoDate): SeedState {
     steps: [{ status: "IN_REVIEW", daysAgo: 10 }],
   });
   claim({
-    serial: "252409963",
+    serial: "SC680-252409963",
     source: "CUSTOMER",
     issueType: "MECHANICAL",
     description: "The clamp jaw doesn't close fully, and readings jump when the head swivels.",
@@ -801,7 +801,7 @@ export function createSeedData(today: IsoDate): SeedState {
     payload: {
       invoice: "GS-240517",
       dealer: "Lone Star Refrigeration Supply",
-      lines: [{ serial: "261804517", batchNumber: "2618-L02", model: "SM482V" }],
+      lines: [{ serial: "SM482V-261804517", batchNumber: "2618-L02", model: "SM482V" }],
     },
     at: ts(daysAgo(12), "08:30:00"),
   });
@@ -818,7 +818,7 @@ export function createSeedData(today: IsoDate): SeedState {
       registered: 1,
       review: 0,
       errors: 0,
-      serials: ["252612087"],
+      serials: ["SRS1-252612087"],
     },
     at: ts(daysAgo(60), "09:00:00"),
   });
@@ -829,7 +829,7 @@ export function createSeedData(today: IsoDate): SeedState {
     status: "FAILED",
     lastError: "CRM did not respond within 30 s.",
     refId: "c-bwalker",
-    payload: { customerId: "c-bwalker", products: ["252612087"] },
+    payload: { customerId: "c-bwalker", products: ["SRS1-252612087"] },
     at: ts(daysAgo(60), "09:05:00"),
   });
 

@@ -21,7 +21,7 @@ describe("SerialNumberInput", () => {
 
 describe("isValidSerial", () => {
   it("checks against the default pattern", () => {
-    expect(isValidSerial("251406233")).toBe(true);
+    expect(isValidSerial("SC680-251406233")).toBe(true);
     expect(isValidSerial("abc")).toBe(false);
   });
 

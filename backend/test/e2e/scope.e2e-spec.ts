@@ -45,20 +45,20 @@ describe("roles and data scope", () => {
     const gulfstates = await products("distributor");
     expect(new Set(gulfstates.map((u) => u.dealerId))).toEqual(new Set(["d-lonestar", "d-bayou"]));
     expect((await products("customer")).map((u) => u.serial).sort()).toEqual([
-      "243208841",
-      "251406233",
-      "252207119",
+      "DR82-252207119",
+      "SC680-251406233",
+      "VP87-243208841",
     ]);
   });
 
   it("answers 404, not 403, for a record outside the caller's scope", async () => {
-    // 252409963 belongs to Desert Peak HVAC Supply (no distributor).
+    // SC680-252409963 belongs to Desert Peak HVAC Supply (no distributor).
     for (const who of ["dealer", "distributor", "customer"] as const) {
-      const res = await get(who, "/units/252409963");
+      const res = await get(who, "/units/SC680-252409963");
       expect([who, res.status, res.body.code]).toEqual([who, 404, "not_found"]);
     }
-    expect((await get("bayou", "/units/251406233")).status).toBe(404);
-    expect((await get("admin", "/units/252409963")).status).toBe(200);
+    expect((await get("bayou", "/units/SC680-251406233")).status).toBe(404);
+    expect((await get("admin", "/units/SC680-252409963")).status).toBe(200);
   });
 
   it("scopes warranty claims: customers see their own, dealers their products', admins all", async () => {
@@ -79,7 +79,7 @@ describe("roles and data scope", () => {
       ["distributor", "GET", "/admin/org"],
       ["dealer", "GET", "/admin/partner-clients"],
       ["dealer", "POST", "/registrations/bulk-approve"],
-      ["dealer", "POST", "/units/251406233/void"],
+      ["dealer", "POST", "/units/SC680-251406233/void"],
       ["distributor", "POST", "/claims/CLM-1006/transitions"],
       ["customer", "POST", "/claims/CLM-1006/transitions"],
       ["customer", "POST", "/simulate/erp-invoice"],
@@ -121,7 +121,7 @@ describe("roles and data scope", () => {
       url: "/claims",
       as: s.customer,
       body: {
-        unitSerial: "251406233",
+        unitSerial: "SC680-251406233",
         issueType: "DISPLAY",
         description: "Display flickers all the time.",
         attachmentIds: [up.body.id],

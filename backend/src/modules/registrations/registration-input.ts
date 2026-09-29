@@ -1,6 +1,6 @@
 import {
+  modelSerial,
   normalizeBatchValue,
-  normalizeSerialValue,
   type RegistrationCustomer,
   type RegistrationRowInput,
   type RowErrors,
@@ -56,9 +56,9 @@ export function createBody(body: unknown): CreateRegistrationBody {
   };
 }
 
-/** A row's values as registration fields (serial and batch normalised, blanks dropped). */
+/** A row's values as registration fields (serial as MODEL-NUMBER, batch normalised, blanks dropped). */
 export const rowToFields = (values: RegistrationRowInput) => ({
-  serial: normalizeSerialValue(values.serial),
+  serial: modelSerial(values.modelCode, values.serial),
   batchNumber: normalizeBatchValue(values.batchNumber) || undefined,
   modelCode: (values.modelCode ?? "").trim().toUpperCase(),
   customer: {

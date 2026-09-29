@@ -1,4 +1,4 @@
-import { addDaysIso, type IsoDate, type RegistrationView } from "@wms/domain";
+import { addDaysIso, type IsoDate, type RegistrationView, serialNumberPart } from "@wms/domain";
 import { conflict, notFound } from "./errors";
 import { inboundEmail, INBOUND_EMAIL_ADDRESS, partnerRegistrations } from "./intake";
 import { simplePdf } from "./pdf";
@@ -20,17 +20,25 @@ function batchFor(today: IsoDate, line: number): string {
   return `${String(built.getUTCFullYear()).slice(2)}${String(week).padStart(2, "0")}-L${String(line).padStart(2, "0")}`;
 }
 
-/** A serial nobody has used yet, in the label format: the batch's yyww + a 5-digit sequence. */
-function freeSerial(state: DemoState, today: IsoDate, taken: ReadonlySet<string> = new Set()): string {
-  const used = new Set([
-    ...taken,
-    ...state.units.map((u) => u.serial),
-    ...state.registrations.map((r) => r.serial),
-  ]);
+/**
+ * A MODEL-NUMBER serial nobody has used yet; the number is in the label format (the batch's yyww + a 5-digit
+ * sequence) and not used under any model, so the demo never produces a MODEL_MISMATCH by accident.
+ */
+function freeSerial(
+  state: DemoState,
+  today: IsoDate,
+  modelCode: string,
+  taken: ReadonlySet<string> = new Set(),
+): string {
+  const used = new Set(
+    [...taken, ...state.units.map((u) => u.serial), ...state.registrations.map((r) => r.serial)].map(
+      serialNumberPart,
+    ),
+  );
   const prefix = batchFor(today, 1).slice(0, 4);
   for (let n = 30001; ; n += 1) {
-    const serial = `${prefix}${String(n).padStart(5, "0")}`;
-    if (!used.has(serial)) return serial;
+    const number = `${prefix}${String(n).padStart(5, "0")}`;
+    if (!used.has(number)) return `${modelCode}-${number}`;
   }
 }
 
@@ -55,7 +63,7 @@ export function simulateErpInvoice(ctx: Ctx): RegistrationView[] {
   ];
   // One registration per invoice line; each is saved before the next serial is picked, so serials never repeat.
   const created = lines.map((line) => {
-    const serial = freeSerial(state, today);
+    const serial = freeSerial(state, today, line.model);
     const id = submitForReview(
       ctx,
       {
@@ -101,7 +109,7 @@ export function simulateErpInvoice(ctx: Ctx): RegistrationView[] {
 export function simulateRegistrationEmail(ctx: Ctx): RegistrationView {
   requireRole(ctx, "admin");
   const { today } = ctx;
-  const serial = freeSerial(ctx.state, today);
+  const serial = freeSerial(ctx.state, today, "SC680");
   const batch = batchFor(today, 3);
   const [y, m, d] = addDaysIso(today, -3).split("-");
   const invoiceNumber = `LS-${today.slice(0, 4)}-${serial.slice(-4)}`;
@@ -146,8 +154,8 @@ export function simulateMarketplaceOrder(ctx: Ctx): RegistrationView[] {
   const { state, today } = ctx;
   const client = state.partnerClients.find((p) => p.id === "pc-marketplace");
   if (!client?.active) throw notFound("Active marketplace partner");
-  const first = freeSerial(state, today);
-  const second = freeSerial(state, today, new Set([first]));
+  const first = freeSerial(state, today, "VP87");
+  const second = freeSerial(state, today, "SM482V", new Set([first]));
   const order = (serial: string, line: number, modelCode: string, customer: Record<string, string>) => ({
     serial,
     batchNumber: batchFor(today, line),

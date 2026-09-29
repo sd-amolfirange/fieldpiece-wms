@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseCsv, readSheet, rowsFromMatrix, templateCsv, templateXlsx } from "./sheets";
+import { normalizeSheetDate, parseCsv, readSheet, rowsFromMatrix, templateCsv, templateXlsx } from "./sheets";
 
 describe("bulk sheets", () => {
   it("parses quoted CSV with CRLF and a BOM", () => {
@@ -14,11 +14,11 @@ describe("bulk sheets", () => {
     expect(
       rowsFromMatrix([
         ["Purchase date", "Serial number", "Unknown", "Model", "Lot number"],
-        ["2026-09-01", " 251406233 ", "x", "SC680", "2514-L01"],
+        ["2026-09-01", " SC680-251406233 ", "x", "SC680", "2514-L01"],
         ["", "", "", "", ""],
       ]),
     ).toEqual([
-      { purchaseDate: "2026-09-01", serial: "251406233", modelCode: "SC680", batchNumber: "2514-L01" },
+      { purchaseDate: "2026-09-01", serial: "SC680-251406233", modelCode: "SC680", batchNumber: "2514-L01" },
     ]);
   });
 
@@ -27,7 +27,7 @@ describe("bulk sheets", () => {
     const fromXlsx = rowsFromMatrix(await readSheet("t.xlsx", await templateXlsx()));
     expect(fromCsv).toEqual(fromXlsx);
     expect(fromCsv[0]).toMatchObject({
-      serial: "243500101",
+      serial: "SC680-243500101",
       batchNumber: "2435-L02",
       modelCode: "SC680",
       purchaseDate: "2026-09-15",
@@ -35,6 +35,31 @@ describe("bulk sheets", () => {
       zip: "77002",
       customerEmail: "",
     });
+  });
+
+  it("accepts a US-format purchase date (M/D/YYYY or MM-DD-YYYY) and converts it to ISO", () => {
+    expect(normalizeSheetDate("9/15/2026")).toBe("2026-09-15");
+    expect(normalizeSheetDate("09/15/2026")).toBe("2026-09-15");
+    expect(normalizeSheetDate("09-15-2026")).toBe("2026-09-15");
+    expect(normalizeSheetDate("1/1/2026")).toBe("2026-01-01");
+  });
+
+  it("leaves an already-ISO date, and an unrecognised or invalid date, unchanged", () => {
+    expect(normalizeSheetDate("2026-09-15")).toBe("2026-09-15");
+    expect(normalizeSheetDate("")).toBe("");
+    expect(normalizeSheetDate("not a date")).toBe("not a date");
+    // Feb 30 doesn't exist, and 13 isn't a month: never silently accepted.
+    expect(normalizeSheetDate("02/30/2026")).toBe("02/30/2026");
+    expect(normalizeSheetDate("13/01/2026")).toBe("13/01/2026");
+  });
+
+  it("normalises Purchase date in a row the same way", () => {
+    expect(
+      rowsFromMatrix([
+        ["Serial number", "Model", "Purchase date"],
+        ["SC680-251406233", "SC680", "9/15/2026"],
+      ]),
+    ).toEqual([{ serial: "SC680-251406233", modelCode: "SC680", purchaseDate: "2026-09-15" }]);
   });
 
   it("reads the W1 sample file: 25 rows, one without a purchase date", async () => {

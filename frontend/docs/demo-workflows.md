@@ -24,7 +24,7 @@ All signed-in roles: Notifications (bell), Profile / sign out. Each role sees on
 
 - One warranty per product: **1 year from the date of purchase** (Fieldpiece: "All of our products have a 1 year warranty from date of purchase."), kept per model in the product catalog.
 - Warranty ends on purchase date + 12 months − 1 day. Status: Active, Expiring soon (≤ 30 days), Expired, Void, Pending registration.
-- Serial: 9 digits, year + week + 5-digit sequence (e.g. `251406233`). Batch: year + week + line (e.g. `2514-L03`). Stored per model so real formats can be set later [CONFIRM].
+- Serial: 9 digits, year + week + 5-digit sequence (e.g. `SC680-251406233`). Batch: year + week + line (e.g. `2514-L03`). Stored per model so real formats can be set later [CONFIRM].
 - A replacement under warranty is registered to the same customer and carries the rest of the original warranty [CONFIRM].
 - Currency USD, time zone America/Los_Angeles, US dates ("Sep 28, 2026").
 
@@ -43,9 +43,9 @@ All signed-in roles: Notifications (bell), Profile / sign out. Each role sees on
 
 ## Seed data
 
-- Bulk file `demo-assets/lonestar_sales_week38.xlsx`: 25 rows, 3 deliberate errors (unknown model SC690 on row 8, serial 252811902 already registered on row 14, missing purchase date on row 20).
-- Product `261804517` (SM482V, batch `2618-L02`): shipped to Lone Star on an ERP invoice, not registered; has a printable QR label (W2). Sample labels in `demo-assets/qr-samples/`.
-- Marcus Reed: `251406233` SC680 (active), `243208841` VP87 (expired), `252207119` DR82 (third-party repair note, voided in W5).
+- Bulk file `demo-assets/lonestar_sales_week38.xlsx`: 25 rows, 3 deliberate errors (unknown model SC690 on row 8, serial MG44-252811902 already registered on row 14, missing purchase date on row 20).
+- Product `SM482V-261804517` (SM482V, batch `2618-L02`): shipped to Lone Star on an ERP invoice, not registered; has a printable QR label (W2). Sample labels in `demo-assets/qr-samples/`.
+- Marcus Reed: `SC680-251406233` SC680 (active), `VP87-243208841` VP87 (expired), `DR82-252207119` DR82 (third-party repair note, voided in W5).
 - 12 Fieldpiece models in 7 categories; 15 products; claims CLM-1001..1007 in every status (repair, replacement, $139.00 credit, rejected, approved, in review, submitted).
 - Partner systems: Desert Peak HVAC Supply point of sale (Partner API) and an online marketplace.
 - Admin → System events → Reset data restores this state.
@@ -54,33 +54,32 @@ All signed-in roles: Notifications (bell), Profile / sign out. Each role sees on
 
 ### Admin (Web · desktop layout)
 
-| Code | Screen                | Must contain                                                                                                                                                                                                              |
-| ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A01  | Admin dashboard       | Cards: registered products, active, ending within 30 days, expired, open claims, registrations to review; Registrations by channel; Claims by status; Claims by product category; Warranties ending soon; Recent activity |
-| A02  | Registration inbox    | Queue from every channel with a channel badge; batch number; filters: status, exceptions, duplicates, channel; bulk approve                                                                                               |
-| A03  | Registration review   | Submitted data (serial, batch, model, purchase date, place of purchase, US address) next to the receipt; duplicate / model-mismatch warnings; approve, reject, merge                                                      |
-| A04  | Registered products   | Search by serial, batch, model, customer, dealer; batch, purchase date, warranty end, status pill; manual add, bulk upload                                                                                                |
-| A05  | Product detail        | Warranty (term, start, end, days left, what's covered); claims on the product; history; QR label with batch; certificate PDF; void warranty with reason                                                                   |
-| A06  | Product catalog       | Fieldpiece models by category with warranty term; model page: warranty, serial and batch label format                                                                                                                     |
-| A09  | Warranty claims       | Counts per status (Submitted, In review, Approved, Closed, Rejected); filters: status, issue, who filed it; File a claim                                                                                                  |
-| A10  | Claim detail          | Coverage when filed; product (serial, batch, purchase date, warranty today); evidence; progress; Start review, Approve (repair / replace / credit in USD), Reject, Close (replacement serial and batch)                   |
-| A11  | Dealers & users       | Distributor → dealer hierarchy; dealer accounts and logins                                                                                                                                                                |
-| A12  | Integration log       | Every message: Distributor ERP, Email, Partner API, CRM, Finance (credit memos); direction, status, retry, payload                                                                                                        |
-| A13  | System events         | Distributor ERP invoice (3 serials), registration email with receipt, marketplace orders (2 serials); Reset data                                                                                                          |
-| HUB  | Registration channels | Every entry point: at the counter, bulk upload, website form (link and QR), email address, customer portal, partner API sample; partner systems and API keys                                                              |
+| Code | Screen              | Must contain                                                                                                                                                                                                              |
+| ---- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A01  | Admin dashboard     | Cards: registered products, active, ending within 30 days, expired, open claims, registrations to review; Registrations by channel; Claims by status; Claims by product category; Warranties ending soon; Recent activity |
+| A02  | Registration inbox  | Queue from every channel with a channel badge; batch number; filters: status, exceptions, duplicates, channel; bulk approve                                                                                               |
+| A03  | Registration review | Submitted data (serial, batch, model, purchase date, place of purchase, US address) next to the receipt; duplicate / model-mismatch warnings; approve, reject, merge                                                      |
+| A04  | Registered products | Search by serial, batch, model, customer, dealer; batch, purchase date, warranty end, status pill; manual add, bulk upload                                                                                                |
+| A05  | Product detail      | Warranty (term, start, end, days left, what's covered); claims on the product; history; QR label with batch; certificate PDF; void warranty with reason                                                                   |
+| A06  | Product catalog     | Fieldpiece models by category with warranty term; model page: warranty, serial and batch label format                                                                                                                     |
+| A09  | Warranty claims     | Counts per status (Submitted, In review, Approved, Closed, Rejected); filters: status, issue, who filed it; File a claim                                                                                                  |
+| A10  | Claim detail        | Coverage when filed; product (serial, batch, purchase date, warranty today); evidence; progress; Start review, Approve (repair / replace / credit in USD), Reject, Close (replacement serial and batch)                   |
+| A11  | Dealers & users     | Distributor → dealer hierarchy; dealer accounts and logins                                                                                                                                                                |
+| A12  | Integration log     | Every message: Distributor ERP, Email, Partner API, CRM, Finance (credit memos); direction, status, retry, payload; partner systems and API keys (add, turn on/off)                                                       |
+| A13  | System events       | Distributor ERP invoice (3 serials), registration email with receipt, marketplace orders (2 serials); Reset data                                                                                                          |
 
 ### Dealer / Distributor (Web · desktop & tablet)
 
-| Code | Screen                     | Must contain                                                                                                    |
-| ---- | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| DL01 | Dealer home                | Registrations this month, pending, rejected, open claims; distributor: filter by dealer, dealer comparison      |
-| DL02 | Bulk import                | Excel / CSV template; upload → row checks (model, serial and batch format, date); fix inline, resubmit; history |
-| DL03 | Register a product         | Single form or QR scan; serial, batch, model, purchase date, invoice; customer with US state and ZIP            |
-| DL04 | Products I sold            | Products this dealer sold (distributor: all its dealers); search, status pills                                  |
-| DL05 | Product detail (read-only) | Warranty; certificate download; File a claim                                                                    |
-| DL06 | File a claim               | For the customer, with photos, video or receipt; coverage shown before submitting                               |
-| DL07 | Warranty claims            | Progress tracker per claim; resolution and credit amount; view only                                             |
-| HUB  | Registration channels      | Same as admin, without partner key management                                                                   |
+| Code | Screen                     | Must contain                                                                                                                                                                                                                               |
+| ---- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DL01 | Dealer home                | Registrations this month, pending, rejected, open claims; distributor: filter by dealer, dealer comparison                                                                                                                                 |
+| DL02 | Bulk import                | Excel / CSV template; upload → row checks (model, serial and batch format, date); fix inline, resubmit; history                                                                                                                            |
+| DL03 | Register a product         | Single form or QR scan; serial, batch, model, purchase date, invoice; customer with US state and ZIP                                                                                                                                       |
+| DL04 | Sold products              | Products this dealer sold (distributor: all its dealers); search, status pills                                                                                                                                                             |
+| DL05 | Product detail (read-only) | Warranty; certificate download; File a claim                                                                                                                                                                                               |
+| DL06 | File a claim               | For the customer, with photos, video or receipt; coverage shown before submitting                                                                                                                                                          |
+| DL07 | Warranty claims            | Progress tracker per claim; resolution and credit amount; view only                                                                                                                                                                        |
+| HUB  | Registration channels      | Every entry point for this dealer/distributor: at the counter, bulk upload, website form (link and QR), email address, customer portal, partner API sample. Not shown to admin: partner keys are managed from A12 Integration log instead. |
 
 ### Customer (Web · phone layout)
 
@@ -113,8 +112,8 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 | 1   | Dealer | DL01 Dealer home        | Sign in as Lone Star.                                                  | Own numbers only; no admin menus.                                           |
 | 2   | Dealer | DL02 Bulk import        | Download the template; upload the file.                                | 25 rows checked: 22 registered, 2 need fixing, 1 sent to the warranty desk. |
 | 3   | Dealer | DL02 Bulk import        | Fix the model on row 8 and the date on row 20 inline; resubmit.        | 24 registered, 0 need fixing — no re-upload.                                |
-| 4   | Dealer | DL04 Products I sold    | Search `2635`.                                                         | 24 new products, Active, with batch numbers; 1-year warranty from purchase. |
-| 5   | Admin  | A02 Registration inbox  | Filter Duplicates.                                                     | Only serial 252811902 needs a human.                                        |
+| 4   | Dealer | DL04 Sold products      | Search `2635`.                                                         | 24 new products, Active, with batch numbers; 1-year warranty from purchase. |
+| 5   | Admin  | A02 Registration inbox  | Filter Duplicates.                                                     | Only serial MG44-252811902 needs a human.                                   |
 | 6   | Admin  | A03 Registration review | Compare with the existing record (James Nguyen); reject with a reason. | The duplicate check protects against double claims.                         |
 | 7   | Admin  | A04 Registered products | Filter by dealer Lone Star.                                            | 31 products.                                                                |
 | 8   | Admin  | A01 Admin dashboard     | Registrations by channel.                                              | Dealer bar +24.                                                             |
@@ -123,7 +122,7 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 ### W2 – Customer self-registration by QR
 
 **Duration:** 4 min · **Roles:** Customer (phone), Admin  
-**Set-up:** QR label for `261804517` (A05 → Print label, or `demo-assets/qr-samples`).
+**Set-up:** QR label for `SM482V-261804517` (A05 → Print label, or `demo-assets/qr-samples`).
 
 | #   | Role     | Screen                  | Action                                 | Expected result                                                     |
 | --- | -------- | ----------------------- | -------------------------------------- | ------------------------------------------------------------------- |
@@ -138,7 +137,7 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 ### W3 – Warranty claim settled by replacement (core workflow)
 
 **Duration:** 5 min · **Roles:** Customer (phone), Admin  
-**Set-up:** Marcus Reed's SC680 `251406233` is in warranty.
+**Set-up:** Marcus Reed's SC680 `SC680-251406233` is in warranty.
 
 | #   | Role     | Screen              | Action                                                                | Expected result                                                                           |
 | --- | -------- | ------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -152,18 +151,18 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 
 **Duration:** 3 min · **Roles:** Dealer, Admin
 
-| #   | Role   | Screen               | Action                                                              | Expected result                                    |
-| --- | ------ | -------------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | Dealer | DL05 → DL06          | On MG44 `252811902`, File a claim: Bluetooth / Job Link connection. | Coverage shown; claim Submitted, source Dealer.    |
-| 2   | Dealer | DL07 Warranty claims | Follow the claim.                                                   | Progress tracker; no decision buttons.             |
-| 3   | Admin  | A10 Claim detail     | Start review; Approve → Credit $89.50; Close.                       | "Credit of $89.50 issued."                         |
-| 4   | Admin  | A12 Integration log  | Open the latest Finance message.                                    | Outbound credit memo with the claim id and amount. |
-| 5   | Dealer | DL07 Warranty claims | Back as dealer.                                                     | Credit, $89.50.                                    |
+| #   | Role   | Screen               | Action                                                                   | Expected result                                    |
+| --- | ------ | -------------------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| 1   | Dealer | DL05 → DL06          | On MG44 `MG44-252811902`, File a claim: Bluetooth / Job Link connection. | Coverage shown; claim Submitted, source Dealer.    |
+| 2   | Dealer | DL07 Warranty claims | Follow the claim.                                                        | Progress tracker; no decision buttons.             |
+| 3   | Admin  | A10 Claim detail     | Start review; Approve → Credit $89.50; Close.                            | "Credit of $89.50 issued."                         |
+| 4   | Admin  | A12 Integration log  | Open the latest Finance message.                                         | Outbound credit memo with the claim id and amount. |
+| 5   | Dealer | DL07 Warranty claims | Back as dealer.                                                          | Credit, $89.50.                                    |
 
 ### W5 – Void warranty
 
 **Duration:** 3 min · **Roles:** Admin, Customer (phone)  
-**Set-up:** DR82 `252207119` has a note: opened by a third-party repair shop.
+**Set-up:** DR82 `DR82-252207119` has a note: opened by a third-party repair shop.
 
 | #   | Role     | Screen              | Action                                                | Expected result                                  |
 | --- | -------- | ------------------- | ----------------------------------------------------- | ------------------------------------------------ |
@@ -183,7 +182,7 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 | 2   | Visitor | WEB Register your product | Open `/register-product` (no account); scan the QR label or fill in manually; attach receipt; submit. | Confirmation; the registration waits for review.                          |
 | 3   | Admin   | A02 Registration inbox    | Pending: Email, Web form, Distributor ERP badges; channel filter Marketplace.                         | One inbox for every channel.                                              |
 | 4   | Admin   | A03 Registration review   | Approve the emailed registration (receipt read from the email).                                       | CRM update sent.                                                          |
-| 5   | Admin   | HUB Registration channels | Mailbox address, website form link and QR, partner API; add a partner system.                         | API key shown once; a registration sent with it is registered at once.    |
+| 5   | Admin   | A12 Integration log       | Add a partner system.                                                                                 | API key shown once; a registration sent with it is registered at once.    |
 | 6   | Admin   | A12 Integration log       | Inbound ERP, email, partner; outbound CRM.                                                            | Payload view, retry.                                                      |
 | 7   | Admin   | A01 Admin dashboard       | Channel chart.                                                                                        | Email +1, Marketplace +2.                                                 |
 
@@ -196,7 +195,7 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 | 1   | Admin       | A11 Dealers & users  | Gulf States with its two dealers.                   | Hierarchy set once by the admin.          |
 | 2   | Distributor | DL01 Dealer home     | Totals for both dealers; dealer comparison.         | Sees across its network.                  |
 | 3   | Distributor | DL01 Dealer home     | Filter Bayou Air Parts: registrations, open claims. | Spot dealers behind on registering sales. |
-| 4   | Distributor | DL04 Products I sold | Filter to Bayou Air Parts.                          | –                                         |
+| 4   | Distributor | DL04 Sold products   | Filter to Bayou Air Parts.                          | –                                         |
 | 5   | Distributor | DL07 Warranty claims | Open a claim.                                       | Only its dealers' claims; view only.      |
 
 ## Pre-demo checklist
@@ -204,6 +203,6 @@ Suggested running order: W1, W2, W6, W3, W4, W5, W7 (about 25 minutes).
 1. Reset data (Admin → System events).
 2. Open windows for Admin, Dealer, Distributor, Customer (phone), each signed in, plus a private window for the website form.
 3. Keep `demo-assets/lonestar_sales_week38.xlsx` ready.
-4. Print or show the QR label for `261804517`.
+4. Print or show the QR label for `SM482V-261804517`.
 5. Have a receipt photo ready on the phone.
 6. Check the app opens over HTTPS on the phone (needed for the camera).

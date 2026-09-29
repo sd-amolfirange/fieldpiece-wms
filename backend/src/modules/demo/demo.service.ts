@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { addDaysIso, type RegistrationView } from "@wms/domain";
+import { addDaysIso, type RegistrationView, serialNumberPart } from "@wms/domain";
 import type { Ctx } from "../../common/auth/context";
 import { nextCounter } from "../../common/db/ids";
 import { AppError } from "../../common/errors/app-error";
@@ -105,7 +105,7 @@ export class DemoService {
       ];
       const created: { id: string; serial: string; modelCode: string; batchNumber: string }[] = [];
       for (const line of lines) {
-        const serial = await this.freeSerial(tx, ctx.today);
+        const serial = await this.freeSerial(tx, ctx.today, line.model);
         const id = await this.registrations.submitForReview(
           tx,
           {
@@ -157,7 +157,7 @@ export class DemoService {
   /** A customer emails the registration mailbox with the invoice attached (the real email intake path). */
   async registrationEmail(ctx: Ctx): Promise<RegistrationView> {
     requireRole(ctx.user, "admin");
-    const serial = await this.freeSerial(this.prisma, ctx.today);
+    const serial = await this.freeSerial(this.prisma, ctx.today, "SC680");
     const batch = this.batchFor(ctx.today, 3);
     const purchaseDate = addDaysIso(ctx.today, -3);
     const [y, m, d] = purchaseDate.split("-");
@@ -203,8 +203,8 @@ export class DemoService {
     requireRole(ctx.user, "admin");
     const client = await this.prisma.partnerClient.findUnique({ where: { id: "pc-marketplace" } });
     if (!client?.active) throw AppError.notFound("Active marketplace partner");
-    const serials = [await this.freeSerial(this.prisma, ctx.today)];
-    serials.push(await this.freeSerial(this.prisma, ctx.today, new Set(serials)));
+    const serials = [await this.freeSerial(this.prisma, ctx.today, "VP87")];
+    serials.push(await this.freeSerial(this.prisma, ctx.today, "SM482V", new Set(serials)));
     const { results } = await this.intake.partnerRegistrations(
       ctx,
       { id: client.id, name: client.name, channel: "RETAIL", dealerId: client.dealerId },
@@ -255,17 +255,28 @@ export class DemoService {
     return `${String(built.getUTCFullYear()).slice(2)}${String(week).padStart(2, "0")}-L${String(line).padStart(2, "0")}`;
   }
 
-  /** A serial nobody has used yet, in the label format: the batch's yyww + a 5-digit sequence. */
-  private async freeSerial(db: Db, today: string, taken: ReadonlySet<string> = new Set()): Promise<string> {
+  /**
+   * A MODEL-NUMBER serial nobody has used yet; the number is in the label format (the batch's yyww + a 5-digit
+   * sequence) and not used under any model, so the demo never produces a MODEL_MISMATCH by accident.
+   */
+  private async freeSerial(
+    db: Db,
+    today: string,
+    modelCode: string,
+    taken: ReadonlySet<string> = new Set(),
+  ): Promise<string> {
     const prefix = this.batchFor(today, 1).slice(0, 4);
+    const where = { serial: { contains: `-${prefix}` } };
     const [units, registrations] = await Promise.all([
-      db.unit.findMany({ where: { serial: { startsWith: prefix } }, select: { serial: true } }),
-      db.registration.findMany({ where: { serial: { startsWith: prefix } }, select: { serial: true } }),
+      db.unit.findMany({ where, select: { serial: true } }),
+      db.registration.findMany({ where, select: { serial: true } }),
     ]);
-    const used = new Set([...taken, ...units.map((u) => u.serial), ...registrations.map((r) => r.serial)]);
+    const used = new Set(
+      [...taken, ...units.map((u) => u.serial), ...registrations.map((r) => r.serial)].map(serialNumberPart),
+    );
     for (let n = 30001; ; n += 1) {
-      const serial = `${prefix}${String(n).padStart(5, "0")}`;
-      if (!used.has(serial)) return serial;
+      const number = `${prefix}${String(n).padStart(5, "0")}`;
+      if (!used.has(number)) return `${modelCode}-${number}`;
     }
   }
 }

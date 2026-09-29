@@ -10,7 +10,7 @@ describe("warranty claim forms", () => {
     );
     expect(
       claimSchema.safeParse({
-        unitSerial: "251406233",
+        unitSerial: "SC680-251406233",
         issueType: "DISPLAY",
         description: "Display flickers when the jaw is open.",
       }).success,
@@ -32,7 +32,7 @@ describe("warranty claim forms", () => {
 
   it("needs the replacement serial only when closing a replacement", () => {
     expect(closeClaimSchema(true).safeParse({ replacementSerial: "" }).success).toBe(false);
-    expect(closeClaimSchema(true).safeParse({ replacementSerial: "252707701" }).success).toBe(true);
+    expect(closeClaimSchema(true).safeParse({ replacementSerial: "SM382V-252707701" }).success).toBe(true);
     expect(closeClaimSchema(false).safeParse({}).success).toBe(true);
   });
 });

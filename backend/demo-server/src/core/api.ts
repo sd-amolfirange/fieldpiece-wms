@@ -101,7 +101,7 @@ export function createSessionStore(): SessionStore {
 
 export interface DemoRequest {
   method: string;
-  /** Path after the API base, e.g. "/units/251406233". */
+  /** Path after the API base, e.g. "/units/SC680-251406233". */
   path: string;
   query: RawQuery;
   /** JSON body, or the text fields of a multipart form. */

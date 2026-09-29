@@ -28,7 +28,6 @@ export const navItems: NavItem[] = [
   { to: "/units", labelKey: "nav.units", icon: Boxes, roles: ["admin"] },
   { to: "/claims", labelKey: "nav.claims", icon: ClipboardList, roles: ["admin"] },
   { to: "/models", labelKey: "nav.models", icon: Package, roles: ["admin"] },
-  { to: "/registrations/channels", labelKey: "nav.channels", icon: Network, roles: ["admin"] },
   { to: "/admin/dealers", labelKey: "nav.admin", icon: Settings, roles: ["admin"] },
   // Dealer and distributor
   { to: "/", labelKey: "nav.home", icon: LayoutDashboard, roles: ["dealer", "distributor"], end: true },

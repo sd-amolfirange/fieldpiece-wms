@@ -81,21 +81,21 @@ describe("seed", () => {
       "CLM-1007",
     ]);
     expect(state.partnerClients.map((p) => [p.id, p.apiKey])).toEqual(Object.entries(DEMO_PARTNER_KEYS));
-    expect(state.units.find((u) => u.serial === "261804517")).toMatchObject({
+    expect(state.units.find((u) => u.serial === "SM482V-261804517")).toMatchObject({
       batchNumber: "2618-L02",
       dealerId: "d-lonestar",
     });
-    expect(state.units.find((u) => u.serial === "261804517")?.warrantyEnd).toBeUndefined();
+    expect(state.units.find((u) => u.serial === "SM482V-261804517")?.warrantyEnd).toBeUndefined();
   });
 
   it("places the named products relative to today and continues the id sequences", () => {
     const s = setup();
-    expect(s.get("admin", "/units/251406233").body).toMatchObject({
+    expect(s.get("admin", "/units/SC680-251406233").body).toMatchObject({
       status: "ACTIVE",
       categoryName: "Clamp meters",
     });
-    expect(s.get("admin", "/units/243208841").body.status).toBe("EXPIRED");
-    expect(s.get("admin", "/units/252707701").body).toMatchObject({ replacesSerial: "252005531" });
+    expect(s.get("admin", "/units/VP87-243208841").body.status).toBe("EXPIRED");
+    expect(s.get("admin", "/units/SM382V-252707701").body).toMatchObject({ replacesSerial: "SM382V-252005531" });
     const reg = s.post("dealer", "/registrations", {
       serial: "263899001",
       batchNumber: "2638-L01",
@@ -172,12 +172,12 @@ describe("auth", () => {
       body: { email: EMAILS.customer, password: DEMO_PASSWORD },
     }).setRefreshToken!;
     expect(s.raw({ path: "/units", refreshToken: refresh }).status).toBe(401);
-    const pdf = s.raw({ path: "/units/251406233/certificate.pdf", refreshToken: refresh });
+    const pdf = s.raw({ path: "/units/SC680-251406233/certificate.pdf", refreshToken: refresh });
     expect(pdf.status).toBe(200);
-    expect(pdf.download).toMatchObject({ mime: "application/pdf", name: "warranty-251406233.pdf" });
+    expect(pdf.download).toMatchObject({ mime: "application/pdf", name: "warranty-SC680-251406233.pdf" });
     expect(String(pdf.download?.data).slice(0, 5)).toBe("%PDF-");
-    expect(s.raw({ path: "/units/261804517/certificate.pdf", refreshToken: refresh }).status).toBe(404);
-    expect(s.get("admin", "/units/261804517/certificate.pdf").body.code).toBe("not_registered");
+    expect(s.raw({ path: "/units/SM482V-261804517/certificate.pdf", refreshToken: refresh }).status).toBe(404);
+    expect(s.get("admin", "/units/SM482V-261804517/certificate.pdf").body.code).toBe("not_registered");
   });
 });
 
@@ -214,17 +214,17 @@ describe("roles and data scope", () => {
         .units("customer")
         .items.map((u) => u.serial)
         .sort(),
-    ).toEqual(["243208841", "251406233", "252207119"]);
+    ).toEqual(["DR82-252207119", "SC680-251406233", "VP87-243208841"]);
   });
 
   it("answers 404, not 403, for a record outside the caller's scope", () => {
     const s = setup();
     for (const who of ["dealer", "distributor", "customer"] as const) {
-      const res = s.get(who, "/units/252409963");
+      const res = s.get(who, "/units/SC680-252409963");
       expect([who, res.status, res.body.code]).toEqual([who, 404, "not_found"]);
     }
-    expect(s.get("bayou", "/units/251406233").status).toBe(404);
-    expect(s.get("admin", "/units/252409963").status).toBe(200);
+    expect(s.get("bayou", "/units/SC680-251406233").status).toBe(404);
+    expect(s.get("admin", "/units/SC680-252409963").status).toBe(200);
   });
 
   it("scopes warranty claims: customers see their own, dealers their products', admins all", () => {
@@ -247,7 +247,7 @@ describe("roles and data scope", () => {
       ["distributor", "GET", "/admin/org"],
       ["dealer", "GET", "/admin/partner-clients"],
       ["dealer", "POST", "/registrations/bulk-approve"],
-      ["dealer", "POST", "/units/251406233/void"],
+      ["dealer", "POST", "/units/SC680-251406233/void"],
       ["distributor", "POST", "/claims/CLM-1006/transitions"],
       ["customer", "POST", "/claims/CLM-1006/transitions"],
       ["customer", "POST", "/simulate/erp-invoice"],
@@ -292,7 +292,7 @@ describe("roles and data scope", () => {
     expect(s.upload("dealer", { ...JPEG, size: 16 * 1024 * 1024 }).body.code).toBe("too_large");
     const up = s.upload("dealer");
     const res = s.post("customer", "/claims", {
-      unitSerial: "251406233",
+      unitSerial: "SC680-251406233",
       issueType: "DISPLAY",
       description: "Display flickers all the time.",
       attachmentIds: [up.body.id],
@@ -316,7 +316,7 @@ describe("registration entry points", () => {
         "ZIP",
       ],
       ["263510101", "2635-L01", "SC680", TODAY, "Adam Rhodes", "(713) 555-0102", "TX", "77002"],
-      ["252811902", "2528-L01", "MG44", TODAY, "Bianca Flores", "(713) 555-0103", "TX", "77502"],
+      ["MG44-252811902", "2528-L01", "MG44", TODAY, "Bianca Flores", "(713) 555-0103", "TX", "77502"],
       ["263510103", "2635-L01", "SC999", TODAY, "Carl Jenkins", "(713) 555-0104", "TX", "77581"],
       ["263510104", "2635-L02", "VP87", "", "Dana Scott", "(713) 555-0105", "TX", "77373"],
     ];
@@ -405,7 +405,7 @@ describe("registration entry points", () => {
       customerId: "c-aparker",
       batchNumber: "2638-L01",
     });
-    expect(s.get("dealer", "/units/263899001").body).toMatchObject({
+    expect(s.get("dealer", "/units/SC680-263899001").body).toMatchObject({
       warrantyStart: "2026-01-10",
       warrantyEnd: "2027-01-09",
       categoryName: "Clamp meters",
@@ -421,7 +421,7 @@ describe("registration entry points", () => {
     expect(again.body).toMatchObject({ status: "PENDING", flags: ["DUPLICATE", "EXCEPTION"] });
     expect(s.post("admin", `/registrations/${again.body.id}/approve`).body.code).toBe("duplicate_serial");
     expect(s.get("admin", `/registrations/${again.body.id}`).body.duplicateOf).toMatchObject({
-      serial: "263899001",
+      serial: "SC680-263899001",
     });
     expect(s.get("dealer", `/registrations/${again.body.id}`).body.duplicateOf).toBeUndefined();
     expect(s.post("admin", `/registrations/${again.body.id}/merge`).body.status).toBe("APPROVED");
@@ -431,14 +431,14 @@ describe("registration entry points", () => {
   it("W2: a customer's QR registration waits for the warranty desk, then starts the 1-year warranty", () => {
     const s = setup();
     const noProof = s.post("customer", "/registrations", {
-      serial: "261804517",
+      serial: "SM482V-261804517",
       modelCode: "SM482V",
       purchaseDate: TODAY,
     });
     expect(noProof.body.fieldErrors).toEqual({ attachmentIds: "validation.invoiceRequired" });
     const up = s.upload("customer");
     const reg = s.post("customer", "/registrations", {
-      serial: "261804517",
+      serial: "SM482V-261804517",
       modelCode: "SM482V",
       purchaseDate: TODAY,
       attachmentIds: [up.body.id],
@@ -450,7 +450,7 @@ describe("registration entry points", () => {
       dealerId: "d-lonestar",
     });
     expect(s.post("admin", `/registrations/${reg.body.id}/approve`).body.status).toBe("APPROVED");
-    const unit = s.get("customer", "/units/261804517").body;
+    const unit = s.get("customer", "/units/SM482V-261804517").body;
     expect(unit).toMatchObject({
       status: "ACTIVE",
       batchNumber: "2618-L02",
@@ -544,7 +544,7 @@ describe("registration entry points", () => {
           customer: { name: "Pat Moreno", state: "AZ" },
         },
         {
-          serial: "251406233",
+          serial: "SC680-251406233",
           batchNumber: "2514-L01",
           modelCode: "SC680",
           purchaseDate: TODAY,
@@ -567,7 +567,7 @@ describe("registration entry points", () => {
       "REVIEW",
       "ERROR",
     ]);
-    expect(s.get("admin", "/units/263899003").body).toMatchObject({
+    expect(s.get("admin", "/units/SC260-263899003").body).toMatchObject({
       dealerId: "d-desertpeak",
       status: "ACTIVE",
     });
@@ -585,7 +585,7 @@ describe("registration entry points", () => {
       customer: { name: "Nina Patel", email: "nina@example.com" },
     });
     expect(retail.body.results[0].status).toBe("REGISTERED");
-    expect(s.get("admin", "/units/263899006").body).toMatchObject({ placeOfPurchase: "Online marketplace" });
+    expect(s.get("admin", "/units/SRS1-263899006").body).toMatchObject({ placeOfPurchase: "Online marketplace" });
 
     expect([partner("fpk_wrong", {}).status, partner("fpk_wrong", {}).body.code]).toEqual([
       401,
@@ -626,7 +626,7 @@ describe("registration entry points", () => {
     const reg = s.get("admin", `/registrations/${res.body.registrationId}`).body;
     expect(reg).toMatchObject({
       channel: "EMAIL",
-      serial: "263899004",
+      serial: "MG44-263899004",
       batchNumber: "2638-L03",
       modelCode: "MG44",
       purchaseDate: "2026-09-20",
@@ -635,7 +635,7 @@ describe("registration entry points", () => {
     expect(reg.attachmentIds).toHaveLength(1);
     // Renee is an existing customer (same email): approval links the product to her record.
     s.post("admin", `/registrations/${reg.id}/approve`);
-    expect(s.get("admin", "/units/263899004").body.customerId).toBe("c-rcarter");
+    expect(s.get("admin", "/units/MG44-263899004").body.customerId).toBe("c-rcarter");
 
     expect(inbound(SECRET, { from: "x@example.com", text: "hello" }).body.status).toBe("IGNORED");
     expect(s.get("admin", "/integrations?system=EMAIL&status=FAILED").body.total).toBe(1);
@@ -657,12 +657,12 @@ describe("registration entry points", () => {
 describe("warranty claims", () => {
   it("a covered claim approved as a replacement moves the rest of the warranty to the new serial", () => {
     const s = setup();
-    expect(s.get("customer", "/units/251406233/coverage").body).toMatchObject({
+    expect(s.get("customer", "/units/SC680-251406233/coverage").body).toMatchObject({
       covered: true,
       reason: "IN_WARRANTY",
     });
     const filed = s.post("customer", "/claims", {
-      unitSerial: "251406233",
+      unitSerial: "SC680-251406233",
       issueType: "DISPLAY",
       description: "Backlight flickers and the reading freezes.",
     });
@@ -676,18 +676,18 @@ describe("warranty claims", () => {
       warrantyStatus: "ACTIVE",
     });
     const again = s.post("customer", "/claims", {
-      unitSerial: "251406233",
+      unitSerial: "SC680-251406233",
       issueType: "DISPLAY",
       description: "Filing the same problem twice.",
     });
     expect([again.status, again.body.code]).toEqual([409, "claim_open"]);
-    expect(s.post("customer", "/claims", { unitSerial: "251406233" }).body.fieldErrors).toEqual({
+    expect(s.post("customer", "/claims", { unitSerial: "SC680-251406233" }).body.fieldErrors).toEqual({
       issueType: "validation.issueType",
       description: "validation.describeFault",
     });
     expect(
       s.post("admin", "/claims", {
-        unitSerial: "261804517",
+        unitSerial: "SM482V-261804517",
         issueType: "OTHER",
         description: "Not registered yet.",
       }).body.code,
@@ -703,7 +703,7 @@ describe("warranty claims", () => {
     expect(s.move(id, { action: "close" }).body.fieldErrors).toEqual({
       replacementSerial: "validation.required",
     });
-    expect(s.move(id, { action: "close", replacementSerial: "252811902" }).body.code).toBe(
+    expect(s.move(id, { action: "close", replacementSerial: "SC680-252409963" }).body.code).toBe(
       "duplicate_serial",
     );
     const closed = s.move(id, {
@@ -714,7 +714,7 @@ describe("warranty claims", () => {
     expect(closed.body).toMatchObject({
       status: "CLOSED",
       resolution: "REPLACE",
-      replacementSerial: "263899005",
+      replacementSerial: "SC680-263899005",
     });
     expect(closed.body.history.map((e: { status: string }) => e.status)).toEqual([
       "SUBMITTED",
@@ -723,12 +723,12 @@ describe("warranty claims", () => {
       "CLOSED",
     ]);
 
-    const original = s.get("customer", "/units/251406233").body;
-    const replacement = s.get("customer", "/units/263899005").body;
-    expect(original).toMatchObject({ status: "EXPIRED", replacedBySerial: "263899005" });
+    const original = s.get("customer", "/units/SC680-251406233").body;
+    const replacement = s.get("customer", "/units/SC680-263899005").body;
+    expect(original).toMatchObject({ status: "EXPIRED", replacedBySerial: "SC680-263899005" });
     expect(replacement).toMatchObject({
       status: "ACTIVE",
-      replacesSerial: "251406233",
+      replacesSerial: "SC680-251406233",
       warrantyEnd: original.warrantyEnd,
       warrantyStart: TODAY,
       batchNumber: "2638-L02",
@@ -747,7 +747,7 @@ describe("warranty claims", () => {
   it("a credit is posted to Finance; a rejection needs a reason; dealers and customers can't decide", () => {
     const s = setup();
     const filed = s.post("dealer", "/claims", {
-      unitSerial: "252811902",
+      unitSerial: "MG44-252811902",
       issueType: "CONNECTIVITY",
       description: "Gauge drops the Bluetooth link every few minutes.",
     });
@@ -770,7 +770,7 @@ describe("warranty claims", () => {
     });
 
     const expired = s.post("customer", "/claims", {
-      unitSerial: "243208841",
+      unitSerial: "VP87-243208841",
       issueType: "MECHANICAL",
       description: "Pump motor stalls after a minute.",
     });
@@ -790,7 +790,7 @@ describe("warranty claims", () => {
 
   it("W5: a voided product's claim is filed as not covered", () => {
     const s = setup();
-    const voided = s.post("admin", "/units/252207119/void", {
+    const voided = s.post("admin", "/units/DR82-252207119/void", {
       reason: "UNAUTHORIZED_REPAIR",
       note: "Tamper label broken.",
     });
@@ -798,13 +798,13 @@ describe("warranty claims", () => {
       status: "VOID",
       void: { reason: "UNAUTHORIZED_REPAIR", byName: "Warranty Desk" },
     });
-    expect(s.post("admin", "/units/252207119/void", { reason: "NOPE" }).body.fieldErrors).toEqual({
+    expect(s.post("admin", "/units/DR82-252207119/void", { reason: "NOPE" }).body.fieldErrors).toEqual({
       reason: "validation.voidReason",
     });
-    expect(s.post("admin", "/units/252207119/void", { reason: "MISUSE" }).body.code).toBe("already_void");
-    expect(s.post("admin", "/units/261804517/void", { reason: "MISUSE" }).body.code).toBe("not_registered");
+    expect(s.post("admin", "/units/DR82-252207119/void", { reason: "MISUSE" }).body.code).toBe("already_void");
+    expect(s.post("admin", "/units/SM482V-261804517/void", { reason: "MISUSE" }).body.code).toBe("not_registered");
     const claim = s.post("customer", "/claims", {
-      unitSerial: "252207119",
+      unitSerial: "DR82-252207119",
       issueType: "INACCURATE_READING",
       description: "Detector alarms with no leak present.",
     });

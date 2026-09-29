@@ -3,7 +3,7 @@ import { appUrl, expect, present, resetDemoData, rolePage, test } from "./fixtur
 // W5 – Void warranty (docs/demo-workflows.md). Logins: admin, customer Marcus Reed (phone). A third-party repair
 // shop opened the leak detector; the warranty desk voids the warranty, and a later claim isn't covered.
 
-const UNIT = "252207119";
+const UNIT = "DR82-252207119";
 
 test("W5: void warranty", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));

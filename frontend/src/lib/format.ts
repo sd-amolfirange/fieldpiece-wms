@@ -61,3 +61,9 @@ export const formatClaimId = (id: string | number) => padId("CLM", id);
 export function normalizeSerial(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase();
 }
+
+/** "SC680-263510101": the model code and serial number as one label, wherever a product is listed. */
+export function formatModelSerial(modelCode: string | undefined, serial: string): string {
+  // Serials are stored MODEL-NUMBER; only an older bare number gets the model code added.
+  return modelCode && !serial.startsWith(`${modelCode}-`) ? `${modelCode}-${serial}` : serial;
+}

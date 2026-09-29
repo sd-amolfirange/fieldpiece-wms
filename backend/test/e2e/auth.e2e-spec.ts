@@ -73,7 +73,7 @@ describe("auth and sessions", () => {
     expect((await h.request({ method: "GET", url: "/units", as: s, cookieOnly: true })).status).toBe(401);
     const pdf = await h.request({
       method: "GET",
-      url: "/units/251406233/certificate.pdf",
+      url: "/units/SC680-251406233/certificate.pdf",
       as: s,
       cookieOnly: true,
     });

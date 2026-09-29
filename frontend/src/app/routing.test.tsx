@@ -32,24 +32,25 @@ describe("routing and role homes", { timeout: 20_000 }, () => {
     expect(screen.getByText("Open claims")).toBeInTheDocument();
     expect(screen.getByText("Registrations to review")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Product catalog" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Registration channels" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Registration channels" })).not.toBeInTheDocument();
   });
 
   it("shows a dealer its own home and menu, without admin items", async () => {
     await signInAs("dealer.lonestar@wms.local");
     renderAt("/");
     expect(await screen.findByText("Registrations this month")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Products I sold" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Sold products" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Warranty claims" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Registration channels" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "Product catalog" })).not.toBeInTheDocument();
   });
 
   it("gives the customer their three products on CU02 My products", async () => {
     await signInAs("customer.mreed@wms.local");
     renderAt("/");
-    expect(await screen.findByText("251406233")).toBeInTheDocument();
-    expect(screen.getByText("243208841")).toBeInTheDocument();
-    expect(screen.getByText("252207119")).toBeInTheDocument();
+    expect(await screen.findByText("SC680-251406233")).toBeInTheDocument();
+    expect(screen.getByText("VP87-243208841")).toBeInTheDocument();
+    expect(screen.getByText("DR82-252207119")).toBeInTheDocument();
     expect(screen.getByText("Batch 2514-L01")).toBeInTheDocument();
     expect(screen.getAllByText(/^Warranty ended on /).length).toBeGreaterThan(0);
   });
@@ -57,6 +58,12 @@ describe("routing and role homes", { timeout: 20_000 }, () => {
   it("blocks, not just hides, other roles' screens", async () => {
     await signInAs("customer.mreed@wms.local");
     renderAt("/registrations");
+    expect(await screen.findByText(/you don't have access/i)).toBeInTheDocument();
+  });
+
+  it("blocks the admin from the dealer/distributor registration channels page", async () => {
+    await signInAs("admin@wms.local");
+    renderAt("/registrations/channels");
     expect(await screen.findByText(/you don't have access/i)).toBeInTheDocument();
   });
 
@@ -86,7 +93,7 @@ describe("routing and role homes", { timeout: 20_000 }, () => {
 
   it("sends signed-out visitors to the sign-in page with the demo accounts", async () => {
     renderAt("/units");
-    expect(await screen.findByRole("heading", { name: "Sign in to HVAC Warranty" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     // Loaded from the demo server, not compiled into the app.
     expect(await screen.findByRole("option", { name: "Customer: Marcus Reed" })).toBeInTheDocument();
   });

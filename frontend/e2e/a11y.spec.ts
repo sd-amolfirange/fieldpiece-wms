@@ -8,9 +8,8 @@ const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]>
     "/",
     "/registrations",
     "/registrations/REG-1001",
-    "/registrations/channels",
     "/units",
-    "/units/251406233",
+    "/units/SC680-251406233",
     "/models",
     "/models/m-sc680",
     "/claims",
@@ -26,12 +25,12 @@ const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]>
     "/registrations/bulk",
     "/registrations/channels",
     "/units",
-    "/units/252811902",
+    "/units/MG44-252811902",
     "/claims",
     "/claims/new",
   ],
   distributor: ["/", "/units", "/claims"],
-  customer: ["/", "/register", "/units/251406233", "/claims", "/claims/new"],
+  customer: ["/", "/register", "/units/SC680-251406233", "/claims", "/claims/new"],
 };
 
 test("a11y: no WCAG 2.2 AA violations on any screen", async ({ browser, baseURL }) => {

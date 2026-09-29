@@ -3,13 +3,15 @@ import { Prisma } from "@prisma/client";
 import {
   hasErrors,
   isIsoDate,
+  isModelSerial,
+  modelSerial,
   needsAdminReview,
   normalizeBatchValue,
-  normalizeSerialValue,
   REGISTRATION_CHANNELS,
   REGISTRATION_FLAGS,
   REGISTRATION_STATUSES,
   SERIAL_PATTERN,
+  serialNumberPart,
   validateRegistrationRow,
   warrantyFromPurchase,
   type IsoDate,
@@ -274,14 +276,14 @@ export class RegistrationsService {
     { proofRequired }: { proofRequired: boolean },
   ): Promise<Record<string, string>> {
     const errors: Record<string, string> = {};
-    const serial = normalizeSerialValue(body.serial);
-    const batch = normalizeBatchValue(body.batchNumber);
     const modelCode = (body.modelCode ?? "").trim().toUpperCase();
+    const serial = modelSerial(modelCode, body.serial);
+    const batch = normalizeBatchValue(body.batchNumber);
     const format = (await this.catalog.modelFormats(db)).get(modelCode);
     if (!modelCode) errors.modelCode = "validation.required";
     else if (!format) errors.modelCode = "rowErrors.unknown_model";
     if (!serial) errors.serial = "validation.required";
-    else if (!SERIAL_PATTERN.test(serial) || (format && !format.serial.test(serial)))
+    else if (!SERIAL_PATTERN.test(serial) || (format && !isModelSerial(serial, modelCode, format)))
       errors.serial = "rowErrors.invalid_serial";
     if (batch && format && !format.batch.test(batch)) errors.batchNumber = "rowErrors.invalid_batch";
     if (!isIsoDate(body.purchaseDate)) errors.purchaseDate = "validation.date";
@@ -314,7 +316,7 @@ export class RegistrationsService {
   ): Promise<TrustedResult> {
     const errors = validateRegistrationRow(
       values,
-      await this.rowContext(tx, ctx.today, values.serial, extra.seenInFile),
+      await this.rowContext(tx, ctx.today, values.serial, values.modelCode, extra.seenInFile),
     );
     const fields = rowToFields(values);
     const common = {
@@ -371,13 +373,24 @@ export class RegistrationsService {
     return id;
   }
 
-  /** EXCEPTION when the serial is unknown; DUPLICATE when already registered; MODEL_MISMATCH when the model differs. */
+  /**
+   * EXCEPTION when the serial is unknown; DUPLICATE when already registered; MODEL_MISMATCH when we know this label
+   * number under another model (the serial is MODEL-NUMBER, so a wrongly picked model gives an unknown serial).
+   */
   async reviewFlags(db: Db, serial: string, modelCode: string): Promise<RegistrationFlag[]> {
     const unit = await db.unit.findUnique({ where: { serial }, include: { model: true } });
     const flags: RegistrationFlag[] = [];
     if (!unit) flags.push("EXCEPTION");
     else if (unit.warrantyEnd) flags.push("DUPLICATE", "EXCEPTION");
     if (unit && unit.model.code !== modelCode) flags.push("MODEL_MISMATCH");
+    if (!unit) {
+      const number = serialNumberPart(serial);
+      const sameNumber = await db.unit.findFirst({
+        where: { serial: { endsWith: `-${number}` }, NOT: { serial } },
+        select: { serial: true },
+      });
+      if (sameNumber) flags.push("MODEL_MISMATCH");
+    }
     return flags;
   }
 
@@ -481,9 +494,10 @@ export class RegistrationsService {
     db: Db,
     today: IsoDate,
     serialInput: string | undefined,
+    modelCode: string | undefined,
     seenInFile?: ReadonlySet<string>,
   ): Promise<RowContext> {
-    const serial = normalizeSerialValue(serialInput);
+    const serial = modelSerial(modelCode, serialInput);
     const registered = serial
       ? await db.unit.findFirst({ where: { serial, warrantyEnd: { not: null } }, select: { serial: true } })
       : null;

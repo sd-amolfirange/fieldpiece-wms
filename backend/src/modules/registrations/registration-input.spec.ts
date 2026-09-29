@@ -11,9 +11,9 @@ import {
 
 describe("registration input", () => {
   it("keeps only known fields, as strings", () => {
-    expect(rowInput({ serial: "251406233", modelCode: 7, extra: "x", customerName: { evil: true } })).toEqual(
+    expect(rowInput({ serial: "SC680-251406233", modelCode: 7, extra: "x", customerName: { evil: true } })).toEqual(
       {
-        serial: "251406233",
+        serial: "SC680-251406233",
         modelCode: "7",
       },
     );
@@ -42,7 +42,7 @@ describe("registration input", () => {
         city: "",
       }),
     ).toEqual({
-      serial: "251406233",
+      serial: "SC680-251406233",
       batchNumber: "2514-L01",
       modelCode: "SC680",
       customer: {

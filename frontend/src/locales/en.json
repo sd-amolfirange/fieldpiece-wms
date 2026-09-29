@@ -47,7 +47,7 @@
     "models": "Product catalog",
     "registerUnit": "Register a product",
     "bulkImport": "Bulk import",
-    "mySoldUnits": "Products I sold",
+    "mySoldUnits": "Sold products",
     "myUnits": "My products",
     "registerProduct": "Register a product",
     "collapse": "Collapse sidebar",
@@ -175,7 +175,7 @@
     "zip": "ZIP code"
   },
   "auth": {
-    "signInTitle": "Sign in to HVAC Warranty",
+    "signInTitle": "Sign in",
     "signIn": "Sign in",
     "forgotPassword": "Forgot password?",
     "forgotTitle": "Reset your password",
@@ -515,7 +515,7 @@
   },
   "units": {
     "title": "Registered products",
-    "mySoldUnits": "Products I sold",
+    "mySoldUnits": "Sold products",
     "addUnit": "Add product",
     "bulkUpload": "Bulk upload",
     "searchPlaceholder": "Search serial, batch, model, customer or dealer",
@@ -629,7 +629,7 @@
     "labelFormat": "Label format",
     "labelFormatHelp": "Every registration of this model is checked against these formats.",
     "serialFormat": "Serial number",
-    "serialDefault": "9 digits: year, week, then a 5-digit sequence (e.g. 251406233)",
+    "serialDefault": "Model code, a dash, then 9 digits: year, week, 5-digit sequence (e.g. SC680-251406233). Typing just the 9 digits is fine.",
     "batchFormat": "Batch number",
     "batchDefault": "Year and week, then the line (e.g. 2514-L03)",
     "products": "Registered products",
@@ -751,7 +751,7 @@
     "templateCsv": "CSV template",
     "templateXlsx": "Excel template",
     "uploadTitle": "Upload a sales file",
-    "dropHint": "Excel (.xlsx) or CSV, up to 5 MB. Use the template columns: serial, batch, model, purchase date and customer.",
+    "dropHint": "Excel (.xlsx) or CSV, up to 5 MB. Use the template columns: serial, batch, model, purchase date and customer. Purchase date accepts yyyy-mm-dd or mm/dd/yyyy.",
     "uploaded": "{{file}} checked",
     "summary": "{{total}} rows checked: {{registered}} registered, {{errors}} need fixing, {{review}} sent to the warranty desk.",
     "resubmit_one": "Resubmit {{count}} fixed row",
@@ -876,7 +876,8 @@
     },
     "portal": {
       "title": "Customer portal",
-      "help": "Signed-in customers scan the QR label on the product and register it from their phone."
+      "help": "Signed-in customers scan the QR label on the product and register it from their phone. Print a label from any product's own page (open the product, then Print label).",
+      "action": "Open Registered products"
     },
     "partner": {
       "title": "Partner API",

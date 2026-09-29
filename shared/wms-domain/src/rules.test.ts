@@ -6,8 +6,11 @@ import {
 import {
   DEFAULT_BATCH_PATTERN,
   DEFAULT_SERIAL_PATTERN,
+  isModelSerial,
   modelFormat,
+  modelSerial,
   needsAdminReview,
+  serialNumberPart,
   validateRegistrationRow,
   type RowContext,
 } from "./registration-rules";
@@ -22,8 +25,8 @@ describe("validateRegistrationRow", () => {
       ["SC680", format],
       ["SM482V", format],
     ]),
-    existingSerials: new Set(["241807532"]),
-    seenInFile: new Set(["243500118"]),
+    existingSerials: new Set(["SC680-241807532"]),
+    seenInFile: new Set(["SC680-243500118"]),
     today: "2026-09-24",
   };
   const valid = {
@@ -50,8 +53,19 @@ describe("validateRegistrationRow", () => {
     });
   });
 
+  it("accepts the full MODEL-NUMBER serial too, and a duplicate typed either way", () => {
+    expect(validateRegistrationRow({ ...valid, serial: "sc680-243500101" }, ctx)).toEqual({});
+    expect(validateRegistrationRow({ ...valid, serial: "SC680-241807532" }, ctx).serial).toBe(
+      "duplicate_serial",
+    );
+  });
+
   it("checks the serial and batch against the model's format", () => {
     expect(validateRegistrationRow({ ...valid, serial: "SC680-12345" }, ctx).serial).toBe(
+      "invalid_serial",
+    );
+    // Another model's prefix is never silently re-labelled.
+    expect(validateRegistrationRow({ ...valid, serial: "SM482V-243500101" }, ctx).serial).toBe(
       "invalid_serial",
     );
     expect(validateRegistrationRow({ ...valid, batchNumber: "L02" }, ctx).batchNumber).toBe(
@@ -81,6 +95,29 @@ describe("validateRegistrationRow", () => {
     expect(needsAdminReview({ serial: "duplicate_serial" })).toBe(true);
     expect(needsAdminReview({ serial: "duplicate_serial", purchaseDate: "required" })).toBe(false);
     expect(needsAdminReview({ modelCode: "unknown_model" })).toBe(false);
+  });
+});
+
+describe("model serials", () => {
+  const format = modelFormat({
+    serialPattern: DEFAULT_SERIAL_PATTERN,
+    batchPattern: DEFAULT_BATCH_PATTERN,
+  });
+
+  it("prefixes a bare label number with the model code, and keeps a full serial", () => {
+    expect(modelSerial("SC680", " 2514 06233 ")).toBe("SC680-251406233");
+    expect(modelSerial("sc680", "sc680-251406233")).toBe("SC680-251406233");
+    expect(modelSerial(undefined, "251406233")).toBe("251406233");
+    expect(modelSerial("SC680", "")).toBe("");
+    expect(modelSerial("SC680", "SM482V-251406233")).toBe("SM482V-251406233");
+  });
+
+  it("splits out the number and checks the whole serial against the model", () => {
+    expect(serialNumberPart("JL3KH6-242704412")).toBe("242704412");
+    expect(serialNumberPart("251406233")).toBe("251406233");
+    expect(isModelSerial("SC680-251406233", "SC680", format)).toBe(true);
+    expect(isModelSerial("SC680-2514062", "SC680", format)).toBe(false);
+    expect(isModelSerial("SM482V-251406233", "SC680", format)).toBe(false);
   });
 });
 

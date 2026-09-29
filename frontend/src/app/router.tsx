@@ -77,10 +77,12 @@ export const routes: RouteObject[] = [
               [
                 { path: "registrations/new", element: <NewRegistrationPage /> }, // DL03 (admin: manual add)
                 { path: "registrations/bulk", element: <BulkRegistrationPage /> }, // DL02
-                { path: "registrations/channels", element: <RegistrationHubPage /> }, // registration hub
                 { path: "units", element: <UnitsListPage /> }, // A04 / DL04
               ],
             ),
+            // Registration channels: a dealer/distributor reference page (mailbox address, web form link, bulk
+            // template). Not for admin — partner API key management lives on Admin > Integrations instead.
+            guarded(PARTNERS, [{ path: "registrations/channels", element: <RegistrationHubPage /> }]),
             guarded(["customer"], [{ path: "register", element: <CustomerRegisterPage /> }]), // CU01
 
             // Shared screens: the demo server decides which rows each role gets.

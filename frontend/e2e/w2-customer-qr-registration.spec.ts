@@ -19,7 +19,7 @@ const { BinaryBitmap, HybridBinarizer, QRCodeReader, RGBLuminanceSource } = zxin
 // W2 – Customer self-registration by QR (docs/demo-workflows.md). Logins: customer Marcus Reed (phone), admin.
 // The QR label is decoded exactly as a phone camera would read it; the real camera is a manual check.
 
-const SERIAL = "261804517";
+const SERIAL = "SM482V-261804517";
 const BATCH = "2618-L02";
 const MODEL = "SMAN Wireless 4-Port Digital Manifold (SM482V)";
 

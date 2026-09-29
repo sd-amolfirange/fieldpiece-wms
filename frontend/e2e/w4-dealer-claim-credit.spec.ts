@@ -3,7 +3,7 @@ import { appUrl, expect, present, resetDemoData, rolePage, test } from "./fixtur
 // W4 – Dealer files a claim for a customer, settled by credit (docs/demo-workflows.md). Logins: dealer Lone Star
 // (tablet), admin. The credit is posted to Finance when the claim is closed.
 
-const UNIT = "252811902";
+const UNIT = "MG44-252811902";
 
 test("W4: dealer claim settled by credit", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));

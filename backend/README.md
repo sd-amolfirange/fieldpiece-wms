@@ -47,8 +47,10 @@ Sign in with the "Sign in as" picker, or with any demo account and `DEMO_PASSWOR
 
 The first five are in the sign-in picker (`src/modules/demo/seed-data.ts`). The seed also creates two partner API
 clients with known keys (`DEMO_PARTNER_KEYS` in the same file) for trying `POST /api/partner/v1/registrations`, and
-`../demo-assets/lonestar_sales_week38.xlsx` is a sample bulk upload for Lone Star (25 rows, 3 deliberate errors;
-regenerate it with `npx tsx scripts/make-sample-bulk-file.ts`).
+`../demo-assets/lonestar_sales_week38.xlsx` is a sample bulk upload for Lone Star (25 rows, 3 deliberate errors).
+Its purchase dates are relative to when it was generated (a sales week ending 7 days before that), so it never
+needs regenerating just because time has passed — only if the row content itself should change. Regenerate with
+`npx tsx scripts/make-sample-bulk-file.ts`.
 
 Postgres is on host port **5433** so it doesn't clash with a local install. If your Docker volume was created by
 an earlier version of this backend, the `wms_hvac*` databases don't exist yet: create them with the three

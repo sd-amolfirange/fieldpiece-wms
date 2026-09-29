@@ -45,7 +45,7 @@ test("W7: distributor oversight", async ({ browser, baseURL }) => {
     ).toBeVisible();
   });
 
-  await test.step("4. DL04: Products I sold filtered to Bayou Air Parts", async () => {
+  await test.step("4. DL04: Sold products filtered to Bayou Air Parts", async () => {
     await distributor.goto("/units");
     await expect(distributor.locator("table tbody tr").first()).toBeVisible();
     await distributor.locator("#units-dealer").selectOption({ label: "Bayou Air Parts" });

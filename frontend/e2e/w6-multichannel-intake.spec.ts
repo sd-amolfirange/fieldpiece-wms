@@ -1,11 +1,12 @@
 import { appUrl, expect, isoDay, present, receiptPhoto, resetDemoData, rolePage, test } from "./fixtures";
 
-// W6 – Registration channels (docs/demo-workflows.md). Logins: admin (System events and the registration hub),
-// and a visitor without an account (the website form). Registrations arrive from a distributor ERP, the registration
-// mailbox, an online marketplace, the website form and a partner system with its own API key.
+// W6 – Registration channels (docs/demo-workflows.md). Logins: admin (System events and Integrations, where
+// partner API keys are managed), and a visitor without an account (the website form). Registrations arrive from
+// a distributor ERP, the registration mailbox, an online marketplace, the website form and a partner system with
+// its own API key.
 
-const WEB_SERIAL = "263899911";
-const API_SERIAL = "263899921";
+const WEB_SERIAL = "SC260-263899911";
+const API_SERIAL = "SC680-263899921";
 
 test("W6: registrations from every channel", async ({ browser, baseURL }) => {
   await resetDemoData(browser, appUrl(baseURL));
@@ -30,7 +31,7 @@ test("W6: registrations from every channel", async ({ browser, baseURL }) => {
     await expect(admin.getByText("3 registrations received from the ERP").first()).toBeVisible();
     erpSerials = (
       await admin
-        .getByText(/^\d{9}, \d{9}, \d{9}$/)
+        .getByText(/^[A-Z0-9]+-\d{9}, [A-Z0-9]+-\d{9}, [A-Z0-9]+-\d{9}$/)
         .first()
         .innerText()
     )
@@ -40,7 +41,7 @@ test("W6: registrations from every channel", async ({ browser, baseURL }) => {
     await expect(admin.getByText("Registration email received").first()).toBeVisible();
     emailSerial = (
       await admin
-        .getByText(/^\d{9}$/)
+        .getByText(/^[A-Z0-9]+-\d{9}$/)
         .first()
         .innerText()
     ).trim();
@@ -90,9 +91,8 @@ test("W6: registrations from every channel", async ({ browser, baseURL }) => {
     await expect(admin.getByRole("link", { name: "Open product" })).toBeVisible();
   });
 
-  await test.step("5. Registration channels: add a partner system and send a registration with its key", async () => {
-    await admin.goto("/registrations/channels");
-    await expect(admin.getByText("registrations@wms.local")).toBeVisible();
+  await test.step("5. Integrations: add a partner system and send a registration with its key", async () => {
+    await admin.goto("/admin/integrations");
     const partners = admin.locator("section", {
       has: admin.getByRole("heading", { name: "Partner systems" }),
     });

@@ -21,9 +21,9 @@ describe("W2: customer self-registration by QR", () => {
     "opens pre-filled from the QR link, goes to the inbox as Customer portal, and gets its warranty on approval",
     async () => {
       await signInAs("customer.mreed@wms.local");
-      const cu01 = renderApp("/register?serial=261804517&model=SM482V&batch=2618-L02");
+      const cu01 = renderApp("/register?serial=SM482V-261804517&model=SM482V&batch=2618-L02");
       expect(await screen.findByText("Details read from the QR label on your product.")).toBeInTheDocument();
-      expect(screen.getByText("261804517")).toBeInTheDocument();
+      expect(screen.getByText("SM482V-261804517")).toBeInTheDocument();
       expect(screen.getByText("2618-L02")).toBeInTheDocument();
       expect(await screen.findByText("SMAN Wireless 4-Port Digital Manifold (SM482V)")).toBeInTheDocument();
 
@@ -38,7 +38,7 @@ describe("W2: customer self-registration by QR", () => {
       // Admin: the registration is in the inbox as a portal registration; approve it on the review screen.
       await signInAs("admin@wms.local");
       const pending = await registrationsApi.list({ status: "PENDING" });
-      const reg = pending.items.find((r) => r.serial === "261804517")!;
+      const reg = pending.items.find((r) => r.serial === "SM482V-261804517")!;
       expect(reg.channel).toBe("PORTAL");
       expect(reg.batchNumber).toBe("2618-L02");
       expect(reg.attachmentIds).toHaveLength(1);
@@ -51,16 +51,16 @@ describe("W2: customer self-registration by QR", () => {
       a03.unmount();
 
       // A05: a 1-year warranty from the purchase date; QR label with the batch.
-      const a05 = renderApp("/units/261804517");
+      const a05 = renderApp("/units/SM482V-261804517");
       expect(await screen.findByRole("heading", { name: "QR label" })).toBeInTheDocument();
       expect(await screen.findByText("1 year from the date of purchase")).toBeInTheDocument();
-      expect(screen.getByRole("img", { name: "QR code for 261804517" })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "QR code for SM482V-261804517" })).toBeInTheDocument();
       a05.unmount();
 
       // Customer: the product is theirs now.
       await signInAs("customer.mreed@wms.local");
       renderApp("/");
-      expect(await screen.findByText("261804517")).toBeInTheDocument();
+      expect(await screen.findByText("SM482V-261804517")).toBeInTheDocument();
     },
     WORKFLOW_TIMEOUT,
   );
@@ -75,7 +75,7 @@ describe("W1: dealer bulk registration", () => {
     `263599101,2635-L01,SC680,${day},Adam Rhodes,(713) 555-0120,,Houston,TX,77002,LS-1`,
     `263599102,2635-L02,VP87,${day},Bianca Flores,(713) 555-0121,,Pasadena,TX,77502,LS-2`,
     `263599103,2635-L01,SC690,${day},Carl Jenkins,(713) 555-0122,,Pearland,TX,77581,LS-3`,
-    `252811902,2528-L01,MG44,${day},Dana Scott,(713) 555-0123,,Spring,TX,77373,LS-4`,
+    `MG44-252811902,2528-L01,MG44,${day},Dana Scott,(713) 555-0123,,Spring,TX,77373,LS-4`,
     "263599105,2635-L03,SRS1,,Eric Lawson,(713) 555-0124,,Katy,TX,77450,LS-5",
   ].join("\n");
 
@@ -118,7 +118,7 @@ describe("W1: dealer bulk registration", () => {
       // A02: only the duplicate needs a human.
       await signInAs("admin@wms.local");
       const duplicates = await registrationsApi.list({ flag: "DUPLICATE" });
-      expect(duplicates.items.map((r) => r.serial)).toEqual(["252811902"]);
+      expect(duplicates.items.map((r) => r.serial)).toEqual(["MG44-252811902"]);
       expect(duplicates.items[0]?.duplicateOf?.customerName).toBe("James Nguyen");
     },
     WORKFLOW_TIMEOUT,
@@ -177,11 +177,13 @@ describe("W6: registration channels", () => {
       // A02: new items with their channel badges, same Pending status as every reviewed channel.
       const a02 = renderApp("/registrations?status=PENDING");
       const table = await screen.findByRole("table");
-      const emailRow = (await within(table).findByText(email.serial)).closest("tr")!;
+      const emailRow = (await within(table).findByText(new RegExp(email.serial))).closest("tr")!;
       expect(within(emailRow).getByText("Email")).toBeInTheDocument();
-      const erpRow = within(table).getByText(erp[0]!.serial).closest("tr")!;
+      const erpRow = within(table).getByText(new RegExp(erp[0]!.serial)).closest("tr")!;
       expect(within(erpRow).getByText("Distributor ERP")).toBeInTheDocument();
-      const webRow = within(table).getByText("263899911").closest("tr")!;
+      const webRow = within(table)
+        .getByText(/263899911/)
+        .closest("tr")!;
       expect(within(webRow).getByText("Web form")).toBeInTheDocument();
       a02.unmount();
 

@@ -9,9 +9,9 @@ import {
   modelFormat,
   nextClaimStatus,
   normalizeBatchValue,
-  normalizeSerialValue,
+  isModelSerial,
+  modelSerial,
   RESOLUTIONS,
-  SERIAL_PATTERN,
   type ClaimActionName,
   type ClaimSource,
   type ClaimStatus,
@@ -316,7 +316,8 @@ export class ClaimsService {
   ): Promise<string | undefined> {
     const unit = claim.unit;
     if (claim.resolution === "REPLACE") {
-      const serial = normalizeSerialValue(
+      const serial = modelSerial(
+        unit.model.code,
         typeof body.replacementSerial === "string" ? body.replacementSerial : "",
       );
       const batch = normalizeBatchValue(
@@ -325,7 +326,7 @@ export class ClaimsService {
       const format = modelFormat(unit.model);
       const errors: Record<string, string> = {};
       if (!serial) errors.replacementSerial = "validation.required";
-      else if (!SERIAL_PATTERN.test(serial) || !format.serial.test(serial) || serial === unit.serial)
+      else if (!isModelSerial(serial, unit.model.code, format) || serial === unit.serial)
         errors.replacementSerial = "rowErrors.invalid_serial";
       if (batch && !format.batch.test(batch)) errors.replacementBatchNumber = "rowErrors.invalid_batch";
       if (Object.keys(errors).length) throw AppError.validation("Check the highlighted fields.", errors);

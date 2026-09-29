@@ -14,7 +14,7 @@ import {
   ProductThumb,
   WarrantyStatusBadge,
 } from "@/components/ui";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatModelSerial } from "@/lib/format";
 import { useDealers } from "@/features/catalog";
 import { useCurrentRole } from "@/lib/session";
 import { useTableParams } from "@/lib/use-table-params";
@@ -51,7 +51,7 @@ export default function UnitsListPage() {
         header: t("units.columns.serial"),
         cell: (i) => (
           <Link to={`/units/${i.getValue()}`} className="underline-offset-2 hover:underline">
-            <MonoId>{i.getValue()}</MonoId>
+            <MonoId>{formatModelSerial(i.row.original.modelCode, i.getValue())}</MonoId>
           </Link>
         ),
       }),

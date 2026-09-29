@@ -51,7 +51,7 @@ describe("bulk sheets", () => {
     const rows = rowsFromMatrix(await readSheet("template.xlsx", await templateXlsx()));
     expect(rows).toEqual([
       {
-        serial: "243500101",
+        serial: "SC680-243500101",
         batchNumber: "2435-L02",
         modelCode: "SC680",
         purchaseDate: "2026-09-15",

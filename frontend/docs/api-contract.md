@@ -136,8 +136,11 @@ Integration message `type` values the frontend has labels for: `erp_invoice`, `r
 
 Serial and batch formats are per model (`Model.serialPattern`, `batchPattern`). Every serial must also match
 `^[A-Z0-9-]{6,20}$`. The assumed Fieldpiece label format, used by every seeded model, is a 9-digit serial (`yy` + `ww` +
-5-digit sequence, e.g. `243500101`) and a batch `yyww-Lnn` (e.g. `2435-L02`). **[CONFIRM]** with Fieldpiece. Serials
-are stored without spaces and upper-cased; batches trimmed and upper-cased.
+5-digit sequence, e.g. `243500101`) and a batch `yyww-Lnn` (e.g. `2435-L02`). **[CONFIRM]** with Fieldpiece. A
+serial is stored and returned as **`MODEL-NUMBER`** (e.g. `SC680-243500101`); `serialPattern` describes the number
+part. Senders may send either the full serial or just the label number, which gets the row's model code added; a
+prefix of another model is `invalid_serial`. Serials are stored without spaces and upper-cased; batches trimmed and
+upper-cased.
 
 ## 3. Shapes
 
@@ -590,7 +593,7 @@ the partner client.
 
 ```json
 {
-  "serial": "243500101",
+  "serial": "SC680-243500101",
   "batchNumber": "2435-L02",
   "modelCode": "SC680",
   "purchaseDate": "2026-09-15",
@@ -624,7 +627,7 @@ string; errors?: Partial<Record<RegistrationField, RowErrorCode>> }[] }`, one pe
 **Answers `404` while `INBOUND_EMAIL_SECRET` isn't set** (email intake off).
 
 - Body: `{ from, to, subject, text, attachments: { filename, contentType, contentBase64 }[] }`.
-- The registration is read from lines of the text such as `Serial number: 243500101`, `Batch: 2435-L02`,
+- The registration is read from lines of the text such as `Serial number: SC680-243500101`, `Batch: 2435-L02`,
   `Model: SC680`, `Purchased: 09/15/2026` (US or ISO dates), `Phone:`, `City:`, `State:`, `ZIP:`, `Invoice:`; the
   sender's name and email come from `from`. Up to 5 attachments are kept as proof of purchase (photos and PDF only;
   others, such as signature images in other formats, are skipped).

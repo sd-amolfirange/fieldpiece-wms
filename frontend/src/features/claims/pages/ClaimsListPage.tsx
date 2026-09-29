@@ -24,7 +24,7 @@ import {
   NativeSelect,
   ProductThumb,
 } from "@/components/ui";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { formatDateTime, formatModelSerial, formatMoney } from "@/lib/format";
 import { useCurrentRole, useCurrentUser } from "@/lib/session";
 import { useTableParams } from "@/lib/use-table-params";
 import { ClaimTracker } from "../components/ClaimTracker";
@@ -89,11 +89,10 @@ export default function ClaimsListPage() {
           <span className="flex items-center gap-2">
             <ProductThumb imageUrl={i.row.original.modelImageUrl} size="sm" />
             <span>
-              <MonoId>{i.getValue()}</MonoId>
-              <span className="block text-xs text-text-muted">
-                {i.row.original.modelCode}
-                {i.row.original.batchNumber ? ` · ${i.row.original.batchNumber}` : ""}
-              </span>
+              <MonoId>{formatModelSerial(i.row.original.modelCode, i.getValue())}</MonoId>
+              {i.row.original.batchNumber ? (
+                <span className="block text-xs text-text-muted">{i.row.original.batchNumber}</span>
+              ) : null}
             </span>
           </span>
         ),

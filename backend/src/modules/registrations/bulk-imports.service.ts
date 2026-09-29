@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
   bulkCounts,
-  normalizeSerialValue,
+  modelSerial,
   type BulkImportView,
   type BulkRowStatus,
   type RegistrationRowInput,
@@ -166,7 +166,10 @@ export class BulkImportsService {
       },
       select: { values: true },
     });
-    const seen = new Set(others.map((r) => normalizeSerialValue((r.values as RegistrationRowInput).serial)));
+    const seen = new Set(others.map((r) => {
+        const values = r.values as RegistrationRowInput;
+        return modelSerial(values.modelCode, values.serial);
+      }));
 
     for (const row of rows) {
       await this.prisma.tx(async (tx) => {
@@ -195,7 +198,7 @@ export class BulkImportsService {
           },
         });
       });
-      seen.add(normalizeSerialValue(row.values.serial));
+      seen.add(modelSerial(row.values.modelCode, row.values.serial));
     }
 
     const batch = await this.prisma.bulkImport.update({

@@ -34,10 +34,12 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
       await expect(heading(admin, h)).toBeVisible();
   });
 
-  // Two portal registrations for A02 / A03: a clean one (the product from the ERP invoice, can be approved) and a
-  // duplicate of a registered product with another model (can only be rejected or merged).
+  // Three portal registrations for A02 / A03: a clean one (the product from the ERP invoice, can be approved), a
+  // duplicate of a registered product (can only be rejected or merged), and a registered product's label number
+  // under another model (flagged as a model mismatch).
   for (const [serial, model] of [
-    ["261804517", "SM482V"],
+    ["SM482V-261804517", "SM482V"],
+    ["SC680-251406233", "SC680"],
     ["251406233", "SC480"],
   ]) {
     await customer.goto(`/register?serial=${serial}&model=${model}`);
@@ -69,11 +71,14 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     await expect(heading(admin, "Submitted data")).toBeVisible();
     await expect(heading(admin, "Receipt or invoice")).toBeVisible();
     await expect(admin.getByText(/is already registered/).first()).toBeVisible();
-    await expect(admin.getByText(/doesn't match the model in our records/)).toBeVisible();
     await expect(admin.getByRole("button", { name: "Reject" }).first()).toBeVisible();
     await expect(admin.getByRole("button", { name: "Merge into existing record" })).toBeVisible();
+    // The same label number under another model.
+    await admin.goto("/registrations?q=SC480-251406233");
+    await admin.locator("table tbody tr").first().getByRole("link").first().click();
+    await expect(admin.getByText(/doesn't match the model in our records/)).toBeVisible();
     // A clean registration can be approved.
-    await admin.goto("/registrations?status=PENDING&q=261804517");
+    await admin.goto("/registrations?status=PENDING&q=SM482V-261804517");
     await admin.locator("table tbody tr").first().getByRole("link").first().click();
     await expect(admin.getByRole("button", { name: "Approve" })).toBeVisible();
   });
@@ -90,7 +95,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
   });
 
   await test.step("A05 Product detail", async () => {
-    await admin.goto("/units/252207119");
+    await admin.goto("/units/DR82-252207119");
     await expect(admin.getByText("1 year from the date of purchase")).toBeVisible();
     await expect(admin.getByText("2522-L01").first()).toBeVisible();
     await expect(heading(admin, "QR label")).toBeVisible();
@@ -149,7 +154,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     await expect(admin.getByText(/^dealer\.lonestar@/).first()).toBeVisible();
   });
 
-  await test.step("A12 Integration log", async () => {
+  await test.step("A12 Integration log (with partner API keys)", async () => {
     await admin.goto("/admin/integrations");
     const systems = admin.getByLabel("System");
     for (const s of ["CRM", "Distributor ERP", "Finance", "Partner API", "Email"]) {
@@ -161,6 +166,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     await admin.getByRole("button", { name: "View payload" }).first().click();
     await expect(admin.locator("pre")).toBeVisible();
     await admin.keyboard.press("Escape");
+    await expect(heading(admin, "Partner systems")).toBeVisible();
   });
 
   await test.step("A13 System events", async () => {
@@ -175,8 +181,8 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     }
   });
 
-  await test.step("Registration channels (admin: with partner keys)", async () => {
-    await admin.goto("/registrations/channels");
+  await test.step("Registration channels (dealer / distributor only)", async () => {
+    await dealer.goto("/registrations/channels");
     for (const h of [
       "At the counter",
       "Bulk upload",
@@ -185,11 +191,12 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
       "Customer portal",
       "Partner API",
     ])
-      await expect(admin.getByRole("heading", { name: h })).toBeVisible();
-    await expect(heading(admin, "Partner systems")).toBeVisible();
-    await dealer.goto("/registrations/channels");
-    await expect(dealer.getByRole("heading", { name: "Website form" })).toBeVisible();
+      await expect(dealer.getByRole("heading", { name: h })).toBeVisible();
+    await expect(dealer.getByText("registrations@wms.local")).toBeVisible();
     await expect(heading(dealer, "Partner systems")).toHaveCount(0);
+    // Admin manages partner keys from Integrations instead, not this page.
+    await admin.goto("/registrations/channels");
+    await expect(admin.getByText(/you don't have access/i)).toBeVisible();
   });
 
   await test.step("DL01 Dealer home (dealer and distributor)", async () => {
@@ -222,7 +229,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     }
   });
 
-  await test.step("DL04 Products I sold (dealer; distributor sees all its dealers)", async () => {
+  await test.step("DL04 Sold products (dealer; distributor sees all its dealers)", async () => {
     await dealer.goto("/units");
     await expect(dealer.locator("main").getByRole("searchbox")).toBeVisible();
     await expect(dealer.locator("table tbody tr").first()).toContainText(
@@ -233,15 +240,15 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
   });
 
   await test.step("DL05 Product detail (read-only)", async () => {
-    await dealer.goto("/units/252811902");
+    await dealer.goto("/units/MG44-252811902");
     await expect(dealer.getByText("1 year from the date of purchase")).toBeVisible();
     await expect(dealer.getByRole("button", { name: "Warranty certificate (PDF)" })).toBeVisible();
     await expect(dealer.getByRole("button", { name: "Void warranty" })).toHaveCount(0);
   });
 
   await test.step("DL06 File a claim", async () => {
-    await dealer.goto("/claims/new?serial=252811902");
-    await expect(dealer.getByText("Warranty coverage for 252811902")).toBeVisible();
+    await dealer.goto("/claims/new?serial=MG44-252811902");
+    await expect(dealer.getByText("Warranty coverage for MG44-252811902")).toBeVisible();
     await expect(dealer.locator('input[type="file"]')).toBeAttached();
     await expect(dealer.getByLabel("What's wrong")).toBeVisible();
   });
@@ -253,7 +260,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
   });
 
   await test.step("CU01 Register a product", async () => {
-    await customer.goto("/register?serial=261804517&model=SM482V&batch=2618-L02");
+    await customer.goto("/register?serial=SM482V-261804517&model=SM482V&batch=2618-L02");
     await expect(customer.getByText("Details read from the QR label on your product.")).toBeVisible();
     await expect(customer.getByLabel("Purchase date")).toBeVisible();
     await expect(customer.getByText("Receipt or invoice (photo or PDF)")).toBeVisible();
@@ -261,13 +268,13 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
 
   await test.step("CU02 My products", async () => {
     await customer.goto("/");
-    await expect(customer.getByText("251406233").first()).toBeVisible();
+    await expect(customer.getByText("SC680-251406233").first()).toBeVisible();
     await expect(customer.getByText(/In warranty for \d+ more days?/).first()).toBeVisible();
     await expect(customer.getByText(/Warranty ended on /).first()).toBeVisible();
   });
 
   await test.step("CU03 Product detail", async () => {
-    await customer.goto("/units/251406233");
+    await customer.goto("/units/SC680-251406233");
     await expect(customer.getByText("1 year from the date of purchase")).toBeVisible();
     await expect(customer.getByRole("button", { name: "Warranty certificate (PDF)" })).toBeVisible();
     await expect(customer.getByRole("link", { name: "File a claim" })).toBeVisible();
@@ -278,8 +285,8 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     await expect(customer.getByLabel("Product")).toBeVisible();
     await expect(customer.getByLabel("What's wrong")).toBeVisible();
     await expect(customer.locator('input[type="file"]')).toBeAttached();
-    await customer.getByLabel("Product").selectOption({ value: "251406233" });
-    await expect(customer.getByText(/Warranty coverage for 251406233/)).toBeVisible();
+    await customer.getByLabel("Product").selectOption({ value: "SC680-251406233" });
+    await expect(customer.getByText(/Warranty coverage for SC680-251406233/)).toBeVisible();
   });
 
   await test.step("CU05 Claim tracking", async () => {
@@ -300,7 +307,7 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
     const visitor = await context.newPage();
     await visitor.goto("/register-product");
     await expect(visitor.getByRole("heading", { name: "Register your Fieldpiece product" })).toBeVisible();
-    await expect(visitor.getByRole("button", { name: "Scan QR label" })).toBeVisible();
+    await expect(visitor.getByRole("button", { name: "Scan the QR label" })).toBeVisible();
     for (const label of ["Model", "Serial number", "Batch number", "Purchase date", "Customer email"])
       await expect(visitor.getByLabel(new RegExp(label)).first()).toBeVisible();
     await context.close();

@@ -7,9 +7,9 @@ import {
   modelFormat,
   nextClaimStatus,
   normalizeBatchValue,
-  normalizeSerialValue,
+  isModelSerial,
+  modelSerial,
   RESOLUTIONS,
-  SERIAL_PATTERN,
   type ClaimActionName,
   type ClaimSource,
   type IssueType,
@@ -246,7 +246,8 @@ function settle(ctx: Ctx, claim: WarrantyClaim, body: ClaimActionInput): string 
   const model = state.models.find((m) => m.id === unit?.modelId);
   if (!unit || !model) throw notFound("Product");
   if (claim.resolution === "REPLACE") {
-    const serial = normalizeSerialValue(
+    const serial = modelSerial(
+      model.code,
       typeof body.replacementSerial === "string" ? body.replacementSerial : "",
     );
     const batch = normalizeBatchValue(
@@ -255,7 +256,7 @@ function settle(ctx: Ctx, claim: WarrantyClaim, body: ClaimActionInput): string 
     const format = modelFormat(model);
     const errors: Record<string, string> = {};
     if (!serial) errors.replacementSerial = "validation.required";
-    else if (!SERIAL_PATTERN.test(serial) || !format.serial.test(serial) || serial === unit.serial)
+    else if (!isModelSerial(serial, model.code, format) || serial === unit.serial)
       errors.replacementSerial = "rowErrors.invalid_serial";
     if (batch && !format.batch.test(batch)) errors.replacementBatchNumber = "rowErrors.invalid_batch";
     throwIfErrors(errors);

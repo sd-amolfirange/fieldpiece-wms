@@ -44,7 +44,7 @@ describe("W7: distributor oversight", () => {
       ).toBeInTheDocument();
       dl01.unmount();
 
-      // DL04: Products I sold filtered to Bayou Air Parts.
+      // DL04: Sold products filtered to Bayou Air Parts.
       const dl04 = renderApp("/units?dealerId=d-bayou");
       const table = await screen.findByRole("table");
       const dealerCells = await within(table).findAllByText(

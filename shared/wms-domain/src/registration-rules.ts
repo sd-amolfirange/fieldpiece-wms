@@ -37,7 +37,11 @@ export type RowErrors = Partial<Record<RegistrationField, RowErrorCode>>;
 /** Loose check any serial must pass (before the model's own format is known). */
 export const SERIAL_PATTERN = /^[A-Z0-9-]{6,20}$/;
 
-/** Assumed Fieldpiece formats: serial = yy + ww + 5-digit sequence; batch = yyww-L + line. [CONFIRM] */
+/**
+ * Assumed Fieldpiece formats: the number on the label = yy + ww + 5-digit sequence; batch = yyww-L + line. [CONFIRM]
+ * A product's serial is stored as MODEL-NUMBER (e.g. "SC680-251406233"), so the same number on two models never
+ * collides; `serialPattern` is the format of the NUMBER part.
+ */
 export const DEFAULT_SERIAL_PATTERN = "^\\d{9}$";
 export const DEFAULT_BATCH_PATTERN = "^\\d{4}-L\\d{2}$";
 
@@ -47,10 +51,45 @@ export const normalizeSerialValue = (value: string | undefined) =>
 export const normalizeBatchValue = (value: string | undefined) =>
   (value ?? "").trim().toUpperCase();
 
+/**
+ * The stored serial for what someone typed or scanned: "251406233" with model SC680 -> "SC680-251406233"; a value
+ * that already starts with "SC680-" is kept. Anything else (another model's prefix, letters) is returned
+ * normalized, for validation to reject.
+ */
+export function modelSerial(
+  modelCode: string | undefined,
+  value: string | undefined,
+): string {
+  const serial = normalizeSerialValue(value);
+  const code = (modelCode ?? "").trim().toUpperCase();
+  if (!serial || !code || serial.startsWith(`${code}-`)) return serial;
+  return /^\d+$/.test(serial) ? `${code}-${serial}` : serial;
+}
+
+/** The number part of a stored serial ("SC680-251406233" -> "251406233"); the value itself when it has no prefix. */
+export function serialNumberPart(serial: string): string {
+  const dash = serial.lastIndexOf("-");
+  return dash < 0 ? serial : serial.slice(dash + 1);
+}
+
 /** The formats of one model, compiled. */
 export interface ModelFormat {
   serial: RegExp;
   batch: RegExp;
+}
+
+/** Whether `serial` (already through modelSerial) is MODEL-NUMBER for this model, with the number in its format. */
+export function isModelSerial(
+  serial: string,
+  modelCode: string,
+  format: ModelFormat,
+): boolean {
+  const prefix = `${modelCode.trim().toUpperCase()}-`;
+  return (
+    SERIAL_PATTERN.test(serial) &&
+    serial.startsWith(prefix) &&
+    format.serial.test(serial.slice(prefix.length))
+  );
 }
 
 export const modelFormat = (
@@ -75,9 +114,9 @@ export function validateRegistrationRow(
   ctx: RowContext,
 ): RowErrors {
   const errors: RowErrors = {};
-  const serial = normalizeSerialValue(row.serial);
-  const batch = normalizeBatchValue(row.batchNumber);
   const modelCode = (row.modelCode ?? "").trim().toUpperCase();
+  const serial = modelSerial(modelCode, row.serial);
+  const batch = normalizeBatchValue(row.batchNumber);
   const purchaseDate = (row.purchaseDate ?? "").trim();
   const format = ctx.models.get(modelCode);
 
@@ -87,7 +126,7 @@ export function validateRegistrationRow(
   if (!serial) errors.serial = "required";
   else if (
     !SERIAL_PATTERN.test(serial) ||
-    (format && !format.serial.test(serial))
+    (format && !isModelSerial(serial, modelCode, format))
   )
     errors.serial = "invalid_serial";
   else if (ctx.existingSerials.has(serial)) errors.serial = "duplicate_serial";

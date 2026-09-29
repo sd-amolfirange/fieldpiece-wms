@@ -1,5 +1,6 @@
+import { isValid, parse } from "date-fns";
 import ExcelJS from "exceljs";
-import type { RegistrationRowInput } from "@wms/domain";
+import { isIsoDate, type RegistrationRowInput } from "@wms/domain";
 
 // Bulk registration sheets (DL02): the templates, and reading an uploaded .xlsx or .csv into rows. Columns are
 // matched by header name, so their order in the file doesn't matter.
@@ -44,7 +45,7 @@ const FIELD_BY_HEADER: Record<string, keyof RegistrationRowInput> = {
 };
 
 const SAMPLE_ROW = [
-  "243500101",
+  "SC680-243500101",
   "2435-L02",
   "SC680",
   "2026-09-15",
@@ -57,6 +58,29 @@ const SAMPLE_ROW = [
   "INV-10001",
 ];
 
+// A US dealer's own spreadsheet usually has Excel's US locale default, M/D/YYYY (or MM-DD-YYYY), not ISO — accept
+// those in an uploaded sheet's Purchase date column and convert to yyyy-MM-dd before validation ever sees them.
+// An .xlsx date CELL is already converted to ISO in cellText() below; this only covers a date typed as TEXT
+// (every CSV cell, or a text-formatted Excel cell). Four-digit years only, so it's never ambiguous with ISO or
+// with a day-first (DD/MM/YYYY) reading.
+const US_DATE_FORMATS = ["M/d/yyyy", "MM/dd/yyyy", "M-d-yyyy", "MM-dd-yyyy"];
+
+/** "9/15/2026" or "09-15-2026" -> "2026-09-15"; anything already ISO, or not a recognised US date, is unchanged. */
+export function normalizeSheetDate(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || isIsoDate(trimmed)) return trimmed;
+  for (const dateFormat of US_DATE_FORMATS) {
+    const parsed = parse(trimmed, dateFormat, new Date());
+    if (isValid(parsed) && parsed.getFullYear() >= 1000) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, "0");
+      const d = String(parsed.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return trimmed;
+}
+
 /** Rows from a string matrix (header row first). Blank rows are skipped. */
 export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
   const [header, ...body] = matrix;
@@ -67,7 +91,9 @@ export function rowsFromMatrix(matrix: string[][]): RegistrationRowInput[] {
     .map((cells) => {
       const row: RegistrationRowInput = {};
       fields.forEach((field, i) => {
-        if (field) row[field] = (cells[i] ?? "").trim().slice(0, 200);
+        if (!field) return;
+        const text = (cells[i] ?? "").trim().slice(0, 200);
+        row[field] = field === "purchaseDate" ? normalizeSheetDate(text) : text;
       });
       return row;
     });

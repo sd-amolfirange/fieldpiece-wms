@@ -20,12 +20,12 @@ import { env } from "@/lib/env";
 import { can } from "@/lib/permissions";
 import { useCurrentRole } from "@/lib/session";
 import { bulkImportsApi } from "../api";
-import { PartnerClientsCard } from "../components/PartnerClientsCard";
 import { useIntakeInfo } from "../hooks";
 
-// Registration hub: every way a product registration reaches the warranty desk, in one place. Dealers register
-// at the counter (single, QR or bulk); buyers use the website form, email their receipt or sign in; partner systems
-// (point of sale, distributor ERP, online marketplaces) send registrations through the partner API.
+// Registration hub (dealer / distributor): every way a product registration reaches the warranty desk, in one
+// place. Dealers register at the counter (single, QR or bulk); buyers use the website form, email their receipt
+// or sign in; partner systems (point of sale, distributor ERP, online marketplaces) send registrations through
+// the partner API. Managing partner API keys is an admin task, done from Admin > Integrations instead.
 
 const PARTNER_SAMPLE = `POST {url}/registrations
 X-Api-Key: fpk_…
@@ -33,7 +33,7 @@ Content-Type: application/json
 
 {
   "registrations": [{
-    "serial": "263810457",
+    "serial": "SC680-263810457",
     "batchNumber": "2638-L01",
     "modelCode": "SC680",
     "purchaseDate": "2026-09-15",
@@ -200,7 +200,17 @@ export default function RegistrationHubPage() {
             </p>
           </ChannelCard>
 
-          <ChannelCard icon={ShieldCheck} title={t("hub.portal.title")} channels={["PORTAL"]}>
+          <ChannelCard
+            icon={ShieldCheck}
+            title={t("hub.portal.title")}
+            channels={["PORTAL"]}
+            actions={
+              <Link to="/units" className={buttonVariants()}>
+                <QrIcon size={20} strokeWidth={1.75} aria-hidden />
+                {t("hub.portal.action")}
+              </Link>
+            }
+          >
             <p className="text-body">{t("hub.portal.help")}</p>
           </ChannelCard>
 
@@ -216,9 +226,7 @@ export default function RegistrationHubPage() {
               ) : null
             }
           >
-            <p className="text-body">
-              {can(role, "partners:manage") ? t("hub.partner.helpAdmin") : t("hub.partner.help")}
-            </p>
+            <p className="text-body">{t("hub.partner.help")}</p>
             <pre
               className="overflow-x-auto rounded bg-ink-50 p-3 font-mono text-sm"
               // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by keyboard
@@ -230,8 +238,6 @@ export default function RegistrationHubPage() {
             </pre>
           </ChannelCard>
         </div>
-
-        {can(role, "partners:manage") ? <PartnerClientsCard /> : null}
       </div>
     </>
   );

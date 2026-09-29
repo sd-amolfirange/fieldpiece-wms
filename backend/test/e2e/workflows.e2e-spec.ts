@@ -93,7 +93,7 @@ describe("workflows", () => {
       customerId: "c-aparker",
       batchNumber: "2638-L01",
     });
-    const unit = await call("dealer", "GET", "/units/263899001");
+    const unit = await call("dealer", "GET", "/units/SC680-263899001");
     expect(unit.body).toMatchObject({
       warrantyStart: "2026-01-10",
       warrantyEnd: "2027-01-09",
@@ -108,14 +108,14 @@ describe("workflows", () => {
       content: JPEG,
     });
     const reg = await call("customer", "POST", "/registrations", {
-      serial: "261804517",
+      serial: "SM482V-261804517",
       modelCode: "SM482V",
       purchaseDate: h.today(),
       attachmentIds: [up.body.id],
     });
     expect(reg.body).toMatchObject({ status: "PENDING", channel: "PORTAL", flags: [] });
     await call("admin", "POST", `/registrations/${reg.body.id}/approve`);
-    const unit = await call("customer", "GET", "/units/261804517");
+    const unit = await call("customer", "GET", "/units/SM482V-261804517");
     expect(unit.body).toMatchObject({
       status: "ACTIVE",
       batchNumber: "2618-L02",
@@ -189,7 +189,7 @@ describe("workflows", () => {
             customer: { name: "Pat Moreno", state: "AZ" },
           },
           {
-            serial: "251406233",
+            serial: "SC680-251406233",
             batchNumber: "2514-L01",
             modelCode: "SC680",
             purchaseDate: h.today(),
@@ -213,7 +213,7 @@ describe("workflows", () => {
       "REVIEW",
       "ERROR",
     ]);
-    const unit = await call("admin", "GET", "/units/263899003");
+    const unit = await call("admin", "GET", "/units/SC260-263899003");
     expect(unit.body).toMatchObject({ dealerId: "d-desertpeak", status: "ACTIVE" });
     const reg = await call("admin", "GET", `/registrations/${res.body.results[0].registrationId}`);
     expect(reg.body.channel).toBe("API");
@@ -231,7 +231,7 @@ describe("workflows", () => {
       },
     });
     expect(retail.body.results[0].status).toBe("REGISTERED");
-    expect((await call("admin", "GET", "/units/263899006")).body).toMatchObject({
+    expect((await call("admin", "GET", "/units/SRS1-263899006")).body).toMatchObject({
       placeOfPurchase: "Online marketplace",
     });
 
@@ -292,7 +292,7 @@ describe("workflows", () => {
     const reg = await call("admin", "GET", `/registrations/${res.body.registrationId}`);
     expect(reg.body).toMatchObject({
       channel: "EMAIL",
-      serial: "263899004",
+      serial: "MG44-263899004",
       batchNumber: "2638-L03",
       modelCode: "MG44",
       purchaseDate: "2026-09-20",
@@ -301,7 +301,7 @@ describe("workflows", () => {
     expect(reg.body.attachmentIds).toHaveLength(1);
     // Renee is an existing customer (same email): approval links the product to her record.
     await call("admin", "POST", `/registrations/${reg.body.id}/approve`);
-    expect((await call("admin", "GET", "/units/263899004")).body.customerId).toBe("c-rcarter");
+    expect((await call("admin", "GET", "/units/MG44-263899004")).body.customerId).toBe("c-rcarter");
 
     const unreadable = await h.request({
       method: "POST",
@@ -317,10 +317,10 @@ describe("workflows", () => {
   // ── Warranty claims ───────────────────────────────────────────────────────
 
   it("claims: a covered claim approved as a replacement moves the rest of the warranty to the new serial", async () => {
-    const coverage = await call("customer", "GET", "/units/251406233/coverage");
+    const coverage = await call("customer", "GET", "/units/SC680-251406233/coverage");
     expect(coverage.body).toMatchObject({ covered: true, reason: "IN_WARRANTY" });
     const filed = await call("customer", "POST", "/claims", {
-      unitSerial: "251406233",
+      unitSerial: "SC680-251406233",
       issueType: "DISPLAY",
       description: "Backlight flickers and the reading freezes.",
     });
@@ -332,7 +332,7 @@ describe("workflows", () => {
       modelCode: "SC680",
     });
     const again = await call("customer", "POST", "/claims", {
-      unitSerial: "251406233",
+      unitSerial: "SC680-251406233",
       issueType: "DISPLAY",
       description: "Filing the same problem twice.",
     });
@@ -350,7 +350,7 @@ describe("workflows", () => {
     expect((await move(id, { action: "close" })).body.fieldErrors).toEqual({
       replacementSerial: "validation.required",
     });
-    expect((await move(id, { action: "close", replacementSerial: "252811902" })).body.code).toBe(
+    expect((await move(id, { action: "close", replacementSerial: "SC680-252409963" })).body.code).toBe(
       "duplicate_serial",
     );
     const closed = await move(id, {
@@ -361,7 +361,7 @@ describe("workflows", () => {
     expect(closed.body).toMatchObject({
       status: "CLOSED",
       resolution: "REPLACE",
-      replacementSerial: "263899005",
+      replacementSerial: "SC680-263899005",
     });
     expect(closed.body.history.map((e: { status: string }) => e.status)).toEqual([
       "SUBMITTED",
@@ -370,12 +370,12 @@ describe("workflows", () => {
       "CLOSED",
     ]);
 
-    const original = await call("customer", "GET", "/units/251406233");
-    const replacement = await call("customer", "GET", "/units/263899005");
-    expect(original.body).toMatchObject({ status: "EXPIRED", replacedBySerial: "263899005" });
+    const original = await call("customer", "GET", "/units/SC680-251406233");
+    const replacement = await call("customer", "GET", "/units/SC680-263899005");
+    expect(original.body).toMatchObject({ status: "EXPIRED", replacedBySerial: "SC680-263899005" });
     expect(replacement.body).toMatchObject({
       status: "ACTIVE",
-      replacesSerial: "251406233",
+      replacesSerial: "SC680-251406233",
       warrantyEnd: original.body.warrantyEnd,
       warrantyStart: h.today(),
     });
@@ -387,7 +387,7 @@ describe("workflows", () => {
 
   it("claims: a credit is posted to Finance; a rejection needs a reason; dealers and customers can't decide", async () => {
     const filed = await call("dealer", "POST", "/claims", {
-      unitSerial: "252811902",
+      unitSerial: "MG44-252811902",
       issueType: "CONNECTIVITY",
       description: "Gauge drops the Bluetooth link every few minutes.",
     });
@@ -411,7 +411,7 @@ describe("workflows", () => {
     });
 
     const expired = await call("customer", "POST", "/claims", {
-      unitSerial: "243208841",
+      unitSerial: "VP87-243208841",
       issueType: "MECHANICAL",
       description: "Pump motor stalls after a minute.",
     });
@@ -453,16 +453,16 @@ describe("workflows", () => {
   });
 
   it("W5: a voided product's claim is filed as not covered", async () => {
-    const voided = await call("admin", "POST", "/units/252207119/void", {
+    const voided = await call("admin", "POST", "/units/DR82-252207119/void", {
       reason: "UNAUTHORIZED_REPAIR",
       note: "Tamper label broken.",
     });
     expect(voided.body.status).toBe("VOID");
     expect(
-      (await call("admin", "POST", "/units/252207119/void", { reason: "NOPE" })).body.fieldErrors,
+      (await call("admin", "POST", "/units/DR82-252207119/void", { reason: "NOPE" })).body.fieldErrors,
     ).toEqual({ reason: "validation.voidReason" });
     const claim = await call("customer", "POST", "/claims", {
-      unitSerial: "252207119",
+      unitSerial: "DR82-252207119",
       issueType: "INACCURATE_READING",
       description: "Detector alarms with no leak present.",
     });
