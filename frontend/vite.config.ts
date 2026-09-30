@@ -22,7 +22,14 @@ export default defineConfig({
   server: {
     port: 5173,
     // The shared demo API (demo-server/). Ignored in `dev:mock`, where MSW answers first.
-    proxy: { "/api": { target: process.env.DEMO_API_URL ?? "http://localhost:4000" } },
+    proxy: {
+      "/api": { target: process.env.DEMO_API_URL ?? "http://localhost:4000" },
+      // Warranty Assistant (../chatbot, `uvicorn app.main:app --port 8090`).
+      "/assistant": {
+        target: process.env.ASSISTANT_URL ?? "http://localhost:8090",
+        rewrite: (path: string) => path.replace(/^\/assistant/, ""),
+      },
+    },
     // Lets a tunnel (docs/demo-setup.md, option B) reach the dev server.
     allowedHosts: [".trycloudflare.com", ".ngrok-free.app"],
   },

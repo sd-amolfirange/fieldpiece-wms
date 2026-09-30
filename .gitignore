@@ -11,3 +11,12 @@ frontend/e2e/demo-data/
 
 # Cloud deployment settings (secrets). Only the template is committed.
 deploy/env/cloud.env
+
+# Warranty Assistant (chatbot/, Python). chatbot/.env holds LLM API keys: covered by ".env" above.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

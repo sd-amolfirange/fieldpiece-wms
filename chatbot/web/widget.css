@@ -1,0 +1,110 @@
+/* Fieldpiece Warranty Assistant widget. Brand values from frontend/src/styles/tokens.css and tailwind.config.ts:
+   yellow header (--brand-500) with black text, ink neutrals, Myriad Pro stack, 4px/8px radius, card/overlay
+   shadows. Everything is scoped under .fpw- so it never touches the host page. */
+.fpw-root {
+  --fpw-brand-50: #fef8eb;
+  --fpw-brand-100: #fdefc9;
+  --fpw-brand-500: #f8bc35;
+  --fpw-brand-600: #e0a21f;
+  --fpw-brand-800: #8a5e0e;
+  --fpw-ink-0: #ffffff;
+  --fpw-ink-50: #f7f7f7;
+  --fpw-ink-100: #e8e8e9;
+  --fpw-ink-500: #5e5e5c;
+  --fpw-ink-900: #12130d;
+  --fpw-ink-1000: #000000;
+  --fpw-info: #17318c;
+  --fpw-tint: rgba(0, 0, 0, 0.08);
+  --fpw-font: "Myriad Pro", "MyriadProRegular", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --fpw-font-display: "Myriad Pro", "MyriadProBold", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --fpw-shadow-card: 0 1px 2px rgba(18, 19, 13, 0.08), 0 1px 3px rgba(18, 19, 13, 0.06);
+  --fpw-shadow-overlay: 0 8px 24px rgba(18, 19, 13, 0.18);
+  font-family: var(--fpw-font);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--fpw-ink-1000);
+}
+.fpw-root *, .fpw-root *::before, .fpw-root *::after { box-sizing: border-box; }
+
+.fpw-launcher {
+  position: fixed; right: 20px; bottom: 20px; z-index: 2147483000;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 60px; height: 60px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--fpw-brand-500); color: var(--fpw-ink-1000);
+  font: 700 15px var(--fpw-font-display); cursor: pointer; box-shadow: var(--fpw-shadow-overlay);
+}
+.fpw-launcher:hover { background: var(--fpw-brand-600); }
+.fpw-launcher:focus-visible, .fpw-root button:focus-visible, .fpw-input:focus-visible {
+  outline: 2px solid var(--fpw-ink-900); outline-offset: 2px;
+}
+.fpw-launcher svg { width: 28px; height: 28px; }
+
+.fpw-panel {
+  position: fixed; right: 20px; bottom: 92px; z-index: 2147483001;
+  width: 460px; max-width: calc(100vw - 32px); height: 720px; max-height: calc(100vh - 116px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--fpw-ink-0); border: 1px solid var(--fpw-ink-100); border-radius: 8px;
+  box-shadow: var(--fpw-shadow-overlay);
+}
+.fpw-panel[hidden] { display: none; }
+@media (max-width: 480px) {
+  .fpw-panel { right: 0; bottom: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .fpw-launcher { right: 16px; bottom: 16px; }
+}
+
+.fpw-header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px;
+  background: var(--fpw-brand-500); color: var(--fpw-ink-1000);
+}
+.fpw-header img { height: 16px; width: auto; display: block; }
+.fpw-title { flex: 1; min-width: 0; }
+.fpw-title strong { display: block; font: 700 15px var(--fpw-font-display); white-space: nowrap; }
+.fpw-title span { display: block; font-size: 12px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fpw-icon-btn {
+  width: 32px; height: 32px; border: 0; border-radius: 4px; background: transparent; color: inherit;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.fpw-icon-btn:hover { background: var(--fpw-tint); }
+.fpw-icon-btn svg { width: 18px; height: 18px; }
+
+.fpw-log { flex: 1; overflow-y: auto; padding: 16px; background: var(--fpw-ink-50); display: flex; flex-direction: column; gap: 12px; }
+.fpw-msg { max-width: 90%; padding: 10px 12px; border-radius: 8px; box-shadow: var(--fpw-shadow-card); word-wrap: break-word; }
+.fpw-msg p { margin: 0 0 6px; }
+.fpw-msg p:last-child { margin-bottom: 0; }
+.fpw-msg ul, .fpw-msg ol { margin: 4px 0 6px; padding-left: 20px; }
+.fpw-msg-bot { align-self: flex-start; background: var(--fpw-ink-0); border: 1px solid var(--fpw-ink-100); }
+.fpw-msg-user { align-self: flex-end; background: var(--fpw-ink-900); color: var(--fpw-ink-0); }
+.fpw-cite { font-size: 11px; font-weight: 700; color: var(--fpw-brand-800); vertical-align: super; }
+.fpw-sources { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--fpw-ink-100); font-size: 12px; color: var(--fpw-ink-500); }
+.fpw-sources ol { margin: 2px 0 0; padding-left: 18px; }
+.fpw-feedback { display: flex; gap: 4px; margin-top: 6px; }
+.fpw-feedback button { border: 1px solid var(--fpw-ink-100); background: var(--fpw-ink-0); border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer; color: var(--fpw-ink-500); }
+.fpw-feedback button[aria-pressed="true"] { background: var(--fpw-brand-100); border-color: var(--fpw-brand-500); color: var(--fpw-ink-1000); }
+
+.fpw-typing { align-self: flex-start; display: flex; gap: 4px; padding: 12px; }
+.fpw-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--fpw-ink-500); animation: fpw-dot 1s infinite ease-in-out; }
+.fpw-typing i:nth-child(2) { animation-delay: 0.15s; }
+.fpw-typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes fpw-dot { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fpw-typing i { animation: none; } }
+
+.fpw-suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; background: var(--fpw-ink-0); }
+.fpw-chip {
+  border: 1px solid var(--fpw-brand-500); background: var(--fpw-brand-50); color: var(--fpw-ink-1000);
+  border-radius: 16px; padding: 4px 10px; font: 13px var(--fpw-font); cursor: pointer;
+}
+.fpw-chip:hover { background: var(--fpw-brand-100); }
+
+.fpw-form { display: flex; gap: 8px; padding: 12px 16px 8px; background: var(--fpw-ink-0); }
+.fpw-input {
+  flex: 1; min-width: 0; resize: none; height: 40px; max-height: 120px; padding: 9px 10px;
+  border: 1px solid var(--fpw-ink-100); border-radius: 4px; font: 15px var(--fpw-font); color: var(--fpw-ink-1000);
+}
+.fpw-send {
+  height: 40px; padding: 0 14px; border: 0; border-radius: 4px; background: var(--fpw-brand-500);
+  color: var(--fpw-ink-1000); font: 700 14px var(--fpw-font-display); cursor: pointer;
+}
+.fpw-send:hover { background: var(--fpw-brand-600); }
+.fpw-send:disabled { opacity: 0.5; cursor: default; }
+.fpw-footnote { margin: 0; padding: 0 16px 10px; background: var(--fpw-ink-0); font-size: 11px; color: var(--fpw-ink-500); }
+.fpw-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

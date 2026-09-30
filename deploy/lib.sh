@@ -35,6 +35,7 @@ load_target() {
 
   PROFILES=()
   if is_true "$(env_value USE_BUNDLED_DB)"; then PROFILES+=(--profile db); fi
+  if is_true "$(env_value ASSISTANT_ENABLED)"; then PROFILES+=(--profile assistant); fi
   # Relative to deploy/ (where the compose file lives): works the same from Git Bash on Windows and on Linux.
   export STACK_ENV_FILE="env/$TARGET.env"
 }

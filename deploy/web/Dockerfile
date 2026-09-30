@@ -19,8 +19,10 @@ COPY frontend/ frontend/
 
 # Build-time settings (Vite bakes them in). The account picker only works while the API's demo features are on.
 ARG VITE_DEMO_MODE=false
+ARG VITE_ASSISTANT_ENABLED=false
 ENV VITE_API_BASE_URL=/api \
     VITE_DEMO_MODE=${VITE_DEMO_MODE} \
+    VITE_ASSISTANT_ENABLED=${VITE_ASSISTANT_ENABLED} \
     VITE_SHOW_ENV_TAG=false \
     VITE_SHOW_FORGOT_PASSWORD=false
 RUN npm run build --prefix frontend

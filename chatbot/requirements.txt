@@ -1,0 +1,13 @@
+langgraph>=1.2,<2
+langchain>=1.4,<2
+langchain-core>=1.6,<2
+langchain-anthropic>=1.7,<2
+langchain-openai>=1.6,<2
+langchain-ollama>=1.1,<2
+fastapi>=0.141,<1
+uvicorn[standard]>=0.54,<1
+psycopg[binary]>=3.2,<4
+pgvector>=0.5,<1
+httpx>=0.28,<1
+pydantic-settings>=2.15,<3
+pytest>=9,<10

@@ -41,11 +41,11 @@ load_target
 info "Target: $TARGET ($ENV_FILE)"
 case "$MODE" in
   build) info "Building images"; compose build ;;
-  pull) info "Pulling images"; compose pull migrate api web ;;
+  pull) info "Pulling images"; compose pull migrate api web $(is_true "$(env_value ASSISTANT_ENABLED)" && echo chatbot) ;;
   push)
     info "Building and pushing $(env_value IMAGE_REGISTRY)/{api,api-tools,web}:$(env_value IMAGE_TAG)"
     compose build
-    compose push migrate api web
+    compose push migrate api web $(is_true "$(env_value ASSISTANT_ENABLED)" && echo chatbot)
     info "Pushed. On the server: ./run.sh $TARGET --pull"
     exit 0
     ;;
@@ -63,6 +63,10 @@ fi
 
 info "Starting the API and the web app"
 compose up -d --no-build --wait --wait-timeout 300 api web
+if is_true "$(env_value ASSISTANT_ENABLED)"; then
+  info "Starting the Warranty Assistant (it seeds its knowledge base on start)"
+  compose up -d --no-build --wait --wait-timeout 300 chatbot-db chatbot
+fi
 
 PORT="$(env_value WEB_PORT)"
 info "Running. Open http://localhost:${PORT:-8088}  (stop with ./down.sh${TARGET:+ $TARGET})"

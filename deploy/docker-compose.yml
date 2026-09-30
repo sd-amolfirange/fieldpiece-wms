@@ -4,6 +4,7 @@
 # Profiles:
 #   db    bundled Postgres (leave it off in the cloud when DATABASE_URL points at a managed database)
 #   seed  one-shot job that loads the starting data into an empty database
+#   assistant  the Warranty Assistant chatbot (../chatbot) and its knowledge-base database (ASSISTANT_ENABLED)
 
 name: ${COMPOSE_PROJECT_NAME:-hvac-wms}
 
@@ -85,6 +86,8 @@ services:
       args:
         # The sign-in page's account picker only works while the API's demo features are on.
         VITE_DEMO_MODE: ${DEMO_FEATURES_ENABLED:-false}
+        # Loads the Warranty Assistant widget (served by the chatbot service under /assistant).
+        VITE_ASSISTANT_ENABLED: ${ASSISTANT_ENABLED:-false}
     restart: unless-stopped
     ports: ["${WEB_PORT:-8088}:80"]
     depends_on:
@@ -94,7 +97,48 @@ services:
       interval: 10s
       retries: 10
 
+  # Warranty Assistant (../chatbot): knowledge base in its own pgvector database, never the WMS one. It calls the
+  # API only with the signed-in user's own token. LLM keys: ../chatbot/.env (git-ignored), see chatbot/README.md.
+  chatbot-db:
+    profiles: ["assistant"]
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chatbot
+      POSTGRES_PASSWORD: ${CHATBOT_DB_PASSWORD:-chatbot_local}
+      POSTGRES_DB: chatbot_kb
+    volumes:
+      - chatbotdata:/var/lib/postgresql/data
+      - ../chatbot/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatbot -d chatbot_kb"]
+      interval: 5s
+      retries: 20
+
+  chatbot:
+    profiles: ["assistant"]
+    image: ${IMAGE_REGISTRY:-hvac-wms}/chatbot:${IMAGE_TAG:-local}
+    build: { context: ../chatbot }
+    restart: unless-stopped
+    env_file:
+      - path: ../chatbot/.env
+        required: false
+    environment:
+      # These win over ../chatbot/.env, which holds the laptop (non-Docker) values.
+      DATABASE_URL: postgresql://chatbot:${CHATBOT_DB_PASSWORD:-chatbot_local}@chatbot-db:5432/chatbot_kb
+      WMS_API_URL: http://api:4000/api
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-8088}
+    depends_on:
+      chatbot-db: { condition: service_healthy }
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/api/health')"]
+      interval: 10s
+      start_period: 20s
+      retries: 10
+
 volumes:
   pgdata: {}
+  chatbotdata: {}
   redisdata: {}
   apistorage: {}

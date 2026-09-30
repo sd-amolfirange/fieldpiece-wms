@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_SHOW_ENV_TAG?: string;
   readonly VITE_SHOW_FORGOT_PASSWORD?: string;
   readonly VITE_EXPIRING_SOON_DAYS?: string;
+  readonly VITE_ASSISTANT_ENABLED?: string;
+  readonly VITE_ASSISTANT_URL?: string;
 }
 
 interface ImportMeta {

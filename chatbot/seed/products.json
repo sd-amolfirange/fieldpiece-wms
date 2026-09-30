@@ -1,0 +1,89 @@
+{
+  "_comment": "Refreshed from the WMS public catalog by app.ingest --from-wms.",
+  "models": [
+    {
+      "code": "SC680",
+      "category": "Clamp meters",
+      "name": "Swivel Head Wireless Clamp Meter",
+      "description": "600A AC/DC swivel head clamp meter with Job Link wireless",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SC480",
+      "category": "Clamp meters",
+      "name": "Wireless Clamp Meter",
+      "description": "600A AC dual display power clamp meter with Job Link wireless",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SC260",
+      "category": "Clamp meters",
+      "name": "Compact Clamp Meter",
+      "description": "400A compact True RMS clamp meter",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SM482V",
+      "category": "Digital manifolds",
+      "name": "SMAN Wireless 4-Port Digital Manifold",
+      "description": "4-port refrigerant manifold with built-in vacuum sensor",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SM382V",
+      "category": "Digital manifolds",
+      "name": "SMAN Wireless 3-Port Digital Manifold",
+      "description": "3-port refrigerant manifold with built-in vacuum sensor",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3KH6",
+      "category": "Job Link probes",
+      "name": "Job Link Probes Charging and Air Kit",
+      "description": "Six wireless probes for charging and airflow",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VP87",
+      "category": "Vacuum and recovery",
+      "name": "8 CFM Vacuum Pump",
+      "description": "8 CFM vacuum pump, 15 micron ultimate vacuum, RunQuick oil change",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "MR45",
+      "category": "Vacuum and recovery",
+      "name": "Digital Recovery Machine",
+      "description": "Refrigerant recovery machine",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "MG44",
+      "category": "Vacuum and recovery",
+      "name": "Wireless Micron Vacuum Gauge",
+      "description": "Wireless micron gauge with Job Link",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "DR82",
+      "category": "Leak detectors",
+      "name": "Infrared Refrigerant Leak Detector",
+      "description": "Infrared refrigerant leak detector",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SRS1",
+      "category": "Refrigerant scales",
+      "name": "Refrigerant Scale",
+      "description": "Residential and light commercial refrigerant scale",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "STA2",
+      "category": "Airflow and temperature",
+      "name": "In-Duct Hot Wire Anemometer",
+      "description": "In-duct hot wire anemometer",
+      "warrantyMonths": 12
+    }
+  ]
+}

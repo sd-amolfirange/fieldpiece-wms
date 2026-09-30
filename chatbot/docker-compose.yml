@@ -1,0 +1,38 @@
+# Knowledge-base database for the warranty assistant: PostgreSQL 16 + pgvector.
+# Separate from the WMS database on purpose (own lifecycle, no access to warranty records).
+services:
+  chatbot-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: chatbot
+      POSTGRES_PASSWORD: chatbot_local
+      POSTGRES_DB: chatbot_kb
+    ports:
+      - "5434:5432"
+    volumes:
+      - chatbot-db:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatbot -d chatbot_kb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  chatbot-api:
+    profiles: ["app"]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://chatbot:chatbot_local@chatbot-db:5432/chatbot_kb
+      # Inside the container "localhost" is the container itself; reach the WMS on the host instead.
+      WMS_API_URL: ${WMS_API_URL_DOCKER:-http://host.docker.internal:8088/api}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8090:8090"
+    depends_on:
+      chatbot-db:
+        condition: service_healthy
+
+volumes:
+  chatbot-db:

@@ -13,5 +13,11 @@ export const env = {
   /** "Forgot password" link and form; `.env.showcase` turns it off (the demo server has no password reset). */
   showForgotPassword: import.meta.env.VITE_SHOW_FORGOT_PASSWORD !== "false",
   expiringSoonDays: Number(import.meta.env.VITE_EXPIRING_SOON_DAYS ?? 30) || 30,
+  /**
+   * Warranty Assistant chat button (../chatbot), loaded from `assistantUrl` (same origin: nginx or the Vite proxy).
+   * Off unless VITE_ASSISTANT_ENABLED=true, so unit and UI tests never depend on the chatbot service.
+   */
+  assistantEnabled: import.meta.env.VITE_ASSISTANT_ENABLED === "true",
+  assistantUrl: import.meta.env.VITE_ASSISTANT_URL || "/assistant",
   mode: import.meta.env.MODE,
 } as const;
