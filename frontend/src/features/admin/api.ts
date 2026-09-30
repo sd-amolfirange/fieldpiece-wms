@@ -41,5 +41,10 @@ export const adminApi = {
     http.post<RegistrationView>("/simulate/registration-email").then((r) => r.data),
   simulateMarketplaceOrder: () =>
     http.post<RegistrationView[]>("/simulate/marketplace-order").then((r) => r.data),
+  /** Fieldpiece's own apps registering products through the partner API. */
+  simulateJobLinkRegistration: () =>
+    http.post<RegistrationView[]>("/simulate/joblink-registration").then((r) => r.data),
+  simulateOverwatchRegistration: () =>
+    http.post<RegistrationView[]>("/simulate/overwatch-registration").then((r) => r.data),
   resetDemo: () => http.post<{ ok: true }>("/simulate/reset").then((r) => r.data),
 };

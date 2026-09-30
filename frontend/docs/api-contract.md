@@ -62,7 +62,7 @@ Codes:
 | General              | `unauthenticated`, `invalid_credentials`, `forbidden`, `not_found`, `validation_error`, `bad_request`, `rate_limited`, `server_error` |
 | Files                | `too_large`, `unsupported_type`, `upload_failed`, `invalid_attachment`, `empty_file`                                                  |
 | Registrations        | `duplicate_serial`, `not_pending`, `unknown_model`, `nothing_to_merge`                                                                |
-| Registered products  | `already_void`, `not_registered`                                                                                                      |
+| Registered products  | `already_void`, `not_registered`, `not_extendable`                                                                                    |
 | Claims, integrations | `claim_open`, `invalid_transition`, `not_failed`                                                                                      |
 | Partner API          | `invalid_api_key`                                                                                                                     |
 
@@ -387,6 +387,8 @@ interface PartnerClientView {
 |                  | `GET /units/:serial/certificate.pdf`               | All (Bearer or cookie)         | A05, DL05, CU03                |
 |                  | `GET /units/:serial/coverage`                      | All                            | New claim (CU04, DL06)         |
 |                  | `POST /units/:serial/void`                         | admin                          | A05                            |
+|                  | `GET /units/:serial/extension`                     | All                            | A05, DL05, CU03                |
+|                  | `POST /units/:serial/extensions`                   | All                            | A05, DL05, CU03                |
 | Registrations    | `GET /registrations`                               | All                            | A02, CU02                      |
 |                  | `GET /registrations/:id`                           | All                            | A03                            |
 |                  | `POST /registrations`                              | All                            | CU01, DL03                     |
@@ -408,6 +410,7 @@ interface PartnerClientView {
 | Files            | `POST /uploads` (multipart)                        | All                            | CU01, DL03, new claim          |
 |                  | `GET /files/:id`                                   | All (scoped; Bearer or cookie) | A03, A10, CU05                 |
 | Catalog          | `GET /models`, `GET /categories`                   | All                            | A06, forms, filters            |
+|                  | `PATCH /models/:id`                                | admin                          | A06 finance and quota          |
 |                  | `GET /dealers`                                     | admin, dealer, distributor     | Filters, DL03, DL01            |
 | Claims           | `GET /claims`, `GET /claims/counts`                | All                            | A09, DL07, my claims           |
 |                  | `GET /claims/:id`                                  | All                            | A10, DL07, CU05                |
@@ -416,6 +419,7 @@ interface PartnerClientView {
 | Integrations     | `GET /integrations`                                | admin                          | A12, A13                       |
 |                  | `POST /integrations/:id/retry`                     | admin                          | A12                            |
 | Dashboard        | `GET /dashboard/summary`                           | All                            | A01, DL01, customer home       |
+|                  | `GET /dashboard/finance`                           | admin, dealer, distributor     | A01, DL01 Finance tab          |
 | Notifications    | `GET /notifications`, `POST /notifications/read`   | All                            | Header bell                    |
 | Admin            | `GET /admin/org`                                   | admin                          | A11                            |
 | Simulator        | `POST /simulate/*` (4 routes)                      | admin (demo only)              | A13                            |
@@ -471,6 +475,29 @@ claim). Same result for every role that can see the product.
   `status: "VOID"`, and a `voided` history event with `reason` and `text = note`.
 - Notifies the product's customer, dealer and distributor (`unit_voided`).
 - `422` `fieldErrors.reason = "validation.voidReason"`; `409` `already_void`; `409` `not_registered`.
+
+**`GET /units/:serial/extension`** (all roles, scoped): `ExtensionQuote`, the extended-warranty offer today.
+
+```ts
+type ExtensionQuote = {
+  eligible: boolean;
+  reason?: "NOT_REGISTERED" | "VOID" | "REPLACED" | "EXPIRED" | "LIMIT_REACHED"; // when not eligible
+  currentEnd?: IsoDate;
+  extendedMonths: number; // added by earlier extensions (36 at most in total)
+  options: { months: 12 | 24 | 36; price: number; newEnd: IsoDate }[]; // price = 15% / 26% / 35% of list price
+};
+```
+
+**`POST /units/:serial/extensions`** (all roles, scoped) `{ months }`: sells / buys an extended warranty.
+
+- `200`: updated `UnitView`: `warrantyEnd` moved, `extensions[]` (oldest first:
+  `{ id, months, price, previousEnd, newEnd, soldBy, soldByName, dealerId?, at }`), history event `extended`
+  (`refId` = extension id).
+- The sale is credited to the caller's dealer when a dealer sells it, otherwise to the product's dealer.
+- Notifies followers (`unit_extended`) and logs `FINANCE` / `OUT` / `extension_invoice` (extension id, serial, model,
+  months, price, currency, seller, dealer). One transaction, row-locked like void.
+- `409` `not_extendable` (message names the reason); `422` `fieldErrors.months = "validation.extensionPlan"`.
+- `UnitView.extensions` is always present (empty when none); the certificate PDF lists extensions.
 
 ### 5.3 Registrations
 
@@ -661,7 +688,14 @@ admins and anyone who can see a record the file is attached to. Bearer or refres
 ### 5.7 Catalog
 
 **`GET /models`**: `ModelView[]`, the Fieldpiece models with category, warranty term and serial and batch formats
-(A06 and every model picker).
+(A06 and every model picker), plus `listPrice` (USD). The internal finance figures `repairCost`, `warrantyBudget`
+(12-month warranty budget) and `claimQuota` (expected claims in 12 months) are sent to **admin only**; other roles
+and `GET /public/models` get the model without them.
+
+**`PATCH /models/:id`** (admin) `{ listPrice?, repairCost?, warrantyBudget?, claimQuota? }`: sets a model's prices and
+warranty quota; omitted fields keep their value. Amounts 0 to 1,000,000 with at most 2 decimals, `claimQuota` a whole
+number 0 to 10,000. `200` `ModelView`; `422` `fieldErrors.<field> = "validation.amount"` / `"validation.quota"`;
+`404`.
 
 **`GET /categories`**: `ProductCategory[]`.
 
@@ -796,6 +830,47 @@ type DashboardSummary =
   | { role: "customer"; units: number; active: number; expiringSoon: number; openClaims: number };
 ```
 
+Added to every role (all additive): admin `trend`; dealer / distributor `unitsByStatus`, `claimsByStatus`, `trend`;
+customer `unitsByStatus`. `trend` is `{ month: "YYYY-MM"; registrations: number; claims: number }[]`, the last 12
+months oldest first (registrations approved that month, claims filed that month). `unitsByStatus` is
+`{ status: WarrantyStatus; count: number }[]` for the products in scope today.
+
+**`GET /dashboard/finance`** (admin, dealer, distributor; `dealerId?` as above): `FinanceSummary` for the last 12
+months (`periodStart` = today − 12 months + 1 day, `periodEnd` = today).
+
+```ts
+type FinanceSummary = {
+  currency: string;
+  periodStart: IsoDate;
+  periodEnd: IsoDate;
+  warrantyCost: number; // approved + closed claims filed in the period: repair cost / 55% of list price / credit
+  creditsIssued: number;
+  extensionRevenue: number;
+  extensionsSold: number;
+  netWarrantyCost: number; // warrantyCost - extensionRevenue
+  budget: number; // warrantyBudget of the models with registered products in scope
+  budgetUsedPct: number;
+  averageClaimCost: number;
+  costByResolution: { resolution: Resolution; amount: number; count: number }[]; // all three
+  costByCategory: { categoryId: string; categoryName: string; amount: number }[]; // every category
+  monthly: { month: string; cost: number; extensionRevenue: number }[]; // 12, oldest first
+  quotas: {
+    modelId: string;
+    modelCode: string;
+    modelName: string;
+    categoryName: string;
+    imageUrl?: string;
+    units: number;
+    budget: number;
+    spent: number;
+    budgetUsedPct: number;
+    claimQuota: number;
+    claims: number;
+    claimQuotaUsedPct: number;
+  }[]; // models with products, spend or claims in scope; highest budget use first
+};
+```
+
 ### 5.11 Admin (A11)
 
 **`GET /admin/org`** (admin):
@@ -835,6 +910,7 @@ Keys the frontend has text for, with their `params`:
 | `registration_rejected`       | `serial`, `reason`                       | Submitter, customer                               |
 | `bulk_processed`              | `file`, `registered`, `errors`, `review` | Uploader                                          |
 | `unit_voided`                 | `serial`                                 | Customer, dealer, distributor                     |
+| `unit_extended`               | `serial`, `months`, `newEnd`             | Customer, dealer, distributor                     |
 | `claim_submitted`             | `id`, `serial`                           | Admins                                            |
 | `claim_approved`              | `id`, `resolution`                       | Customer, dealer, distributor                     |
 | `claim_rejected`              | `id`, `reason`                           | Customer, dealer, distributor                     |

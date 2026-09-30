@@ -1,12 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentRole } from "@/lib/session";
-import { catalogApi } from "./api";
+import { catalogApi, type ModelFinance } from "./api";
 
 // These change rarely, so they're cached for a while.
 const STALE = 5 * 60_000;
 
 export function useModels() {
   return useQuery({ queryKey: ["models"], queryFn: catalogApi.models, staleTime: STALE });
+}
+
+export function useUpdateModelFinance(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ModelFinance) => catalogApi.updateModelFinance(id, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["models"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
 }
 
 export function useCategories() {

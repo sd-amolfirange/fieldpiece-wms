@@ -45,6 +45,14 @@ model Model {
   batchPattern   String          @map("batch_pattern")
   /// Display order in lists and pickers.
   position       Int             @default(0)
+  /// Finance, in the account currency (APP_CURRENCY). [CONFIRM real prices and budgets with Fieldpiece Finance]
+  /// List price: the base for replacement cost and extended-warranty prices.
+  listPrice      Decimal         @default(0) @map("list_price") @db.Decimal(10, 2)
+  /// Standard cost of one warranty repair.
+  repairCost     Decimal         @default(0) @map("repair_cost") @db.Decimal(10, 2)
+  /// Warranty quota: planned warranty spend over 12 months, and the number of claims expected in that time.
+  warrantyBudget Decimal         @default(0) @map("warranty_budget") @db.Decimal(12, 2)
+  claimQuota     Int             @default(0) @map("claim_quota")
   category       ProductCategory @relation(fields: [categoryId], references: [id])
   units          Unit[]
 
@@ -67,20 +75,21 @@ model Distributor {
 }
 
 model Dealer {
-  id             String          @id
+  id             String              @id
   name           String
   city           String
   state          String
-  distributorId  String?         @map("distributor_id")
+  distributorId  String?             @map("distributor_id")
   /// Display order (dealer comparison, filters).
-  position       Int             @default(0)
-  distributor    Distributor?    @relation(fields: [distributorId], references: [id])
+  position       Int                 @default(0)
+  distributor    Distributor?        @relation(fields: [distributorId], references: [id])
   users          User[]
   units          Unit[]
   registrations  Registration[]
   claims         WarrantyClaim[]
   bulkImports    BulkImport[]
   partnerClients PartnerClient[]
+  extensions     WarrantyExtension[]
 
   @@index([distributorId])
   @@map("dealers")
@@ -157,7 +166,7 @@ model AuthSession {
 model PartnerClient {
   id         String    @id
   name       String
-  /// Channel its registrations get: API, RETAIL or ERP.
+  /// Channel its registrations get: API, RETAIL, ERP, or OVERWATCH / JOBLINK (Fieldpiece's own apps).
   channel    String
   /// Dealer the registrations belong to (a distributor's or retailer's own account), if any.
   dealerId   String?   @map("dealer_id")
@@ -177,39 +186,43 @@ model PartnerClient {
 /// One physical product. Known before registration (e.g. from an ERP invoice) with no warranty dates; registration
 /// sets them. One warranty per product, from the purchase date.
 model Unit {
-  serial           String          @id
+  serial           String              @id
   /// Production lot, printed next to the serial number.
-  batchNumber      String?         @map("batch_number")
-  modelId          String          @map("model_id")
-  dealerId         String?         @map("dealer_id")
-  customerId       String?         @map("customer_id")
-  purchaseDate     DateTime?       @map("purchase_date") @db.Date
+  batchNumber      String?             @map("batch_number")
+  modelId          String              @map("model_id")
+  dealerId         String?             @map("dealer_id")
+  customerId       String?             @map("customer_id")
+  purchaseDate     DateTime?           @map("purchase_date") @db.Date
   /// Where it was bought when not from a dealer in the system (online marketplace, retailer).
-  placeOfPurchase  String?         @map("place_of_purchase")
-  warrantyStart    DateTime?       @map("warranty_start") @db.Date
-  warrantyEnd      DateTime?       @map("warranty_end") @db.Date
-  registrationId   String?         @map("registration_id")
-  replacesSerial   String?         @map("replaces_serial")
-  replacedBySerial String?         @map("replaced_by_serial")
-  attachmentIds    String[]        @default([]) @map("attachment_ids")
-  voidReason       String?         @map("void_reason")
-  voidNote         String?         @map("void_note")
-  voidedBy         String?         @map("voided_by")
-  voidedByName     String?         @map("voided_by_name")
-  voidedAt         DateTime?       @map("voided_at") @db.Timestamptz(3)
-  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  model            Model           @relation(fields: [modelId], references: [id])
-  dealer           Dealer?         @relation(fields: [dealerId], references: [id])
-  customer         Customer?       @relation(fields: [customerId], references: [id])
+  placeOfPurchase  String?             @map("place_of_purchase")
+  warrantyStart    DateTime?           @map("warranty_start") @db.Date
+  warrantyEnd      DateTime?           @map("warranty_end") @db.Date
+  /// The registration that started the warranty (its channel is the product's registration channel).
+  registrationId   String?             @map("registration_id")
+  replacesSerial   String?             @map("replaces_serial")
+  replacedBySerial String?             @map("replaced_by_serial")
+  attachmentIds    String[]            @default([]) @map("attachment_ids")
+  voidReason       String?             @map("void_reason")
+  voidNote         String?             @map("void_note")
+  voidedBy         String?             @map("voided_by")
+  voidedByName     String?             @map("voided_by_name")
+  voidedAt         DateTime?           @map("voided_at") @db.Timestamptz(3)
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  model            Model               @relation(fields: [modelId], references: [id])
+  dealer           Dealer?             @relation(fields: [dealerId], references: [id])
+  customer         Customer?           @relation(fields: [customerId], references: [id])
+  registration     Registration?       @relation(fields: [registrationId], references: [id], onDelete: SetNull)
   events           UnitEvent[]
   claims           WarrantyClaim[]
+  extensions       WarrantyExtension[]
 
   @@index([dealerId])
   @@index([customerId])
   @@index([modelId])
   @@index([warrantyEnd])
   @@index([batchNumber])
+  @@index([registrationId])
   @@index([attachmentIds], map: "units_attachment_ids_idx", type: Gin)
   @@map("units")
 }
@@ -228,6 +241,30 @@ model UnitEvent {
   @@index([unitSerial, at])
   @@index([at(sort: Desc)])
   @@map("unit_events")
+}
+
+/// An extended warranty sold for a registered product. `units.warranty_end` already includes it.
+model WarrantyExtension {
+  id          String   @id
+  unitSerial  String   @map("unit_serial")
+  months      Int
+  /// Price paid, in the account currency.
+  price       Decimal  @db.Decimal(10, 2)
+  previousEnd DateTime @map("previous_end") @db.Date
+  newEnd      DateTime @map("new_end") @db.Date
+  /// User who sold or bought it (a dealer, the warranty desk or the customer).
+  soldBy      String   @map("sold_by")
+  soldByName  String   @map("sold_by_name")
+  /// Dealer credited with the sale.
+  dealerId    String?  @map("dealer_id")
+  createdAt   DateTime @map("created_at") @db.Timestamptz(3)
+  unit        Unit     @relation(fields: [unitSerial], references: [serial], onDelete: Cascade, onUpdate: Cascade)
+  dealer      Dealer?  @relation(fields: [dealerId], references: [id])
+
+  @@index([unitSerial, createdAt])
+  @@index([createdAt(sort: Desc)])
+  @@index([dealerId])
+  @@map("warranty_extensions")
 }
 
 // ── Registrations and bulk import ────────────────────────────────────────────
@@ -265,6 +302,7 @@ model Registration {
   customer          Customer?   @relation(fields: [customerId], references: [id])
   dealer            Dealer?     @relation(fields: [dealerId], references: [id])
   bulkImport        BulkImport? @relation(fields: [importId], references: [id])
+  units             Unit[]
 
   @@index([status, submittedAt(sort: Desc)])
   @@index([submittedAt(sort: Desc)])

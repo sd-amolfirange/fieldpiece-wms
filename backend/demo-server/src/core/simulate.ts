@@ -11,6 +11,8 @@ import { nextCounter, type DemoState } from "./state";
 // - ERP sales invoice: one invoice, three new serials, three Pending registrations with channel ERP.
 // - Registration email: one Pending registration with channel EMAIL and the invoice (a PDF) attached.
 // - Marketplace order: two orders through the partner API (channel RETAIL), registered at once.
+// - Job Link / Overwatch: Fieldpiece's apps register new products through the partner API with their own keys
+//   (channels JOBLINK and OVERWATCH), registered at once.
 
 /** Batch for products built about four weeks before `today`: yyww-L + line. */
 function batchFor(today: IsoDate, line: number): string {
@@ -189,4 +191,54 @@ export function simulateMarketplaceOrder(ctx: Ctx): RegistrationView[] {
     },
   );
   return results.flatMap((r) => (r.registrationId ? [getRegistration(ctx, r.registrationId)] : []));
+}
+
+/** New products bought `purchasedDaysAgo` sent by a Fieldpiece app with its own partner key: registered at once. */
+function appRegistration(
+  ctx: Ctx,
+  clientId: "pc-joblink" | "pc-overwatch",
+  models: string[],
+  purchasedDaysAgo: number,
+  customer: Record<string, string>,
+): RegistrationView[] {
+  requireRole(ctx, "admin");
+  const { state, today } = ctx;
+  const client = state.partnerClients.find((p) => p.id === clientId);
+  if (!client?.active) throw notFound("Active Fieldpiece app partner");
+  const serials: string[] = [];
+  for (const model of models) serials.push(freeSerial(state, today, model, new Set(serials)));
+  const { results } = partnerRegistrations(ctx, client, {
+    registrations: models.map((modelCode, i) => ({
+      serial: serials[i],
+      batchNumber: batchFor(today, i + 1),
+      modelCode,
+      purchaseDate: addDaysIso(today, -purchasedDaysAgo),
+      customer,
+    })),
+  });
+  return results.flatMap((r) => (r.registrationId ? [getRegistration(ctx, r.registrationId)] : []));
+}
+
+/** Job Link: a technician registers two new products for a customer from the app (partner API, channel JOBLINK). */
+export function simulateJoblinkRegistration(ctx: Ctx): RegistrationView[] {
+  return appRegistration(ctx, "pc-joblink", ["JL3KH6", "MG44"], 0, {
+    name: "Owen Castillo",
+    email: "owen.castillo@example.com",
+    phone: "(512) 555-0158",
+    city: "Austin",
+    state: "TX",
+    zip: "78704",
+  });
+}
+
+/** Overwatch: one new product registered from the app (partner API, channel OVERWATCH). */
+export function simulateOverwatchRegistration(ctx: Ctx): RegistrationView[] {
+  return appRegistration(ctx, "pc-overwatch", ["SM482V"], 2, {
+    name: "Grace Whitfield",
+    email: "grace.whitfield@example.com",
+    phone: "(615) 555-0173",
+    city: "Nashville",
+    state: "TN",
+    zip: "37203",
+  });
 }

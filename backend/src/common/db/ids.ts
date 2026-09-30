@@ -12,6 +12,7 @@ export const ID_SEQUENCES = {
   ATT: "id_seq_att",
   BLK: "id_seq_blk",
   USR: "id_seq_usr",
+  EXT: "id_seq_ext",
 } as const;
 
 export type IdPrefix = keyof typeof ID_SEQUENCES;

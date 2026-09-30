@@ -1,5 +1,5 @@
-import { Controller, Get } from "@nestjs/common";
-import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Param, Patch } from "@nestjs/common";
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { DealerView, ModelView, OrgStructure, ProductCategory } from "@wms/domain";
 import type { Ctx as RequestCtx } from "../../common/auth/context";
 import { Ctx, Roles } from "../../common/auth/decorators";
@@ -17,8 +17,32 @@ export class CatalogController {
     description: "A06 and every model picker, with warranty term and serial/batch formats.",
   })
   @ApiOkResponse({ description: "ModelView[]" })
-  models(): Promise<ModelView[]> {
-    return this.catalog.models();
+  models(@Ctx() ctx: RequestCtx): Promise<ModelView[]> {
+    return this.catalog.models(ctx.user.role === "admin");
+  }
+
+  @Patch("models/:id")
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Set a model's list price, repair cost and warranty quota (A06)",
+    description:
+      "Omitted fields keep their value. Amounts: 0 to 1,000,000 with up to 2 decimals (`422` validation.amount); " +
+      "claimQuota: a whole number 0 to 10,000 (`422` validation.quota). `404` unknown model.",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        listPrice: { type: "number", minimum: 0 },
+        repairCost: { type: "number", minimum: 0 },
+        warrantyBudget: { type: "number", minimum: 0 },
+        claimQuota: { type: "integer", minimum: 0 },
+      },
+    },
+  })
+  @ApiOkResponse({ description: "ModelView" })
+  updateModel(@Param("id") id: string, @Body() body: unknown): Promise<ModelView> {
+    return this.catalog.updateModel(id, body ?? {});
   }
 
   @Get("categories")

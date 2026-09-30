@@ -88,6 +88,9 @@ services:
         VITE_DEMO_MODE: ${DEMO_FEATURES_ENABLED:-false}
         # Loads the Warranty Assistant widget (served by the chatbot service under /assistant).
         VITE_ASSISTANT_ENABLED: ${ASSISTANT_ENABLED:-false}
+        # Fieldpiece apps in the warranty desk's sidebar (empty = placeholder URL).
+        VITE_OVERWATCH_URL: ${OVERWATCH_URL:-}
+        VITE_JOBLINK_URL: ${JOBLINK_URL:-}
     restart: unless-stopped
     ports: ["${WEB_PORT:-8088}:80"]
     depends_on:

@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import type { UnitView, WarrantyStatus } from "@wms/domain";
+import { REGISTRATION_CHANNELS, type UnitView, type WarrantyStatus } from "@wms/domain";
 import { Boxes, Search, ShieldCheck, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/layout";
 import {
   buttonVariants,
+  ChannelBadge,
   DataTable,
   Input,
   MonoId,
@@ -18,9 +19,11 @@ import { formatDate, formatModelSerial } from "@/lib/format";
 import { useDealers } from "@/features/catalog";
 import { useCurrentRole } from "@/lib/session";
 import { useTableParams } from "@/lib/use-table-params";
+import type { UnitFilters } from "../api";
 import { useUnits } from "../hooks";
 
 // A04 Units (admin) and DL04 My sold units (dealer / distributor). The server returns only the caller's units.
+// "Registered via" filters by the registration's channel, including Fieldpiece's apps (Overwatch, Job Link).
 
 const STATUSES: WarrantyStatus[] = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOID", "PENDING"];
 const col = createColumnHelper<UnitView>();
@@ -34,6 +37,7 @@ export default function UnitsListPage() {
   const [search, setSearch] = useState(params.q ?? "");
   const status = params.filters.status as WarrantyStatus | undefined;
   const dealerId = params.filters.dealerId;
+  const channel = params.filters.channel as UnitFilters["channel"];
   const dealers = useDealers();
   const query = useUnits({
     page: params.page,
@@ -42,6 +46,7 @@ export default function UnitsListPage() {
     q: params.q,
     status,
     dealerId,
+    channel,
   });
   const title = isAdmin ? t("units.title") : t("units.mySoldUnits");
 
@@ -80,6 +85,15 @@ export default function UnitsListPage() {
             }),
           ]
         : []),
+      col.accessor("registrationChannel", {
+        header: t("units.columns.registeredVia"),
+        enableSorting: false,
+        meta: { className: "hidden xl:table-cell" },
+        cell: (i) => {
+          const channel = i.getValue();
+          return channel ? <ChannelBadge status={channel} /> : "—";
+        },
+      }),
       col.accessor("purchaseDate", {
         header: t("units.columns.purchased"),
         cell: (i) => formatDate(i.getValue(), i18n.language) || "—",
@@ -188,6 +202,23 @@ export default function UnitsListPage() {
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {t(`status.warranty.${s}`)}
+                </option>
+              ))}
+            </NativeSelect>
+            <label htmlFor="units-channel" className="sr-only">
+              {t("units.filterChannel")}
+            </label>
+            <NativeSelect
+              id="units-channel"
+              className="w-full sm:w-48"
+              value={channel ?? ""}
+              onChange={(e) => update({ channel: e.target.value })}
+            >
+              <option value="">{t("units.allChannels")}</option>
+              <option value="APPS">{t("units.fieldpieceApps")}</option>
+              {REGISTRATION_CHANNELS.map((c) => (
+                <option key={c} value={c}>
+                  {t(`status.channel.${c}`)}
                 </option>
               ))}
             </NativeSelect>

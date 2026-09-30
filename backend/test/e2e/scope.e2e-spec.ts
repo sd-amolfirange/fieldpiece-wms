@@ -38,15 +38,20 @@ describe("roles and data scope", () => {
         dealerId?: string;
         customerId?: string;
       }[];
-    expect(await products("admin")).toHaveLength(15);
+    expect((await get("admin", "/units?pageSize=1")).body.total).toBe(267);
     const lonestar = await products("dealer");
     expect(lonestar.length).toBeGreaterThan(0);
     expect(lonestar.every((u) => u.dealerId === "d-lonestar")).toBe(true);
     const gulfstates = await products("distributor");
     expect(new Set(gulfstates.map((u) => u.dealerId))).toEqual(new Set(["d-lonestar", "d-bayou"]));
     expect((await products("customer")).map((u) => u.serial).sort()).toEqual([
+      "DR58-252891567",
       "DR82-252207119",
+      "JL3KR4-252479315",
+      "MG44-253177420",
+      "SC440-263473208",
       "SC680-251406233",
+      "SM480V-252586104",
       "VP87-243208841",
     ]);
   });
@@ -64,7 +69,7 @@ describe("roles and data scope", () => {
   it("scopes warranty claims: customers see their own, dealers their products', admins all", async () => {
     const ids = async (who: Who) =>
       (await get(who, "/claims?pageSize=100")).body.items as { dealerId: string; customerId: string }[];
-    expect(await ids("admin")).toHaveLength(7);
+    expect(await ids("admin")).toHaveLength(53);
     expect((await ids("dealer")).every((c) => c.dealerId === "d-lonestar")).toBe(true);
     expect((await ids("customer")).every((c) => c.customerId === "c-mreed")).toBe(true);
     const all = (await get("admin", "/claims?pageSize=100")).body.items as { id: string; dealerId: string }[];
@@ -73,8 +78,26 @@ describe("roles and data scope", () => {
     expect((await get("customer", `/claims/${foreign.id}`)).status).toBe(404);
   });
 
+  it("scopes extended warranties and the finance insights", async () => {
+    // SC680-251406233 belongs to Lone Star (Marcus Reed).
+    expect((await get("bayou", "/units/SC680-251406233/extension")).status).toBe(404);
+    const foreign = await h.request({
+      method: "POST",
+      url: "/units/SC680-251406233/extensions",
+      as: s.bayou,
+      body: { months: 12 },
+    });
+    expect(foreign.status).toBe(404);
+    expect((await get("customer", "/units/SC680-252409963/extension")).status).toBe(404);
+    expect((await get("customer", "/units/SC680-251406233/extension")).body.eligible).toBe(true);
+    expect((await get("customer", "/dashboard/finance")).status).toBe(403);
+    expect((await h.request({ method: "GET", url: "/dashboard/finance" })).status).toBe(401);
+    const bayou = (await get("bayou", "/dashboard/finance")).body;
+    expect(bayou).toMatchObject({ warrantyCost: 1584.4, extensionsSold: 2 });
+  });
+
   it("keeps warranty desk actions admin-only", async () => {
-    const denied: [Who, "GET" | "POST", string][] = [
+    const denied: [Who, "GET" | "POST" | "PATCH", string][] = [
       ["dealer", "GET", "/integrations"],
       ["distributor", "GET", "/admin/org"],
       ["dealer", "GET", "/admin/partner-clients"],
@@ -86,6 +109,8 @@ describe("roles and data scope", () => {
       ["customer", "GET", "/dealers"],
       ["customer", "GET", "/bulk-imports"],
       ["customer", "GET", "/intake"],
+      ["dealer", "PATCH", "/models/m-sc680"],
+      ["distributor", "PATCH", "/models/m-sc680"],
     ];
     for (const [who, method, url] of denied) {
       const res = await h.request({ method, url, as: s[who], body: {} });

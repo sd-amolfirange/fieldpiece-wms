@@ -63,6 +63,8 @@ export const channelStyle: Record<RegistrationChannel, string> = {
   ERP: NEUTRAL,
   API: NEUTRAL,
   RETAIL: WARNING,
+  OVERWATCH: SUCCESS,
+  JOBLINK: SUCCESS,
 };
 
 export const registrationFlagStyle: Record<RegistrationFlag, string> = {

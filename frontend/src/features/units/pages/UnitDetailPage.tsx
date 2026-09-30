@@ -17,6 +17,7 @@ import {
   UnitHistory,
   WarrantySummary,
 } from "../components/UnitCards";
+import { ExtendWarrantyButton } from "../components/ExtendWarrantyModal";
 import { VoidWarrantyModal } from "../components/VoidWarrantyModal";
 import { useUnit, useVoidWarranty } from "../hooks";
 import { unitStatusLine } from "../status-line";
@@ -84,6 +85,7 @@ export default function UnitDetailPage() {
               {t("claims.file")}
             </Link>
           ) : null}
+          {can(role, "units:extend") ? <ExtendWarrantyButton unit={unit} /> : null}
           <CertificateButton unit={unit} variant={isCustomer ? "primary" : "secondary"} />
           {can(role, "units:void") && !unit.void && unit.warrantyEnd ? (
             <Button variant="danger" icon={Ban} onClick={() => setVoidOpen(true)}>

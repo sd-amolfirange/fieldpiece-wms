@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { EXPIRING_SOON_DAYS, type IsoDate, type WarrantyStatus } from "@wms/domain";
+import { EXPIRING_SOON_DAYS, type IsoDate, type RegistrationChannel, type WarrantyStatus } from "@wms/domain";
 import type { Actor } from "../../common/auth/context";
 import { type ListQuery, resolveSort, type SortDirection } from "../../common/http/list-query";
 import { type Db, PrismaService } from "../../infra/prisma/prisma.service";
@@ -32,14 +32,15 @@ const daysRemainingSql = (today: IsoDate) => Prisma.sql`
 const unitListSql = (today: IsoDate) => Prisma.sql`
   SELECT u.serial, u.batch_number, u.dealer_id, u.customer_id, u.purchase_date, u.warranty_end,
          m.code AS model_code, m.name AS model_name, c2.name AS category_name,
-         d.name AS dealer_name, c.name AS customer_name,
+         d.name AS dealer_name, c.name AS customer_name, r.channel AS registration_channel,
          ${statusSql(today)} AS status,
          ${daysRemainingSql(today)} AS days_remaining
   FROM units u
   JOIN models m ON m.id = u.model_id
   JOIN product_categories c2 ON c2.id = m.category_id
   LEFT JOIN dealers d ON d.id = u.dealer_id
-  LEFT JOIN customers c ON c.id = u.customer_id`;
+  LEFT JOIN customers c ON c.id = u.customer_id
+  LEFT JOIN registrations r ON r.id = u.registration_id`;
 
 /** SQL form of scopeWhere() for the aliased unit list. */
 export function unitScopeSql(user: Actor): Prisma.Sql {
@@ -72,6 +73,8 @@ const UNIT_SORTS: Record<string, (dir: SortDirection) => Prisma.Sql> = {
 export interface UnitFilters {
   status?: WarrantyStatus;
   dealerId?: string;
+  /** Channel of the registration that started the warranty (any of these). */
+  channels?: readonly RegistrationChannel[];
 }
 
 @Injectable()
@@ -88,6 +91,8 @@ export class UnitsRepository {
     const conditions: Prisma.Sql[] = [unitScopeSql(user)];
     if (filters.status) conditions.push(Prisma.sql`v.status = ${filters.status}`);
     if (filters.dealerId) conditions.push(Prisma.sql`v.dealer_id = ${filters.dealerId}`);
+    if (filters.channels?.length)
+      conditions.push(Prisma.sql`v.registration_channel IN (${Prisma.join(filters.channels)})`);
     if (list.q) {
       const like = likePattern(list.q);
       conditions.push(
@@ -147,6 +152,48 @@ export class UnitsRepository {
       WHERE v.status = 'EXPIRING_SOON'
       ORDER BY v.days_remaining ASC, v.serial ASC
       LIMIT ${limit}`;
+  }
+
+  /**
+   * Registered products per registration channel (the A01 "Fieldpiece apps" figures): warranty status today, those
+   * registered in the 30 days up to today (COALESCE(reviewed_at, submitted_at), by business date in `timeZone`) and
+   * the warranty claims on them. Channels with no products are left out.
+   */
+  async channelStats(today: IsoDate, timeZone: string, channels: readonly RegistrationChannel[]) {
+    const rows = await this.prisma.$queryRaw<
+      {
+        channel: RegistrationChannel;
+        units: bigint;
+        active: bigint;
+        expiring_soon: bigint;
+        expired: bigint;
+        last_30_days: bigint;
+        claims: bigint;
+      }[]
+    >`
+      SELECT r.channel,
+             COUNT(*) AS units,
+             COUNT(*) FILTER (WHERE s.status = 'ACTIVE') AS active,
+             COUNT(*) FILTER (WHERE s.status = 'EXPIRING_SOON') AS expiring_soon,
+             COUNT(*) FILTER (WHERE s.status = 'EXPIRED') AS expired,
+             COUNT(*) FILTER (
+               WHERE (COALESCE(r.reviewed_at, r.submitted_at) AT TIME ZONE ${timeZone})::date > ${today}::date - 30
+             ) AS last_30_days,
+             COALESCE(SUM((SELECT COUNT(*) FROM warranty_claims wc WHERE wc.unit_serial = u.serial)), 0) AS claims
+      FROM units u
+      JOIN registrations r ON r.id = u.registration_id
+      CROSS JOIN LATERAL (SELECT ${statusSql(today)} AS status) s
+      WHERE u.warranty_end IS NOT NULL AND r.channel IN (${Prisma.join(channels)})
+      GROUP BY r.channel`;
+    return rows.map((r) => ({
+      channel: r.channel,
+      units: Number(r.units),
+      active: Number(r.active),
+      expiringSoon: Number(r.expiring_soon),
+      expired: Number(r.expired),
+      last30Days: Number(r.last_30_days),
+      claims: Number(r.claims),
+    }));
   }
 
   /** Full rows for these serials, in the given order. */

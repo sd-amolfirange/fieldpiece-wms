@@ -10,7 +10,7 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import type { IntakeInfo, ModelView, PartnerClientView } from "@wms/domain";
+import { PARTNER_CHANNELS, type IntakeInfo, type ModelView, type PartnerClientView } from "@wms/domain";
 import type { FastifyRequest } from "fastify";
 import type { SystemCtx } from "../../common/auth/context";
 import { Public, Roles } from "../../common/auth/decorators";
@@ -108,7 +108,8 @@ export class IntakeController {
   @Public()
   @PartnerRateLimit()
   @ApiOperation({
-    summary: "Send registrations from a partner system (distributor ERP, marketplace, retailer)",
+    summary:
+      "Send registrations from a partner system (distributor ERP, marketplace, retailer, Fieldpiece app)",
     description:
       "Authenticate with `X-Api-Key`. Body: one registration, or `{ registrations: [...] }` (up to 500). Each item: " +
       "serial, batchNumber, modelCode, purchaseDate, customer { name, email, phone, city, state, zip }, " +
@@ -188,7 +189,7 @@ export class IntakeController {
       required: ["name", "channel"],
       properties: {
         name: { type: "string" },
-        channel: { type: "string", enum: ["API", "RETAIL", "ERP"] },
+        channel: { type: "string", enum: [...PARTNER_CHANNELS] },
         dealerId: { type: "string" },
       },
     },

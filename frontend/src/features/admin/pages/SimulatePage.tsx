@@ -1,4 +1,4 @@
-import { FileSpreadsheet, Mail, RotateCcw, ShoppingCart } from "lucide-react";
+import { FileSpreadsheet, Link2, Mail, Radar, RotateCcw, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@/components/feedback";
@@ -9,11 +9,12 @@ import { AdminTabs } from "../components/AdminTabs";
 import { useSimulator } from "../hooks";
 
 // A13 System events: stand-ins for the systems that send registrations to the WMS (W6): a distributor's ERP
-// sales feed, the registration mailbox and an online marketplace through the partner API.
+// sales feed, the registration mailbox, an online marketplace and Fieldpiece's Job Link and Overwatch apps
+// through the partner API.
 
 function IntakeCard() {
   const { t } = useTranslation();
-  const { erpInvoice, registrationEmail, marketplaceOrder } = useSimulator();
+  const { erpInvoice, registrationEmail, marketplaceOrder, jobLink, overwatch } = useSimulator();
   return (
     <Card title={t("simulate.intake.title")}>
       <div className="space-y-4">
@@ -62,6 +63,38 @@ function IntakeCard() {
             }
           >
             {t("simulate.intake.marketplace")}
+          </Button>
+          <Button
+            icon={Link2}
+            loading={jobLink.isPending}
+            onClick={() =>
+              jobLink.mutate(undefined, {
+                onSuccess: (regs) =>
+                  toast.success(
+                    t("simulate.intake.jobLinkDone", { count: regs.length }),
+                    regs.map((r) => r.serial).join(", "),
+                  ),
+                onError: (e) => toast.error(toApiError(e).message),
+              })
+            }
+          >
+            {t("simulate.intake.jobLink")}
+          </Button>
+          <Button
+            icon={Radar}
+            loading={overwatch.isPending}
+            onClick={() =>
+              overwatch.mutate(undefined, {
+                onSuccess: (regs) =>
+                  toast.success(
+                    t("simulate.intake.overwatchDone", { count: regs.length }),
+                    regs.map((r) => r.serial).join(", "),
+                  ),
+                onError: (e) => toast.error(toApiError(e).message),
+              })
+            }
+          >
+            {t("simulate.intake.overwatch")}
           </Button>
         </div>
       </div>

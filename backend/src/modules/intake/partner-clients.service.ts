@@ -1,15 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import type { PartnerClientView, RegistrationChannel } from "@wms/domain";
+import { PARTNER_CHANNELS, type PartnerChannel, type PartnerClientView } from "@wms/domain";
 import { createHash, randomBytes } from "node:crypto";
 import { opt } from "../../common/db/dates";
 import { AppError } from "../../common/errors/app-error";
 import { type Db, PrismaService } from "../../infra/prisma/prisma.service";
 
 // Partner systems that send registrations through the partner API (distributor ERPs, online marketplaces, retail
-// chains). Each has an API key; only its SHA-256 is stored, and the key itself is shown once, when it's created.
-
-export type PartnerChannel = Extract<RegistrationChannel, "API" | "RETAIL" | "ERP">;
-export const PARTNER_CHANNELS: readonly PartnerChannel[] = ["API", "RETAIL", "ERP"];
+// chains, and Fieldpiece's own apps Overwatch and Job Link). Each has an API key; only its SHA-256 is stored, and the
+// key itself is shown once, when it's created.
 
 export interface PartnerClientRow {
   id: string;
@@ -71,7 +69,7 @@ export class PartnerClientsService {
     const dealerId = typeof body.dealerId === "string" && body.dealerId ? body.dealerId : undefined;
     const errors: Record<string, string> = {};
     if (!name) errors.name = "validation.required";
-    if (!PARTNER_CHANNELS.includes(channel)) errors.channel = "validation.channel";
+    if (!(PARTNER_CHANNELS as readonly unknown[]).includes(channel)) errors.channel = "validation.channel";
     if (dealerId && !(await this.prisma.dealer.findUnique({ where: { id: dealerId } })))
       errors.dealerId = "validation.pickDealer";
     if (Object.keys(errors).length) throw AppError.validation("Check the highlighted fields.", errors);

@@ -6,9 +6,10 @@ import { ErrorState, Skeleton } from "@/components/feedback";
 import { PageHeader } from "@/components/layout";
 import { Card, MonoId, ProductThumb } from "@/components/ui";
 import { useModels } from "@/features/catalog";
+import { ModelFinanceCard } from "../components/ModelFinanceCard";
 
-// A06 product detail: the model's warranty terms and the serial / batch label format every registration of it
-// is checked against.
+// A06 product detail: the model's warranty terms, its finance and warranty quota, and the serial / batch label
+// format every registration of it is checked against.
 
 function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
@@ -61,6 +62,7 @@ export default function ProductDetailPage() {
               </Field>
             </dl>
           </Card>
+          <ModelFinanceCard model={model} />
           <Card title={t("models.labelFormat")}>
             <p className="mb-4 text-sm text-text-muted">{t("models.labelFormatHelp")}</p>
             <dl className="grid gap-4 sm:grid-cols-2">

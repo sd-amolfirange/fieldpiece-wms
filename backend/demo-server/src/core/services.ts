@@ -1,12 +1,23 @@
 import {
+  addDaysIso,
+  addMonthsIso,
   CLAIM_STATUSES,
+  claimCost,
+  extensionQuote,
+  FIELDPIECE_APP_CHANNELS,
   INTEGRATION_STATUSES,
   INTEGRATION_SYSTEMS,
   coverageFor,
   isOpenClaim,
+  percent,
+  publicModelView,
+  REGISTRATION_CHANNELS,
+  RESOLUTIONS,
+  roundMoney,
   unitWarranty,
   VOID_REASONS,
   WARRANTY_STATUSES,
+  type AppChannelStats,
   type Attachment,
   type ChannelCount,
   type ClaimStatus,
@@ -14,17 +25,24 @@ import {
   type DashboardSummary,
   type DealerStats,
   type DealerView,
+  type ExtensionBlock,
+  type ExtensionQuote,
+  type FinanceSummary,
   type IntegrationDirection,
   type IntegrationMessage,
   type IntegrationStatus,
   type IntegrationSystem,
   type IsoDate,
+  type Model,
+  type ModelQuota,
   type ModelView,
+  type MonthlyTrend,
   type Notification,
   type OrgStructure,
   type Paginated,
   type ProductCategory,
   type Registration,
+  type RegistrationChannel,
   type RegistrationView,
   type Role,
   type SessionUser,
@@ -36,6 +54,7 @@ import {
   type WarrantyClaim,
   type WarrantyClaimView,
   type WarrantyStatus,
+  type WarrantyStatusCount,
 } from "@wms/domain";
 import { conflict, forbidden, notFound, ServiceError, validation } from "./errors";
 import { canSee, visibleDealerIds, type Scoped } from "./scope";
@@ -226,6 +245,7 @@ export function toUnitView(state: DemoState, unit: Unit, today: IsoDate): UnitVi
   const warranty = unitWarranty(unit, today);
   return {
     ...unit,
+    extensions: unit.extensions ?? [],
     modelCode: model?.code ?? unit.modelId,
     modelName: model?.name ?? "",
     modelDescription: model?.description ?? "",
@@ -235,6 +255,9 @@ export function toUnitView(state: DemoState, unit: Unit, today: IsoDate): UnitVi
     customerName: customerName(state, unit.customerId),
     status: warranty.status,
     daysRemaining: warranty.daysRemaining,
+    registrationChannel: unit.registrationId
+      ? state.registrations.find((r) => r.id === unit.registrationId)?.channel
+      : undefined,
   };
 }
 
@@ -297,11 +320,23 @@ export function findUnit(ctx: Ctx, serial: string): Unit {
   return unit;
 }
 
-/** A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. Default sort `serial`. */
+/** `channel` of the product list: one registration channel, or APPS for either Fieldpiece app. Else no filter. */
+const UNIT_CHANNEL_FILTERS = [...REGISTRATION_CHANNELS, "APPS"] as const;
+
+function channelFilter(query: RawQuery): readonly RegistrationChannel[] | undefined {
+  const value = queryEnum(query, "channel", UNIT_CHANNEL_FILTERS);
+  return value === "APPS" ? FIELDPIECE_APP_CHANNELS : value ? [value] : undefined;
+}
+
+/**
+ * A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. `channel` is the channel of the registration
+ * that started the warranty (APPS: either Fieldpiece app). Default sort `serial`.
+ */
 export function listUnits(ctx: Ctx, query: RawQuery = {}): Paginated<UnitView> {
   const list = listQuery(query);
   const status = queryEnum<WarrantyStatus>(query, "status", WARRANTY_STATUSES);
   const dealerId = queryString(query, "dealerId");
+  const channels = channelFilter(query);
   const rows = ctx.state.units
     .filter((u) => canSee(ctx.user, u, ctx.state.dealers))
     .map((u) => toUnitView(ctx.state, u, ctx.today))
@@ -309,6 +344,7 @@ export function listUnits(ctx: Ctx, query: RawQuery = {}): Paginated<UnitView> {
       (u) =>
         (!status || u.status === status) &&
         (!dealerId || u.dealerId === dealerId) &&
+        (!channels || (!!u.registrationChannel && channels.includes(u.registrationChannel))) &&
         matches(list.q, u.serial, u.batchNumber, u.customerName, u.dealerName, u.modelCode),
     );
   return paginate(
@@ -354,14 +390,125 @@ export function voidWarranty(ctx: Ctx, serial: string, body: { reason?: unknown;
   return getUnit(ctx, unit.serial);
 }
 
+/** Why a product can't get an extended warranty (409 not_extendable). */
+const NOT_EXTENDABLE: Record<ExtensionBlock, string> = {
+  NOT_REGISTERED: "This product isn't registered yet.",
+  VOID: "This warranty is void, so it can't be extended.",
+  REPLACED: "This product was replaced; extend the replacement's warranty instead.",
+  EXPIRED: "This warranty has expired; only a warranty still in force can be extended.",
+  LIMIT_REACHED: "This warranty was already extended by the maximum 36 months.",
+};
+
+const quoteFor = (state: DemoState, unit: Unit, today: IsoDate): ExtensionQuote =>
+  extensionQuote(unit, { listPrice: state.models.find((m) => m.id === unit.modelId)?.listPrice ?? 0 }, today);
+
+/** Extended-warranty offer for this product today: the plans still open, their price and new end date. */
+export const unitExtensionQuote = (ctx: Ctx, serial: string): ExtensionQuote =>
+  quoteFor(ctx.state, findUnit(ctx, serial), ctx.today);
+
+/**
+ * Sells an extended warranty: moves the warranty end date by the chosen plan, records who sold it (the dealer is
+ * credited when a dealer sells it) and invoices it through Finance. Anyone who can see the product can buy one.
+ */
+export function extendWarranty(ctx: Ctx, serial: string, body: { months?: unknown }): UnitView {
+  const unit = findUnit(ctx, serial);
+  const quote = quoteFor(ctx.state, unit, ctx.today);
+  if (!quote.eligible || !unit.warrantyEnd) {
+    throw conflict("not_extendable", NOT_EXTENDABLE[quote.reason ?? "NOT_REGISTERED"]);
+  }
+  const option = quote.options.find((o) => o.months === body.months);
+  if (!option) throw validation("Choose a plan.", { months: "validation.extensionPlan" });
+  const id = nextId(ctx.state, "EXT");
+  const dealerId = ctx.user.role === "dealer" && ctx.user.dealerId ? ctx.user.dealerId : unit.dealerId;
+  unit.extensions = [
+    ...(unit.extensions ?? []),
+    {
+      id,
+      months: option.months,
+      price: option.price,
+      previousEnd: unit.warrantyEnd,
+      newEnd: option.newEnd,
+      soldBy: ctx.user.id,
+      soldByName: ctx.user.name,
+      dealerId,
+      at: ctx.now,
+    },
+  ];
+  unit.warrantyEnd = option.newEnd;
+  addUnitEvent(unit, {
+    at: ctx.now,
+    type: "extended",
+    byName: ctx.user.name,
+    text: `Warranty extended by ${option.months} months to ${option.newEnd}`,
+    refId: id,
+  });
+  notify(ctx.state, followers(ctx.state, unit), "unit_extended", ctx.now, {
+    params: { serial: unit.serial, months: option.months, newEnd: option.newEnd },
+    link: `/units/${unit.serial}`,
+  });
+  logMessage(ctx, {
+    system: "FINANCE",
+    direction: "OUT",
+    type: "extension_invoice",
+    refId: id,
+    payload: {
+      extensionId: id,
+      serial: unit.serial,
+      model: ctx.state.models.find((m) => m.id === unit.modelId)?.code,
+      months: option.months,
+      price: option.price,
+      currency: "USD",
+      soldBy: ctx.user.id,
+      dealerId,
+    },
+  });
+  return getUnit(ctx, unit.serial);
+}
+
 // ---- catalogue and organisation --------------------------------------------------------------------
 
 /** A06 and every model picker: grouped by category, in catalogue order. */
-export function listModels(state: DemoState): ModelView[] {
+/** `withFinance`: include the internal finance figures (warranty desk only), like the backend. */
+export function listModels(state: DemoState, withFinance = false): ModelView[] {
   const position = (categoryId: string) => state.categories.findIndex((c) => c.id === categoryId);
-  return [...state.models]
+  const views = [...state.models]
     .sort((a, b) => position(a.categoryId) - position(b.categoryId))
     .flatMap((m) => toModelView(state, m.id) ?? []);
+  return withFinance ? views : views.map(publicModelView);
+}
+
+const MODEL_MONEY_FIELDS = ["listPrice", "repairCost", "warrantyBudget"] as const;
+
+/** A non-negative amount with at most 2 decimals, up to 1,000,000. */
+const isMoney = (value: unknown): value is number =>
+  typeof value === "number" &&
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= 1_000_000 &&
+  Math.abs(Math.round(value * 100) - value * 100) < 1e-6;
+
+/** A06: the warranty desk sets a model's list price, repair cost and warranty quota. Omitted fields keep their value. */
+export function updateModel(ctx: Ctx, id: string, body: Record<string, unknown>): ModelView {
+  requireRole(ctx, "admin");
+  const errors: Record<string, string> = {};
+  const changes: Partial<Pick<Model, "listPrice" | "repairCost" | "warrantyBudget" | "claimQuota">> = {};
+  for (const field of MODEL_MONEY_FIELDS) {
+    const value = body[field];
+    if (value === undefined) continue;
+    if (!isMoney(value)) errors[field] = "validation.amount";
+    else changes[field] = roundMoney(value);
+  }
+  const quota = body.claimQuota;
+  if (quota !== undefined) {
+    if (typeof quota !== "number" || !Number.isInteger(quota) || quota < 0 || quota > 10_000)
+      errors.claimQuota = "validation.quota";
+    else changes.claimQuota = quota;
+  }
+  if (Object.keys(errors).length) throw validation("Check the highlighted fields.", errors);
+  const model = ctx.state.models.find((m) => m.id === id);
+  if (!model) throw notFound("Model");
+  Object.assign(model, changes);
+  return toModelView(ctx.state, model.id) ?? { ...model, categoryName: "" };
 }
 
 export const listCategories = (state: DemoState): ProductCategory[] =>
@@ -402,12 +549,75 @@ const DASHBOARD_CHANNELS: ChannelCount["channel"][] = [
   "ERP",
   "API",
   "RETAIL",
+  "OVERWATCH",
+  "JOBLINK",
 ];
 
 function statusCounts(units: readonly UnitView[]): Record<WarrantyStatus, number> {
   const counts = Object.fromEntries(WARRANTY_STATUSES.map((s) => [s, 0])) as Record<WarrantyStatus, number>;
   for (const u of units) counts[u.status] += 1;
   return counts;
+}
+
+const byWarrantyStatus = (counts: Record<WarrantyStatus, number>): WarrantyStatusCount[] =>
+  WARRANTY_STATUSES.map((status) => ({ status, count: counts[status] }));
+
+/** The last `count` calendar months ("YYYY-MM") up to today's, oldest first. */
+function lastMonths(today: IsoDate, count: number): string[] {
+  const first = `${today.slice(0, 7)}-01`;
+  return Array.from({ length: count }, (_, i) => addMonthsIso(first, i - count + 1).slice(0, 7));
+}
+
+/** Dealers in scope: null = all (admin); a distributor may narrow to one of its dealers. */
+function scopeDealers(ctx: Ctx, query: RawQuery): string[] | null {
+  const { user, state } = ctx;
+  if (user.role === "admin") return null;
+  const ids = visibleDealerIds(user, state.dealers) ?? [];
+  const dealerId = user.role === "distributor" ? queryString(query, "dealerId") : undefined;
+  return dealerId ? ids.filter((id) => id === dealerId) : ids;
+}
+
+const inDealers = (dealerIds: readonly string[] | null, dealerId: string | undefined) =>
+  dealerIds === null || (!!dealerId && dealerIds.includes(dealerId));
+
+/**
+ * A01 "Fieldpiece apps": registered products whose registration came from Overwatch or Job Link, one entry per app
+ * (zeros allowed). `last30Days`: registered (COALESCE(reviewedAt, submittedAt)) in the 30 days up to today.
+ */
+function appChannelStats(state: DemoState, units: readonly UnitView[], today: IsoDate): AppChannelStats[] {
+  const since = addDaysIso(today, -29);
+  return FIELDPIECE_APP_CHANNELS.map((channel) => {
+    const fromApp = units.filter((u) => u.warrantyEnd && u.registrationChannel === channel);
+    const serials = new Set(fromApp.map((u) => u.serial));
+    const registeredAt = (u: UnitView) => {
+      const r = state.registrations.find((x) => x.id === u.registrationId);
+      return (r?.reviewedAt ?? r?.submittedAt ?? "").slice(0, 10);
+    };
+    return {
+      channel,
+      units: fromApp.length,
+      active: fromApp.filter((u) => u.status === "ACTIVE").length,
+      expiringSoon: fromApp.filter((u) => u.status === "EXPIRING_SOON").length,
+      expired: fromApp.filter((u) => u.status === "EXPIRED").length,
+      last30Days: fromApp.filter((u) => registeredAt(u) >= since).length,
+      claims: state.claims.filter((c) => serials.has(c.unitSerial)).length,
+      pendingRegistrations: state.registrations.filter((r) => r.status === "PENDING" && r.channel === channel)
+        .length,
+    };
+  });
+}
+
+/** Registrations approved and claims filed per month, the last 12 months (oldest first), for the dealers in scope. */
+function monthlyTrend(state: DemoState, today: IsoDate, dealerIds: readonly string[] | null): MonthlyTrend[] {
+  const registrations = state.registrations.filter(
+    (r) => r.status === "APPROVED" && inDealers(dealerIds, r.dealerId),
+  );
+  const claims = state.claims.filter((c) => inDealers(dealerIds, c.dealerId));
+  return lastMonths(today, 12).map((month) => ({
+    month,
+    registrations: registrations.filter((r) => (r.reviewedAt ?? r.submittedAt).slice(0, 7) === month).length,
+    claims: claims.filter((c) => c.createdAt.slice(0, 7) === month).length,
+  }));
 }
 
 /** A01 warranty desk, DL01 dealer / distributor, customer home. `dealerId` narrows a distributor's numbers. */
@@ -470,6 +680,8 @@ export function dashboardSummary(ctx: Ctx, query: RawQuery = {}): DashboardSumma
         .flatMap((u) => u.history.map((e) => ({ ...e, serial: u.serial })))
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 8),
+      trend: monthlyTrend(state, today, null),
+      apps: appChannelStats(state, units, today),
     };
   }
 
@@ -480,6 +692,7 @@ export function dashboardSummary(ctx: Ctx, query: RawQuery = {}): DashboardSumma
       active: counts.ACTIVE,
       expiringSoon: counts.EXPIRING_SOON,
       openClaims: claims.filter((c) => isOpenClaim(c.status)).length,
+      unitsByStatus: byWarrantyStatus(counts),
     };
   }
 
@@ -489,7 +702,8 @@ export function dashboardSummary(ctx: Ctx, query: RawQuery = {}): DashboardSumma
   const visible = dealerId ? ids.filter((id) => id === dealerId) : ids;
   const month = today.slice(0, 7);
   const registrations = state.registrations.filter((r) => !!r.dealerId && visible.includes(r.dealerId));
-  const openClaims = claims.filter((c) => isOpenClaim(c.status) && (!dealerId || c.dealerId === dealerId));
+  const dealerClaims = claims.filter((c) => !dealerId || c.dealerId === dealerId);
+  const openClaims = dealerClaims.filter((c) => isOpenClaim(c.status));
   const thisMonth = (r: Registration) => r.submittedAt.slice(0, 7) === month;
   const dealers: DealerStats[] = listDealers(ctx).map((d) => ({
     dealerId: d.id,
@@ -505,6 +719,118 @@ export function dashboardSummary(ctx: Ctx, query: RawQuery = {}): DashboardSumma
     rejected: registrations.filter((r) => r.status === "REJECTED").length,
     openClaims: openClaims.length,
     dealers,
+    unitsByStatus: byWarrantyStatus(statusCounts(units.filter((u) => !dealerId || u.dealerId === dealerId))),
+    claimsByStatus: CLAIM_STATUSES.map((status) => ({
+      status,
+      count: dealerClaims.filter((c) => c.status === status).length,
+    })),
+    trend: monthlyTrend(state, today, visible),
+  };
+}
+
+/**
+ * Warranty cost against budget over the rolling 12 months up to today (finance insights). Cost counts approved and
+ * closed claims filed in the period; extension revenue counts extended warranties sold in the period. Dealers and
+ * distributors see their dealers' figures; `dealerId` narrows a distributor's to one dealer.
+ */
+export function financeSummary(ctx: Ctx, query: RawQuery = {}): FinanceSummary {
+  requireRole(ctx, "admin", "dealer", "distributor");
+  const { state, today } = ctx;
+  const dealerIds = scopeDealers(ctx, query);
+  const periodStart = addDaysIso(addMonthsIso(today, -12), 1);
+  const inPeriod = (at: string) => at.slice(0, 10) >= periodStart && at.slice(0, 10) <= today;
+  const modelOf = (serial: string) => {
+    const unit = state.units.find((u) => u.serial === serial);
+    return state.models.find((m) => m.id === unit?.modelId);
+  };
+
+  const claims = state.claims.filter((c) => inDealers(dealerIds, c.dealerId) && inPeriod(c.createdAt));
+  const settled = claims.flatMap((c) => {
+    const model = modelOf(c.unitSerial);
+    if ((c.status !== "APPROVED" && c.status !== "CLOSED") || !c.resolution || !model) return [];
+    return [
+      {
+        modelId: model.id,
+        categoryId: model.categoryId,
+        resolution: c.resolution,
+        month: c.createdAt.slice(0, 7),
+        cost: claimCost(c.resolution, model, c.creditAmount),
+      },
+    ];
+  });
+  const extensions = state.units
+    .flatMap((u) => u.extensions ?? [])
+    .filter((e) => inDealers(dealerIds, e.dealerId) && inPeriod(e.at));
+  const registered = state.units.filter((u) => !!u.warrantyEnd && inDealers(dealerIds, u.dealerId));
+
+  const total = (rows: { cost: number }[]) => roundMoney(rows.reduce((n, r) => n + r.cost, 0));
+  const revenue = (rows: { price: number }[]) => roundMoney(rows.reduce((n, r) => n + r.price, 0));
+  const warrantyCost = total(settled);
+  const extensionRevenue = revenue(extensions);
+  const models = listModels(state, true).map((m) => ({
+    ...m,
+    warrantyBudget: m.warrantyBudget ?? 0,
+    claimQuota: m.claimQuota ?? 0,
+  }));
+  const budget = roundMoney(
+    models
+      .filter((m) => registered.some((u) => u.modelId === m.id))
+      .reduce((n, m) => n + m.warrantyBudget, 0),
+  );
+  const quotas: ModelQuota[] = models.flatMap((m) => {
+    const units = registered.filter((u) => u.modelId === m.id).length;
+    const spent = total(settled.filter((c) => c.modelId === m.id));
+    const claimCount = claims.filter((c) => modelOf(c.unitSerial)?.id === m.id).length;
+    if (!units && !spent && !claimCount) return [];
+    return [
+      {
+        modelId: m.id,
+        modelCode: m.code,
+        modelName: m.name,
+        categoryName: m.categoryName,
+        imageUrl: m.imageUrl,
+        units,
+        budget: m.warrantyBudget,
+        spent,
+        budgetUsedPct: percent(spent, m.warrantyBudget),
+        claimQuota: m.claimQuota,
+        claims: claimCount,
+        claimQuotaUsedPct: percent(claimCount, m.claimQuota),
+      },
+    ];
+  });
+  quotas.sort(
+    (a, b) =>
+      b.budgetUsedPct - a.budgetUsedPct || b.claims - a.claims || a.modelCode.localeCompare(b.modelCode),
+  );
+
+  return {
+    currency: "USD",
+    periodStart,
+    periodEnd: today,
+    warrantyCost,
+    creditsIssued: total(settled.filter((c) => c.resolution === "CREDIT")),
+    extensionRevenue,
+    extensionsSold: extensions.length,
+    netWarrantyCost: roundMoney(warrantyCost - extensionRevenue),
+    budget,
+    budgetUsedPct: percent(warrantyCost, budget),
+    averageClaimCost: settled.length ? roundMoney(warrantyCost / settled.length) : 0,
+    costByResolution: RESOLUTIONS.map((resolution) => {
+      const rows = settled.filter((c) => c.resolution === resolution);
+      return { resolution, amount: total(rows), count: rows.length };
+    }),
+    costByCategory: state.categories.map((c) => ({
+      categoryId: c.id,
+      categoryName: c.name,
+      amount: total(settled.filter((s) => s.categoryId === c.id)),
+    })),
+    monthly: lastMonths(today, 12).map((month) => ({
+      month,
+      cost: total(settled.filter((c) => c.month === month)),
+      extensionRevenue: revenue(extensions.filter((e) => e.at.slice(0, 7) === month)),
+    })),
+    quotas,
   };
 }
 

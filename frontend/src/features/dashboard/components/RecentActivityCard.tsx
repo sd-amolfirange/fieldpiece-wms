@@ -1,11 +1,19 @@
 import type { ActivityItem } from "@wms/domain";
-import { ArrowRightLeft, Ban, ClipboardList, MessageSquare, ShieldCheck, FilePlus2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Ban,
+  CalendarPlus,
+  ClipboardList,
+  MessageSquare,
+  ShieldCheck,
+  FilePlus2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { Card, Timeline, type TimelineItem } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 
-// A01 recent activity: the latest product events (registrations, claims, replacements, voids).
+// A01 recent activity: the latest product events (registrations, claims, replacements, extensions, voids).
 
 const icon = {
   registered: ShieldCheck,
@@ -13,6 +21,7 @@ const icon = {
   claim_filed: MessageSquare,
   claim_closed: ClipboardList,
   replaced: ArrowRightLeft,
+  extended: CalendarPlus,
   note: FilePlus2,
 } as const;
 

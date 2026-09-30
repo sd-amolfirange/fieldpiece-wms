@@ -6,6 +6,7 @@ import { appUrl, expectNoA11yViolations, resetDemoData, rolePage, test } from ".
 const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]> = {
   admin: [
     "/",
+    "/?view=finance",
     "/registrations",
     "/registrations/REG-1001",
     "/units",
@@ -21,6 +22,7 @@ const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]>
   ],
   dealer: [
     "/",
+    "/?view=finance",
     "/registrations/new",
     "/registrations/bulk",
     "/registrations/channels",
@@ -34,6 +36,8 @@ const SCREENS: Record<"admin" | "dealer" | "distributor" | "customer", string[]>
 };
 
 test("a11y: no WCAG 2.2 AA violations on any screen", async ({ browser, baseURL }) => {
+  // One test walks ~30 screens (with the finance views and the 72-model catalog): more than the default budget.
+  test.setTimeout(300_000);
   await resetDemoData(browser, appUrl(baseURL));
   for (const [account, paths] of Object.entries(SCREENS)) {
     const page: Page = await rolePage(browser, account as keyof typeof SCREENS, appUrl(baseURL));

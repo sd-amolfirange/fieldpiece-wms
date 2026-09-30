@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import type { PartnerClientView } from "@wms/domain";
+import { PARTNER_CHANNELS, type PartnerClientView } from "@wms/domain";
 import { KeyRound, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +12,6 @@ import {
   FormField,
   Input,
   Modal,
-  MonoId,
   NativeSelect,
   PartnerKeyBadge,
 } from "@/components/ui";
@@ -25,7 +24,7 @@ import { useCreatePartnerClient, usePartnerClients, useSetPartnerActive } from "
 // Partner systems allowed to send registrations through the partner API (warranty desk only). A new key is shown
 // once, when it's created; the server keeps only a hash of it.
 
-const CHANNELS: PartnerClientView["channel"][] = ["API", "RETAIL", "ERP"];
+const CHANNELS: PartnerClientView["channel"][] = [...PARTNER_CHANNELS];
 const col = createColumnHelper<PartnerClientView>();
 
 function AddPartnerModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -141,11 +140,8 @@ export function PartnerClientsCard() {
         enableSorting: false,
         cell: (i) => i.getValue() ?? "—",
       }),
-      col.accessor("keyPrefix", {
-        header: t("partners.columns.key"),
-        enableSorting: false,
-        cell: (i) => <MonoId>{`${i.getValue()}…`}</MonoId>,
-      }),
+      // The key prefix stays in the API response (PartnerClientView.keyPrefix) but isn't shown: even part of a key
+      // on screen invites screenshots and copy-paste. The full key is shown once, when the client is created.
       col.accessor("lastUsedAt", {
         header: t("partners.columns.lastUsed"),
         enableSorting: false,

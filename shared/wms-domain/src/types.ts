@@ -42,6 +42,15 @@ export interface Model {
   serialPattern: string;
   /** Regular expression every batch (production lot) number of this model must match. */
   batchPattern: string;
+  // ── Finance (USD, the account currency) [CONFIRM real prices and budgets with Fieldpiece Finance] ──
+  /** List price; the base for replacement cost and warranty-extension prices. */
+  listPrice: number;
+  /** Standard cost of one warranty repair. */
+  repairCost: number;
+  /** Warranty quota: what Fieldpiece plans to spend on warranty for this model over 12 months. */
+  warrantyBudget: number;
+  /** Warranty quota: how many warranty claims over 12 months are expected (above it the model needs attention). */
+  claimQuota: number;
 }
 
 // ── Organisation ─────────────────────────────────────────────────────────────
@@ -106,6 +115,7 @@ export type UnitEventType =
   | "claim_filed"
   | "claim_closed"
   | "replaced"
+  | "extended"
   | "note";
 
 export interface UnitEvent {
@@ -144,13 +154,32 @@ export interface Unit {
   replacedBySerial?: string;
   attachmentIds: string[];
   history: UnitEvent[];
+  /** Warranty extensions bought for this product, oldest first. `warrantyEnd` already includes them. */
+  extensions?: WarrantyExtension[];
+}
+
+/** An extended warranty sold for a registered product: moves its warranty end date later. */
+export interface WarrantyExtension {
+  id: string;
+  months: number;
+  /** Price paid, in the account currency. */
+  price: number;
+  previousEnd: IsoDate;
+  newEnd: IsoDate;
+  /** User who sold / bought it (a dealer, the warranty desk, or the customer). */
+  soldBy: string;
+  soldByName: string;
+  /** Dealer credited with the sale, if any. */
+  dealerId?: string;
+  at: IsoDateTime;
 }
 
 // ── Registrations ────────────────────────────────────────────────────────────
 
 /**
  * Where a registration came from. BULK is a dealer file upload, WEB the public form on the website, PORTAL a
- * signed-in customer, API a partner system, RETAIL an online marketplace or retailer feed.
+ * signed-in customer, API a partner system, RETAIL an online marketplace or retailer feed, OVERWATCH and JOBLINK
+ * Fieldpiece's own apps (sending through the partner API with their own keys).
  */
 export const REGISTRATION_CHANNELS = [
   "DEALER",
@@ -161,8 +190,18 @@ export const REGISTRATION_CHANNELS = [
   "ERP",
   "API",
   "RETAIL",
+  "OVERWATCH",
+  "JOBLINK",
 ] as const;
 export type RegistrationChannel = (typeof REGISTRATION_CHANNELS)[number];
+
+/** Registrations from Fieldpiece's own apps. */
+export const FIELDPIECE_APP_CHANNELS = ["OVERWATCH", "JOBLINK"] as const;
+export type FieldpieceAppChannel = (typeof FIELDPIECE_APP_CHANNELS)[number];
+
+/** Channels a partner system (partner API key) can register with. */
+export const PARTNER_CHANNELS = ["API", "RETAIL", "ERP", "OVERWATCH", "JOBLINK"] as const;
+export type PartnerChannel = (typeof PARTNER_CHANNELS)[number];
 
 export const REGISTRATION_STATUSES = [
   "PENDING",

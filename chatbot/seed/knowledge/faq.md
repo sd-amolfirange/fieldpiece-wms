@@ -45,3 +45,8 @@ reason is shown on the product page. Contact the warranty desk if you think it i
 ## What does Expiring soon mean
 
 30 days or fewer are left before the warranty ends. File any claim before the end date.
+
+## Can I get a longer warranty
+
+Yes. While the product is still covered, open it in the portal and choose "Extend warranty" to add 12, 24 or 36
+months (36 at most in total). The price and the new end date are shown before you confirm.

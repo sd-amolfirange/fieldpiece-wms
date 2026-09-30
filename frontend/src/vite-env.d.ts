@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_EXPIRING_SOON_DAYS?: string;
   readonly VITE_ASSISTANT_ENABLED?: string;
   readonly VITE_ASSISTANT_URL?: string;
+  readonly VITE_OVERWATCH_URL?: string;
+  readonly VITE_JOBLINK_URL?: string;
 }
 
 interface ImportMeta {

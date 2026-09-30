@@ -1,5 +1,6 @@
 import {
   modelSerial,
+  PARTNER_CHANNELS,
   type IntakeInfo,
   type PartnerClientView,
   type RegistrationRowInput,
@@ -22,8 +23,8 @@ import type { PartnerClientRecord } from "./state";
 
 // Registration entry points besides the signed-in screens, as backend/src/modules/intake:
 // - the public registration form (WEB): no account; always reviewed by the warranty desk;
-// - the partner API (API / RETAIL / ERP): partner systems send registrations with an X-Api-Key; clean ones are
-//   registered at once;
+// - the partner API (API / RETAIL / ERP, and OVERWATCH / JOBLINK for Fieldpiece's own apps): partner systems send
+//   registrations with an X-Api-Key and the channel of that key; clean ones are registered at once;
 // - email intake (EMAIL): the mail provider forwards emailed invoices; reviewed by the warranty desk.
 // Every one goes through registrations.ts, so the rules are the same as for the dealer and customer screens.
 
@@ -135,7 +136,6 @@ export interface PartnerItemResult {
 }
 
 const MAX_PARTNER_ITEMS = 500;
-const PARTNER_CHANNELS: readonly PartnerClientRecord["channel"][] = ["API", "RETAIL", "ERP"];
 
 const invalidKey = () =>
   new ServiceError(401, "invalid_api_key", "The API key is missing, wrong or no longer active.");
@@ -258,7 +258,7 @@ export function createPartnerClient(
   const dealerId = typeof body.dealerId === "string" && body.dealerId ? body.dealerId : undefined;
   const errors: Record<string, string> = {};
   if (!name) errors.name = "validation.required";
-  if (!PARTNER_CHANNELS.includes(channel)) errors.channel = "validation.channel";
+  if (!(PARTNER_CHANNELS as readonly unknown[]).includes(channel)) errors.channel = "validation.channel";
   if (dealerId && !ctx.state.dealers.some((d) => d.id === dealerId))
     errors.dealerId = "validation.pickDealer";
   throwIfErrors(errors);

@@ -4,3 +4,4 @@ export * from "./warranty";
 export * from "./registration-rules";
 export * from "./claim-transitions";
 export * from "./views";
+export * from "./finance";

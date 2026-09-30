@@ -1,5 +1,6 @@
 import type { UnitView } from "@wms/domain";
 import {
+  CalendarPlus,
   ArrowRightLeft,
   ClipboardList,
   Download,
@@ -16,6 +17,7 @@ import { toast } from "@/components/feedback";
 import {
   Button,
   Card,
+  ChannelBadge,
   MonoId,
   ProductThumb,
   Timeline,
@@ -63,6 +65,11 @@ export function UnitFactsCard({ unit, showOwner = true }: { unit: UnitView; show
         </Field>
         {showOwner ? <Field label={t("units.fields.customer")}>{unit.customerName ?? "—"}</Field> : null}
         <Field label={t("units.fields.dealer")}>{unit.dealerName ?? "—"}</Field>
+        {unit.registrationChannel ? (
+          <Field label={t("units.fields.registeredVia")}>
+            <ChannelBadge status={unit.registrationChannel} />
+          </Field>
+        ) : null}
         {unit.replacesSerial ? (
           <Field label={t("units.fields.replaces")}>
             <Link to={`/units/${unit.replacesSerial}`} className="underline-offset-2 hover:underline">
@@ -87,12 +94,15 @@ export function WarrantySummary({ unit }: { unit: UnitView }) {
   const { t, i18n } = useTranslation();
   if (!unit.warrantyEnd) return <p className="text-sm text-text-muted">{t("units.notRegisteredLong")}</p>;
   const running = unit.status === "ACTIVE" || unit.status === "EXPIRING_SOON";
+  const extendedMonths = (unit.extensions ?? []).reduce((n, x) => n + x.months, 0);
   return (
     <dl className="grid gap-4 sm:grid-cols-2">
       <Field label={t("units.fields.status")}>
         <WarrantyStatusBadge status={unit.status} />
       </Field>
-      <Field label={t("units.fields.term")}>{t("units.term")}</Field>
+      <Field label={t("units.fields.term")}>
+        {extendedMonths ? t("units.termExtended", { count: extendedMonths }) : t("units.term")}
+      </Field>
       <Field label={t("units.fields.starts")}>{formatDate(unit.warrantyStart, i18n.language)}</Field>
       <Field label={t("units.fields.ends")}>{formatDate(unit.warrantyEnd, i18n.language)}</Field>
       {running ? (
@@ -103,6 +113,23 @@ export function WarrantySummary({ unit }: { unit: UnitView }) {
       <Field label={t("units.fields.covers")} className="sm:col-span-2">
         {t("units.covers")}
       </Field>
+      {unit.extensions?.length ? (
+        <Field label={t("units.fields.extensions")} className="sm:col-span-2">
+          <ul className="space-y-1">
+            {unit.extensions.map((x) => (
+              <li key={x.id} className="text-sm">
+                {t("units.extensionLine", {
+                  months: x.months,
+                  from: formatDate(x.previousEnd, i18n.language),
+                  to: formatDate(x.newEnd, i18n.language),
+                  by: x.soldByName,
+                  date: formatDate(x.at, i18n.language),
+                })}
+              </li>
+            ))}
+          </ul>
+        </Field>
+      ) : null}
     </dl>
   );
 }
@@ -187,6 +214,7 @@ const eventIcon = {
   claim_filed: MessageSquare,
   claim_closed: ClipboardList,
   replaced: ArrowRightLeft,
+  extended: CalendarPlus,
   note: FilePlus2,
 } as const;
 

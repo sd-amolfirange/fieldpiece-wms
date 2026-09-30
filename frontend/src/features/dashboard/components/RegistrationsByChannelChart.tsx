@@ -1,88 +1,53 @@
 import type { ChannelCount } from "@wms/domain";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Button, Card } from "@/components/ui";
+import { useNavigate } from "react-router-dom";
+import { ChartCard, DonutChart } from "./charts";
+import { pct } from "./chart-utils";
 
-// A01 "Registrations by channel": approved registrations per source (bulk uploads count under Dealer).
-// Identical to ClaimsByStatusChart: same axes, grid, tooltip, bar shape, "View data" table, and bar colours
-// from the same CSS variables, following each channel's badge variant (see status-styles.ts).
+// A01 "Registrations by channel": approved registrations per source (bulk uploads count under Dealer), as a donut
+// with each channel's share. A segment opens the registrations from that channel. Colours follow each channel's
+// badge variant (see status-styles.ts); the "View data" table keeps the count in its last column.
 
 const channelColor: Record<ChannelCount["channel"], string> = {
   DEALER: "var(--brand-500)",
   PORTAL: "var(--info)",
-  WEB: "var(--info)",
+  WEB: "var(--success)",
   EMAIL: "var(--ink-400)",
-  ERP: "var(--ink-400)",
-  API: "var(--ink-400)",
+  ERP: "var(--ink-900)",
+  API: "var(--brand-800)",
   RETAIL: "var(--warning)",
+  OVERWATCH: "var(--danger)",
+  JOBLINK: "var(--ink-600)",
 };
 
 export function RegistrationsByChannelChart({ data }: { data: ChannelCount[] }) {
   const { t } = useTranslation();
-  const [showTable, setShowTable] = useState(false);
+  const navigate = useNavigate();
+  const total = data.reduce((n, d) => n + d.count, 0);
   const rows = data.map((d) => ({ ...d, label: t(`status.channel.${d.channel}`) }));
 
   return (
-    <Card
+    <ChartCard
       title={t("dashboard.registrationsByChannel")}
-      actions={
-        <Button variant="ghost" size="sm" onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
-          {showTable ? t("dashboard.viewChart") : t("dashboard.viewData")}
-        </Button>
-      }
+      rows={rows}
+      rowKey={(r) => r.channel}
+      columns={[
+        { header: t("dashboard.channel"), cell: (r) => r.label },
+        { header: "%", cell: (r) => `${pct(r.count, total)}%`, numeric: true },
+        { header: "#", cell: (r) => r.count, numeric: true },
+      ]}
     >
-      {showTable ? (
-        <table className="w-full text-sm">
-          <caption className="sr-only">{t("dashboard.registrationsByChannel")}</caption>
-          <thead>
-            <tr className="text-overline text-ink-600">
-              <th scope="col" className="py-2 text-start">
-                {t("dashboard.channel")}
-              </th>
-              <th scope="col" className="py-2 text-end">
-                #
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.channel} className="border-t border-ink-100">
-                <td className="py-2">{r.label}</td>
-                <td className="py-2 text-end font-mono">{r.count}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <div className="h-72" role="img" aria-label={t("dashboard.registrationsByChannel")}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-              <CartesianGrid stroke="var(--ink-200)" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12, fill: "var(--ink-500)" }}
-                stroke="var(--ink-200)"
-                interval={0}
-                angle={-30}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis
-                allowDecimals={false}
-                tick={{ fontSize: 12, fill: "var(--ink-500)" }}
-                stroke="var(--ink-200)"
-              />
-              <Tooltip cursor={{ fill: "var(--brand-50)" }} />
-              <Bar dataKey="count" radius={[2, 2, 0, 0]}>
-                {rows.map((r) => (
-                  <Cell key={r.channel} fill={channelColor[r.channel]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </Card>
+      <DonutChart
+        ariaLabel={t("dashboard.registrationsByChannel")}
+        centerLabel={t("dashboard.registrations")}
+        data={rows.map((r) => ({
+          key: r.channel,
+          label: r.label,
+          value: r.count,
+          color: channelColor[r.channel],
+          onSelect: () => navigate(`/registrations?channel=${r.channel}`),
+        }))}
+      />
+    </ChartCard>
   );
 }

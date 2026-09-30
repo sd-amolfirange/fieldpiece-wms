@@ -53,7 +53,13 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "myClaims": "My claims",
-    "channels": "Registration channels"
+    "channels": "Registration channels",
+    "apps": {
+      "title": "Fieldpiece apps",
+      "overwatch": "Overwatch",
+      "joblink": "Job Link",
+      "opens": "{{app}} (opens in a new tab)"
+    }
   },
   "roles": {
     "admin": "Admin",
@@ -81,7 +87,8 @@
     "nextPage": "Next page",
     "results": "{{count}} results",
     "dismiss": "Dismiss",
-    "actions": "Actions"
+    "actions": "Actions",
+    "edit": "Edit"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
@@ -104,7 +111,9 @@
       "EMAIL": "Email",
       "ERP": "Distributor ERP",
       "API": "Partner API",
-      "RETAIL": "Marketplace"
+      "RETAIL": "Marketplace",
+      "OVERWATCH": "Overwatch",
+      "JOBLINK": "Job Link"
     },
     "flag": {
       "EXCEPTION": "Exception",
@@ -255,7 +264,32 @@
       "rejected": "Rejected"
     },
     "claimsByCategory": "Claims by product category",
-    "category": "Category"
+    "category": "Category",
+    "viewsLabel": "Dashboard views",
+    "views": {
+      "overview": "Overview",
+      "finance": "Finance"
+    },
+    "claims": "Claims",
+    "products": "Products",
+    "month": "Month",
+    "warrantyStatus": "Warranty status",
+    "soldByStatus": "Sold products by warranty status",
+    "activityTrend": "Registrations and claims, last 12 months",
+    "activityTrendHint": "{{registrations}} registrations and {{claims}} claims: {{rate}} claims per 100 registrations.",
+    "apps": {
+      "title": "Fieldpiece apps",
+      "help": "Warranties registered from Overwatch and Job Link, and how they stand today.",
+      "open": "Open app",
+      "registered": "registered products",
+      "other": "Other",
+      "last30": "Last 30 days",
+      "pending": "To review",
+      "claims": "Claims",
+      "viewProducts": "View {{app}} products",
+      "review_one": "Review {{count}} registration",
+      "review_other": "Review {{count}} registrations"
+    }
   },
   "registrations": {
     "title": "Registrations",
@@ -470,7 +504,11 @@
       "marketplace": "Marketplace orders (2 serials)",
       "erpDone": "{{count}} registrations received from the ERP",
       "emailDone": "Registration email received",
-      "marketplaceDone": "{{count}} marketplace registrations received"
+      "marketplaceDone": "{{count}} marketplace registrations received",
+      "jobLink": "Job Link app registration (2 products)",
+      "jobLinkDone": "Job Link registered {{count}} products",
+      "overwatch": "Overwatch registration",
+      "overwatchDone": "Overwatch registered {{count}} product"
     },
     "reset": {
       "title": "Reset data",
@@ -501,7 +539,9 @@
     "issueType": "Choose what's wrong with the product.",
     "resolution": "Choose how the claim will be settled.",
     "state": "Use the two-letter state code, for example TX.",
-    "zip": "Enter a 5-digit ZIP code."
+    "zip": "Enter a 5-digit ZIP code.",
+    "quota": "Enter a whole number from 0 to 10,000.",
+    "extensionPlan": "Choose one of the extension plans."
   },
   "rowErrors": {
     "required": "Required",
@@ -533,7 +573,8 @@
       "purchased": "Purchased",
       "warrantyEnd": "Warranty ends",
       "status": "Status",
-      "daysLeft": "Days left"
+      "daysLeft": "Days left",
+      "registeredVia": "Registered via"
     },
     "facts": "Product",
     "fields": {
@@ -551,7 +592,9 @@
       "starts": "Starts",
       "ends": "Ends",
       "daysLeft": "Days left",
-      "covers": "What's covered"
+      "covers": "What's covered",
+      "extensions": "Extended warranty",
+      "registeredVia": "Registered via"
     },
     "tabsLabel": "Product details",
     "tabs": {
@@ -601,16 +644,41 @@
       "claim_filed": "filed claim {{ref}}",
       "claim_closed": "closed claim {{ref}}",
       "replaced": "replaced the product under claim {{ref}}",
-      "note": "added a note"
+      "note": "added a note",
+      "extended": "extended the warranty ({{ref}})"
     },
     "replacedLine": "Replaced under warranty by {{serial}}",
     "batchLine": "Batch {{batch}}",
     "term": "1 year from the date of purchase",
-    "covers": "Defects in materials and workmanship. Not covered: misuse, physical damage, unauthorized repair, batteries and normal wear."
+    "covers": "Defects in materials and workmanship. Not covered: misuse, physical damage, unauthorized repair, batteries and normal wear.",
+    "termExtended_one": "1 year from the date of purchase, extended by {{count}} month",
+    "termExtended_other": "1 year from the date of purchase, extended by {{count}} months",
+    "extensionLine": "+{{months}} months ({{from}} → {{to}}), sold by {{by}} on {{date}}",
+    "extend": {
+      "button": "Extend warranty",
+      "title": "Extend the warranty",
+      "help": "The {{model}} is covered until {{end}}. Add 12, 24 or 36 months of the same cover (36 at most in total).",
+      "choose": "Choose a plan",
+      "plan_one": "{{count}} more month",
+      "plan_other": "{{count}} more months",
+      "newEnd": "Covered until {{date}}",
+      "confirm": "Extend for {{price}}",
+      "buy": "Buy for {{price}}",
+      "already_one": "Already extended by {{count}} month.",
+      "already_other": "Already extended by {{count}} months.",
+      "terms": "Same cover as the original warranty. The price is recorded for Fieldpiece Finance; the owner and the dealer are notified.",
+      "done": "Warranty extended by {{months}} months, now until {{end}}."
+    },
+    "filterChannel": "Registered via",
+    "allChannels": "All sources",
+    "fieldpieceApps": "Fieldpiece apps (Overwatch, Job Link)"
   },
   "myUnits": {
     "empty": "No products yet. Scan the QR code on your product to register it.",
-    "pendingLine": "Sent on {{date}}. Your warranty starts once it's approved."
+    "pendingLine": "Sent on {{date}}. Your warranty starts once it's approved.",
+    "overview": "Coverage overview",
+    "warrantyUsed": "Share of the warranty period used",
+    "extendHint": "Ending soon: open it to extend the warranty"
   },
   "models": {
     "title": "Product catalog",
@@ -633,7 +701,23 @@
     "batchFormat": "Batch number",
     "batchDefault": "Year and week, then the line (e.g. 2514-L03)",
     "products": "Registered products",
-    "viewProducts": "Show registered products of this model"
+    "viewProducts": "Show registered products of this model",
+    "finance": {
+      "title": "Finance",
+      "listPrice": "List price",
+      "repairCost": "Repair cost",
+      "replacementCost": "Replacement cost",
+      "extensions": "Extended warranty prices",
+      "quota": "Warranty quota",
+      "quotaHelp": "What Fieldpiece plans to spend on warranty for this product over 12 months, and how many claims it expects.",
+      "budget": "Warranty budget (12 months)",
+      "claimQuota": "Expected claims (12 months)",
+      "budgetUsed": "{{spent}} of {{budget}} used in the last 12 months",
+      "noActivity": "No claims or extensions on this product in the last 12 months.",
+      "editTitle": "Finance for {{code}}",
+      "editHelp": "Prices and quota in USD. Changes show on the dashboards right away.",
+      "saved": "Finance saved"
+    }
   },
   "inbox": {
     "title": "Registration inbox",
@@ -814,6 +898,7 @@
     "registration_rejected": "Registration for {{serial}} was rejected: {{reason}}",
     "bulk_processed": "{{file}}: {{registered}} registered, {{errors}} to fix, {{review}} sent to the warranty desk.",
     "unit_voided": "The warranty on {{serial}} is void. Open the product to see why.",
+    "unit_extended": "The warranty on {{serial}} is extended by {{months}} months, until {{newEnd}}.",
     "erp_invoice_received": "ERP invoice {{invoice}}: {{count}} registrations to review",
     "registration_email_received": "Registration email for {{serial}} to review",
     "claim_submitted": "New warranty claim {{id}} for {{serial}}",
@@ -916,5 +1001,36 @@
       "lastUsed": "Last used",
       "status": "Status"
     }
+  },
+  "finance": {
+    "title": "Finance insights",
+    "period": "Last 12 months: {{from}} to {{to}}",
+    "warrantyCost": "Warranty cost",
+    "extensionRevenue": "Extended warranty revenue",
+    "netCost": "Net warranty cost",
+    "averageClaimCost": "Average cost per claim",
+    "budgetUse": "Warranty budget used",
+    "ofBudget": "of {{budget}} budget",
+    "spent": "Spent",
+    "remaining": "Remaining",
+    "extensionsSold": "Extensions sold",
+    "creditsIssued": "Credits issued",
+    "monthly": "Warranty cost and extension revenue by month",
+    "monthlyHint": "Cost of approved and closed claims (bars) against extended warranty sales (area).",
+    "byResolution": "Cost by resolution",
+    "byCategory": "Cost by product category",
+    "resolution": "Resolution",
+    "amount": "Amount",
+    "noCost": "No warranty cost in the last 12 months.",
+    "quotas": "Warranty quota by product",
+    "quotasHint": "Each product has a 12-month warranty budget and an expected number of claims. Over 75% is amber, over 100% red.",
+    "overQuota_one": "{{count}} product over its quota",
+    "overQuota_other": "{{count}} products over their quota",
+    "model": "Product",
+    "budgetColumn": "Budget used",
+    "claimQuotaColumn": "Claims against quota",
+    "budgetMeter": "{{model}} warranty budget used",
+    "claimMeter": "{{model}} claims against quota",
+    "claimsOfQuota": "{{claims}} of {{quota}} expected claims"
   }
 }

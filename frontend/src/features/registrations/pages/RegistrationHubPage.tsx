@@ -217,7 +217,7 @@ export default function RegistrationHubPage() {
           <ChannelCard
             icon={Plug}
             title={t("hub.partner.title")}
-            channels={["API", "RETAIL", "ERP"]}
+            channels={["API", "RETAIL", "ERP", "OVERWATCH", "JOBLINK"]}
             actions={
               partnerUrl ? (
                 <Button variant="secondary" icon={Copy} onClick={() => copy(partnerUrl, t("hub.copied"))}>

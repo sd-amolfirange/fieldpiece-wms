@@ -113,8 +113,12 @@ test("W2: customer self-registration by QR", async ({ browser, baseURL }) => {
     await admin.goto("/models");
     await admin.getByRole("link", { name: MODEL }).click();
     await expect(admin).toHaveURL(/\/models\/m-sm482v$/);
-    await expect(admin.getByText("12-month warranty")).toBeVisible();
-    await expect(admin.getByText("On the date of purchase")).toBeVisible();
+    // The model page's Warranty card (the catalog list shows the term on every model while it navigates away).
+    const warranty = admin.locator("section", {
+      has: admin.getByRole("heading", { name: "Warranty", exact: true }),
+    });
+    await expect(warranty.getByText("12-month warranty", { exact: true })).toBeVisible();
+    await expect(warranty.getByText("On the date of purchase")).toBeVisible();
   });
 
   await test.step("7. CU03: on the phone, open the product and download the certificate", async () => {

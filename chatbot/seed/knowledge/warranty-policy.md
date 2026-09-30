@@ -27,6 +27,7 @@ covered; the assistant cannot approve or promise the outcome of a claim.
 - Active: the product is registered and inside its warranty period.
 - Expiring soon: 30 days or fewer are left on the warranty.
 - Expired: the warranty end date has passed, or the product was replaced (the replacement carries the warranty).
+  An expired warranty can't be extended; extend it before the end date.
 - Void: the warranty was cancelled by the warranty desk, for example after an unauthorized repair, misuse or
   physical damage. A void warranty cannot be claimed against.
 - Pending: the product is known (for example shipped to a dealer) but not registered yet, so no warranty dates exist.
@@ -36,6 +37,21 @@ covered; the assistant cannot approve or promise the outcome of a claim.
 When a claim is settled by replacement, the new product gets the rest of the original warranty, not a new full
 term. The original product then shows as Expired and "Replaced by" the new serial, and the new product shows
 "Replaces" the original serial. (Rule assumed until Fieldpiece confirms it.)
+
+## Extended warranty
+
+You can extend the warranty of a registered product while it is still covered (status Active or Expiring soon).
+Open the product in the portal and choose "Extend warranty", then pick 12, 24 or 36 more months. The dialog shows
+the price and the new end date before you confirm. A product can be extended by 36 months at most in total. Dealers
+can sell an extension to their customer from "Sold products", and the warranty desk can add one for any product.
+The extension gives the same cover as the original warranty. The new end date shows on the product, in the
+warranty certificate (PDF) and in "Check warranty". You can't extend a product that is void, was replaced, isn't
+registered yet, or whose warranty has already expired.
+
+## Extended warranty prices
+
+The price depends on the model's list price: about 15% of it for 12 more months, 26% for 24 months and 35% for 36
+months. Each product's page in the catalog lists its exact extension prices.
 
 ## Proof of purchase
 

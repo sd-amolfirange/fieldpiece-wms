@@ -45,6 +45,22 @@ export function useVoidWarranty(serial: string) {
   });
 }
 
+export function useExtensionQuote(serial: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["units", serial, "extension"],
+    queryFn: () => unitsApi.extensionQuote(serial ?? ""),
+    enabled: !!serial && enabled,
+  });
+}
+
+export function useExtendWarranty(serial: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (months: number) => unitsApi.extend(serial, months),
+    onSuccess: () => refreshEverything(qc),
+  });
+}
+
 export function useMyPendingRegistrations() {
   return useQuery({
     queryKey: ["registrations", { mine: true, status: "PENDING" }],

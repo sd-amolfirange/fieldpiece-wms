@@ -1,4 +1,4 @@
-import { addDaysIso, type Paginated, type UnitView } from "@wms/domain";
+import { addDaysIso, addMonthsIso, type Paginated, type UnitView } from "@wms/domain";
 import { createSessionStore, dispatch, type DemoDb, type DemoRequest, type DemoResponse } from "./api";
 import { createSeed, DEMO_PARTNER_KEYS, DEMO_PASSWORD } from "./seed";
 import type { DemoFile } from "./services";
@@ -15,11 +15,12 @@ const JPEG: DemoFile = {
   data: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]),
 };
 
-type Who = "admin" | "dealer" | "bayou" | "distributor" | "customer";
+type Who = "admin" | "dealer" | "bayou" | "desertpeak" | "distributor" | "customer";
 const EMAILS: Record<Who, string> = {
   admin: "admin@wms.local",
   dealer: "dealer.lonestar@wms.local",
   bayou: "dealer.bayou@wms.local",
+  desertpeak: "dealer.desertpeak@wms.local",
   distributor: "dist.gulfstates@wms.local",
   customer: "customer.mreed@wms.local",
 };
@@ -62,7 +63,16 @@ function setup() {
     post("admin", `/claims/${id}/transitions`, body);
   const upload = (who: Who, file: DemoFile = JPEG) => post(who, "/uploads", {}, { file });
   const units = (who: Who, query = "") => get(who, `/units?pageSize=100${query}`).body as Paginated<UnitView>;
-  return { db, sessions, tokens, raw, login, call, get, post, move, upload, units };
+  /** Every page of the product list. */
+  const allUnits = (who: Who, query = "") => {
+    const items: UnitView[] = [];
+    for (let page = 1; ; page += 1) {
+      const res = units(who, `${query}&page=${page}`);
+      items.push(...res.items);
+      if (items.length >= res.total || !res.items.length) return { total: res.total, items };
+    }
+  };
+  return { db, sessions, tokens, raw, login, call, get, post, move, upload, units, allUnits };
 }
 
 describe("seed", () => {
@@ -70,8 +80,9 @@ describe("seed", () => {
 
   it("has the backend's accounts, products, claims and partner keys", () => {
     expect(state.users.map((u) => u.email)).toEqual(expect.arrayContaining(Object.values(EMAILS)));
-    expect(state.units).toHaveLength(15);
-    expect(state.claims.map((c) => c.id)).toEqual([
+    expect(state.units).toHaveLength(267);
+    expect(state.claims).toHaveLength(53);
+    expect(state.claims.slice(0, 7).map((c) => c.id)).toEqual([
       "CLM-1001",
       "CLM-1002",
       "CLM-1003",
@@ -88,6 +99,24 @@ describe("seed", () => {
     expect(state.units.find((u) => u.serial === "SM482V-261804517")?.warrantyEnd).toBeUndefined();
   });
 
+  it("generates the same demo volume on every load, clear of the labels the tests and the bulk sample use", () => {
+    expect(createSeed(TODAY)).toEqual(createSeed(TODAY));
+    const labels = [...state.units, ...state.registrations].map((x) => `${x.serial} ${x.batchNumber ?? ""}`);
+    expect(labels.filter((l) => /2635|2638|2639/.test(l))).toEqual([]);
+    const numbers = state.units.map((u) => u.serial.slice(u.serial.lastIndexOf("-") + 1));
+    expect(new Set(numbers).size).toBe(numbers.length);
+    // Every dealer has registrations this month (DL01), whatever the day of the month.
+    for (const today of [TODAY, "2026-10-01"]) {
+      const seed = createSeed(today);
+      for (const dealer of seed.dealers) {
+        const count = seed.registrations.filter(
+          (r) => r.dealerId === dealer.id && r.submittedAt.slice(0, 7) === today.slice(0, 7),
+        ).length;
+        expect([today, dealer.id, count >= 6]).toEqual([today, dealer.id, true]);
+      }
+    }
+  });
+
   it("places the named products relative to today and continues the id sequences", () => {
     const s = setup();
     expect(s.get("admin", "/units/SC680-251406233").body).toMatchObject({
@@ -95,7 +124,9 @@ describe("seed", () => {
       categoryName: "Clamp meters",
     });
     expect(s.get("admin", "/units/VP87-243208841").body.status).toBe("EXPIRED");
-    expect(s.get("admin", "/units/SM382V-252707701").body).toMatchObject({ replacesSerial: "SM382V-252005531" });
+    expect(s.get("admin", "/units/SM382V-252707701").body).toMatchObject({
+      replacesSerial: "SM382V-252005531",
+    });
     const reg = s.post("dealer", "/registrations", {
       serial: "263899001",
       batchNumber: "2638-L01",
@@ -103,7 +134,7 @@ describe("seed", () => {
       purchaseDate: TODAY,
       customerName: "Pat Moreno",
     });
-    expect(reg.body.id).toBe("REG-1014");
+    expect(reg.body.id).toBe("REG-1271");
   });
 });
 
@@ -176,7 +207,9 @@ describe("auth", () => {
     expect(pdf.status).toBe(200);
     expect(pdf.download).toMatchObject({ mime: "application/pdf", name: "warranty-SC680-251406233.pdf" });
     expect(String(pdf.download?.data).slice(0, 5)).toBe("%PDF-");
-    expect(s.raw({ path: "/units/SM482V-261804517/certificate.pdf", refreshToken: refresh }).status).toBe(404);
+    expect(s.raw({ path: "/units/SM482V-261804517/certificate.pdf", refreshToken: refresh }).status).toBe(
+      404,
+    );
     expect(s.get("admin", "/units/SM482V-261804517/certificate.pdf").body.code).toBe("not_registered");
   });
 });
@@ -202,7 +235,7 @@ describe("roles and data scope", () => {
 
   it("shows each role only its products", () => {
     const s = setup();
-    expect(s.units("admin").items).toHaveLength(15);
+    expect(s.units("admin").total).toBe(267);
     const lonestar = s.units("dealer").items;
     expect(lonestar.length).toBeGreaterThan(0);
     expect(lonestar.every((u) => u.dealerId === "d-lonestar")).toBe(true);
@@ -214,7 +247,16 @@ describe("roles and data scope", () => {
         .units("customer")
         .items.map((u) => u.serial)
         .sort(),
-    ).toEqual(["DR82-252207119", "SC680-251406233", "VP87-243208841"]);
+    ).toEqual([
+      "DR58-252891567",
+      "DR82-252207119",
+      "JL3KR4-252479315",
+      "MG44-253177420",
+      "SC440-263473208",
+      "SC680-251406233",
+      "SM480V-252586104",
+      "VP87-243208841",
+    ]);
   });
 
   it("answers 404, not 403, for a record outside the caller's scope", () => {
@@ -231,13 +273,13 @@ describe("roles and data scope", () => {
     const s = setup();
     const claims = (who: Who) =>
       s.get(who, "/claims?pageSize=100").body.items as { id: string; dealerId: string; customerId: string }[];
-    expect(claims("admin")).toHaveLength(7);
+    expect(claims("admin")).toHaveLength(53);
     expect(claims("dealer").every((c) => c.dealerId === "d-lonestar")).toBe(true);
     expect(claims("customer").every((c) => c.customerId === "c-mreed")).toBe(true);
     const foreign = claims("admin").find((c) => c.dealerId === "d-desertpeak")!;
     expect(s.get("dealer", `/claims/${foreign.id}`).status).toBe(404);
     expect(s.get("customer", `/claims/${foreign.id}`).status).toBe(404);
-    expect(s.get("dealer", "/claims/counts").body).toMatchObject({ CLOSED: 1, IN_REVIEW: 1, REJECTED: 0 });
+    expect(s.get("dealer", "/claims/counts").body).toMatchObject({ CLOSED: 10, IN_REVIEW: 2, REJECTED: 4 });
   });
 
   it("keeps warranty desk actions admin-only", () => {
@@ -585,7 +627,43 @@ describe("registration entry points", () => {
       customer: { name: "Nina Patel", email: "nina@example.com" },
     });
     expect(retail.body.results[0].status).toBe("REGISTERED");
-    expect(s.get("admin", "/units/SRS1-263899006").body).toMatchObject({ placeOfPurchase: "Online marketplace" });
+    expect(s.get("admin", "/units/SRS1-263899006").body).toMatchObject({
+      placeOfPurchase: "Online marketplace",
+      registrationChannel: "RETAIL",
+    });
+
+    // Fieldpiece's apps use the same API with their own keys; the registration gets the app's channel.
+    const app = partner(DEMO_PARTNER_KEYS["pc-joblink"], {
+      serial: "263899021",
+      batchNumber: "2638-L02",
+      modelCode: "JL3PR",
+      purchaseDate: TODAY,
+      customer: { name: "Dana Whitaker", email: "dana.whitaker@example.com", state: "TX", zip: "77002" },
+    });
+    expect(app.body.results[0].status).toBe("REGISTERED");
+    expect(s.get("admin", `/registrations/${app.body.results[0].registrationId}`).body).toMatchObject({
+      channel: "JOBLINK",
+      status: "APPROVED",
+      submittedByName: "Fieldpiece Job Link",
+    });
+    expect(s.get("admin", "/units/JL3PR-263899021").body).toMatchObject({
+      status: "ACTIVE",
+      registrationChannel: "JOBLINK",
+    });
+    expect(s.get("admin", "/units/JL3PR-263899021").body.dealerId).toBeUndefined();
+    const again = partner(DEMO_PARTNER_KEYS["pc-overwatch"], {
+      serial: "JL3PR-263899021",
+      batchNumber: "2638-L02",
+      modelCode: "JL3PR",
+      purchaseDate: TODAY,
+      customer: { name: "Someone Else" },
+    });
+    expect(again.body.results[0].status).toBe("REVIEW");
+    expect(s.get("admin", `/registrations/${again.body.results[0].registrationId}`).body).toMatchObject({
+      channel: "OVERWATCH",
+      status: "PENDING",
+      flags: ["DUPLICATE", "EXCEPTION"],
+    });
 
     expect([partner("fpk_wrong", {}).status, partner("fpk_wrong", {}).body.code]).toEqual([
       401,
@@ -593,6 +671,9 @@ describe("registration entry points", () => {
     ]);
     const created = s.post("admin", "/admin/partner-clients", { name: "Retail chain", channel: "RETAIL" });
     expect(created.status).toBe(201);
+    expect(
+      s.post("admin", "/admin/partner-clients", { name: "Job Link (test)", channel: "JOBLINK" }).body.client,
+    ).toMatchObject({ channel: "JOBLINK" });
     expect(created.body.apiKey).toMatch(/^fpk_/);
     expect(created.body.client).toMatchObject({ active: true, keyPrefix: created.body.apiKey.slice(0, 12) });
     expect(JSON.stringify(s.get("admin", "/admin/partner-clients").body)).not.toContain(created.body.apiKey);
@@ -605,7 +686,18 @@ describe("registration entry points", () => {
     });
     expect(off.body.active).toBe(false);
     expect(partner(created.body.apiKey, {}).status).toBe(401);
-    expect(s.get("admin", "/admin/partner-clients").body[0].lastUsedAt).toBeDefined();
+    const clients = s.get("admin", "/admin/partner-clients").body as {
+      id: string;
+      channel: string;
+      lastUsedAt?: string;
+    }[];
+    expect(clients[0]!.lastUsedAt).toBeDefined();
+    expect(clients.slice(0, 4).map((c) => [c.id, c.channel])).toEqual([
+      ["pc-desertpeak-pos", "API"],
+      ["pc-marketplace", "RETAIL"],
+      ["pc-overwatch", "OVERWATCH"],
+      ["pc-joblink", "JOBLINK"],
+    ]);
   });
 
   it("email intake: reads the registration from the message, keeps the attachment, needs the shared secret", () => {
@@ -801,8 +893,12 @@ describe("warranty claims", () => {
     expect(s.post("admin", "/units/DR82-252207119/void", { reason: "NOPE" }).body.fieldErrors).toEqual({
       reason: "validation.voidReason",
     });
-    expect(s.post("admin", "/units/DR82-252207119/void", { reason: "MISUSE" }).body.code).toBe("already_void");
-    expect(s.post("admin", "/units/SM482V-261804517/void", { reason: "MISUSE" }).body.code).toBe("not_registered");
+    expect(s.post("admin", "/units/DR82-252207119/void", { reason: "MISUSE" }).body.code).toBe(
+      "already_void",
+    );
+    expect(s.post("admin", "/units/SM482V-261804517/void", { reason: "MISUSE" }).body.code).toBe(
+      "not_registered",
+    );
     const claim = s.post("customer", "/claims", {
       unitSerial: "DR82-252207119",
       issueType: "INACCURATE_READING",
@@ -817,17 +913,20 @@ describe("warranty claims", () => {
 
   it("filters and searches claims", () => {
     const s = setup();
-    expect(s.get("admin", "/claims?status=CLOSED").body.total).toBe(3);
+    expect(s.get("admin", "/claims?status=CLOSED").body.total).toBe(25);
     expect(s.get("admin", "/claims?q=2427-L01").body.items.map((c: { id: string }) => c.id)).toEqual([
       "CLM-1004",
     ]);
-    expect(
-      s
-        .get("admin", "/claims?issueType=MECHANICAL&sort=createdAt")
-        .body.items.map((c: { id: string }) => c.id),
-    ).toEqual(["CLM-1006", "CLM-1007"]);
+    const mechanical = s.get("admin", "/claims?issueType=MECHANICAL&sort=createdAt&pageSize=100").body
+      .items as { id: string; issueType: string; createdAt: string }[];
+    expect(mechanical.every((c) => c.issueType === "MECHANICAL")).toBe(true);
+    expect(mechanical.map((c) => c.createdAt)).toEqual(mechanical.map((c) => c.createdAt).sort());
+    expect(mechanical.map((c) => c.id).filter((id) => id === "CLM-1006" || id === "CLM-1007")).toEqual([
+      "CLM-1006",
+      "CLM-1007",
+    ]);
     expect(s.get("admin", "/claims?pageSize=2&page=2").body).toMatchObject({
-      total: 7,
+      total: 53,
       page: 2,
       pageSize: 2,
     });
@@ -884,18 +983,25 @@ describe("system events, dashboards, reset", () => {
     const s = setup();
     const all = s.get("distributor", "/dashboard/summary").body;
     expect(all.dealers.map((d: { dealerId: string }) => d.dealerId)).toEqual(["d-lonestar", "d-bayou"]);
-    expect(all.openClaims).toBe(1);
-    expect(s.get("distributor", "/dashboard/summary?dealerId=d-bayou").body.openClaims).toBe(0);
+    expect(all.openClaims).toBe(9);
+    expect(s.get("distributor", "/dashboard/summary?dealerId=d-bayou").body.openClaims).toBe(5);
     expect(s.get("distributor", "/dashboard/summary?dealerId=d-desertpeak").body).toMatchObject({
       registrationsThisMonth: 0,
       openClaims: 0,
     });
     expect(s.get("customer", "/dashboard/summary").body).toEqual({
       role: "customer",
-      units: 3,
-      active: 2,
-      expiringSoon: 0,
+      units: 8,
+      active: 6,
+      expiringSoon: 1,
       openClaims: 0,
+      unitsByStatus: [
+        { status: "ACTIVE", count: 6 },
+        { status: "EXPIRING_SOON", count: 1 },
+        { status: "EXPIRED", count: 1 },
+        { status: "VOID", count: 0 },
+        { status: "PENDING", count: 0 },
+      ],
     });
   });
 
@@ -904,12 +1010,13 @@ describe("system events, dashboards, reset", () => {
     for (const days of [0, 30, 200, 900]) {
       s.db.today = () => addDaysIso(TODAY, days);
       const d = s.get("admin", "/dashboard/summary").body;
-      const list = s.units("admin");
+      const list = s.allUnits("admin");
       expect(d.units).toBe(list.total);
+      expect(list.items).toHaveLength(list.total);
       expect(d.active + d.expiring30 + d.expired + d.pending + d.voided).toBe(d.units);
       for (const status of ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOID", "PENDING"]) {
         const filtered = s
-          .units("admin", `&status=${status}`)
+          .allUnits("admin", `&status=${status}`)
           .items.map((u) => u.serial)
           .sort();
         const expected = list.items
@@ -924,7 +1031,17 @@ describe("system events, dashboards, reset", () => {
   it("reports the admin dashboard from the seed", () => {
     const s = setup();
     const d = s.get("admin", "/dashboard/summary").body;
-    expect(d).toMatchObject({ role: "admin", units: 15, pending: 1, openClaims: 3, pendingRegistrations: 0 });
+    expect(d).toMatchObject({
+      role: "admin",
+      units: 267,
+      active: 174,
+      expiring30: 27,
+      expired: 47,
+      pending: 13,
+      voided: 6,
+      openClaims: 20,
+      pendingRegistrations: 15,
+    });
     expect(d.registrationsByChannel.map((c: { channel: string }) => c.channel)).toEqual([
       "DEALER",
       "PORTAL",
@@ -933,11 +1050,118 @@ describe("system events, dashboards, reset", () => {
       "ERP",
       "API",
       "RETAIL",
+      "OVERWATCH",
+      "JOBLINK",
     ]);
-    expect(d.registrationsByChannel[0].count).toBe(7); // six dealer registrations plus one bulk upload
-    expect(d.claimsByStatus.find((c: { status: string }) => c.status === "CLOSED").count).toBe(3);
-    expect(d.claimsByCategory.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(7);
+    // Approved registrations: dealer entries and bulk uploads together, then each channel.
+    expect(d.registrationsByChannel.map((c: { count: number }) => c.count)).toEqual([
+      112, 22, 15, 9, 11, 24, 7, 20, 30,
+    ]);
+    expect(d.claimsByStatus.find((c: { status: string }) => c.status === "CLOSED").count).toBe(25);
+    expect(d.claimsByCategory.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(53);
     expect(d.recentActivity).toHaveLength(8);
+  });
+
+  it("reports the products registered from Fieldpiece's apps", () => {
+    const s = setup();
+    const apps = s.get("admin", "/dashboard/summary").body.apps as Record<string, number | string>[];
+    expect(apps).toEqual([
+      {
+        channel: "OVERWATCH",
+        units: 20,
+        active: 15,
+        expiringSoon: 1,
+        expired: 4,
+        last30Days: 1,
+        claims: 5,
+        pendingRegistrations: 1,
+      },
+      {
+        channel: "JOBLINK",
+        units: 30,
+        active: 22,
+        expiringSoon: 1,
+        expired: 6,
+        last30Days: 6,
+        claims: 3,
+        pendingRegistrations: 1,
+      },
+    ]);
+    // The same products the list shows for the channel.
+    for (const app of apps) {
+      const list = s.allUnits("admin", `&channel=${app.channel}`);
+      expect([app.channel, list.total]).toEqual([app.channel, app.units]);
+      expect(list.items.every((u) => u.registrationChannel === app.channel)).toBe(true);
+    }
+    expect(s.units("admin", "&channel=APPS").total).toBe(50);
+    expect(s.units("admin", "&channel=FAX").total).toBe(267); // not a channel: no filter
+    expect(s.units("dealer", "&channel=APPS").total).toBe(0); // the apps register without a dealer
+    expect(s.units("customer", "&channel=APPS").items.map((u) => u.serial)).toEqual(["SC440-263473208"]);
+    expect(s.units("customer", "&channel=PORTAL").items.map((u) => u.serial)).toEqual([
+      "DR82-252207119",
+      "JL3KR4-252479315",
+    ]);
+    // The channel of the registration that started the warranty; none before registration or for a replacement.
+    expect(s.get("admin", "/units/SC680-251406233").body.registrationChannel).toBe("DEALER");
+    expect(s.get("admin", "/units/SM482V-261804517").body.registrationChannel).toBeUndefined();
+    expect(s.get("admin", "/units/SM382V-252707701").body.registrationChannel).toBeUndefined();
+    // Dealers, distributors and customers don't get the figures.
+    expect(s.get("dealer", "/dashboard/summary").body.apps).toBeUndefined();
+    expect(s.get("customer", "/dashboard/summary").body.apps).toBeUndefined();
+  });
+
+  it("gives every dealer registrations this month", () => {
+    const s = setup();
+    for (const who of ["dealer", "bayou", "desertpeak"] as const) {
+      const d = s.get(who, "/dashboard/summary").body;
+      expect([who, d.registrationsThisMonth > 0, d.dealers[0].registrationsThisMonth > 0]).toEqual([
+        who,
+        true,
+        true,
+      ]);
+    }
+    expect(s.get("distributor", "/dashboard/summary").body.registrationsThisMonth).toBeGreaterThan(0);
+  });
+
+  it("A13: Job Link and Overwatch register new products through the partner API with their own channels", () => {
+    const s = setup();
+    const joblink = s.post("admin", "/simulate/joblink-registration");
+    expect(joblink.status).toBe(200);
+    expect(
+      joblink.body.map(
+        (r: { channel: string; status: string; modelCode: string }) =>
+          `${r.channel}:${r.status}:${r.modelCode}`,
+      ),
+    ).toEqual(["JOBLINK:APPROVED:JL3KH6", "JOBLINK:APPROVED:MG44"]);
+    expect(joblink.body[0]).toMatchObject({
+      submittedByName: "Fieldpiece Job Link",
+      customer: { name: "Owen Castillo" },
+    });
+    expect(joblink.body[0].dealerId).toBeUndefined();
+    const overwatch = s.post("admin", "/simulate/overwatch-registration");
+    expect(
+      overwatch.body.map((r: { channel: string; status: string }) => `${r.channel}:${r.status}`),
+    ).toEqual(["OVERWATCH:APPROVED"]);
+    expect(s.get("admin", `/units/${overwatch.body[0].serial}`).body).toMatchObject({
+      status: "ACTIVE",
+      registrationChannel: "OVERWATCH",
+    });
+    const apps = s.get("admin", "/dashboard/summary").body.apps as {
+      channel: string;
+      units: number;
+      last30Days: number;
+    }[];
+    expect(apps.map((a) => [a.channel, a.units, a.last30Days])).toEqual([
+      ["OVERWATCH", 21, 2],
+      ["JOBLINK", 32, 8],
+    ]);
+    expect(s.get("admin", "/integrations?q=pc-joblink").body.items[0]).toMatchObject({
+      system: "PARTNER",
+      type: "partner_registration",
+      payload: { channel: "JOBLINK", registered: 2 },
+    });
+    expect(s.post("customer", "/simulate/joblink-registration").status).toBe(403);
+    expect(s.post("dealer", "/simulate/overwatch-registration").status).toBe(403);
   });
 
   it("resets the data and keeps signed-in users signed in", () => {
@@ -969,5 +1193,217 @@ describe("system events, dashboards, reset", () => {
       "unknown_model",
     );
     expect(JSON.stringify(s.db.state)).toBe(before);
+  });
+});
+
+describe("extended warranties and finance", () => {
+  it("quotes and sells an extended warranty to the customer, up to 36 months in total", () => {
+    const s = setup();
+    const serial = "SC680-251406233";
+    const before = s.get("customer", `/units/${serial}`).body;
+    expect(before.extensions).toEqual([]);
+    const quote = s.get("customer", `/units/${serial}/extension`).body;
+    expect(quote).toMatchObject({ eligible: true, currentEnd: before.warrantyEnd, extendedMonths: 0 });
+    expect(quote.options).toEqual([
+      { months: 12, price: 48.99, newEnd: addMonthsIso(before.warrantyEnd, 12) },
+      { months: 24, price: 85.99, newEnd: addMonthsIso(before.warrantyEnd, 24) },
+      { months: 36, price: 114.99, newEnd: addMonthsIso(before.warrantyEnd, 36) },
+    ]);
+
+    const bought = s.post("customer", `/units/${serial}/extensions`, { months: 12 });
+    expect(bought.status).toBe(200);
+    expect(bought.body).toMatchObject({
+      warrantyEnd: addMonthsIso(before.warrantyEnd, 12),
+      status: "ACTIVE",
+    });
+    expect(bought.body.extensions).toEqual([
+      expect.objectContaining({
+        id: "EXT-1019",
+        months: 12,
+        price: 48.99,
+        previousEnd: before.warrantyEnd,
+        soldBy: "u-mreed",
+        dealerId: "d-lonestar",
+      }),
+    ]);
+    expect(bought.body.history.at(-1)).toMatchObject({ type: "extended", refId: "EXT-1019" });
+    expect(s.get("dealer", "/notifications").body[0]).toMatchObject({
+      key: "unit_extended",
+      params: { serial, months: 12 },
+    });
+    const finance = s.get("admin", "/integrations?system=FINANCE").body.items;
+    expect(finance.find((m: { refId: string }) => m.refId === "EXT-1019")).toMatchObject({
+      type: "extension_invoice",
+      payload: { serial, model: "SC680", months: 12, price: 48.99 },
+    });
+
+    const left = s.get("customer", `/units/${serial}/extension`).body.options;
+    expect(left.map((o: { months: number }) => o.months)).toEqual([12, 24]);
+    expect(s.post("customer", `/units/${serial}/extensions`, { months: 36 }).body.fieldErrors).toEqual({
+      months: "validation.extensionPlan",
+    });
+    expect(s.post("customer", `/units/${serial}/extensions`, { months: 24 }).status).toBe(200);
+    const full = s.post("customer", `/units/${serial}/extensions`, { months: 12 });
+    expect([full.status, full.body.code]).toEqual([409, "not_extendable"]);
+    expect(s.get("customer", `/units/${serial}/extension`).body).toMatchObject({
+      eligible: false,
+      reason: "LIMIT_REACHED",
+      extendedMonths: 36,
+    });
+  });
+
+  it("credits the selling dealer, scopes the offer and refuses products that can't be extended", () => {
+    const s = setup();
+    const sold = s.post("dealer", "/units/MG44-252811902/extensions", { months: 24 });
+    expect(sold.body.extensions[0]).toMatchObject({
+      soldBy: "u-lonestar",
+      dealerId: "d-lonestar",
+      price: 48.99,
+    });
+    expect(s.get("bayou", "/units/MG44-252811902/extension").status).toBe(404);
+    expect(s.post("bayou", "/units/MG44-252811902/extensions", { months: 12 }).status).toBe(404);
+    expect(s.get("customer", "/units/MG44-252811902/extension").status).toBe(404);
+
+    const refused = (who: Who, serial: string) => {
+      const res = s.post(who, `/units/${serial}/extensions`, { months: 12 });
+      return [res.status, res.body.code, s.get(who, `/units/${serial}/extension`).body.reason];
+    };
+    expect(refused("customer", "VP87-243208841")).toEqual([409, "not_extendable", "EXPIRED"]);
+    expect(refused("admin", "SM482V-261804517")).toEqual([409, "not_extendable", "NOT_REGISTERED"]);
+    expect(refused("admin", "SM382V-252005531")).toEqual([409, "not_extendable", "REPLACED"]);
+    s.post("admin", "/units/DR82-252207119/void", { reason: "MISUSE" });
+    expect(refused("customer", "DR82-252207119")).toEqual([409, "not_extendable", "VOID"]);
+    expect(s.post("admin", "/units/SC680-252409963/extensions", { months: 6 }).body.fieldErrors).toEqual({
+      months: "validation.extensionPlan",
+    });
+  });
+
+  it("shows a model's internal finance figures to the warranty desk only", () => {
+    const s = setup();
+    const internal = ["repairCost", "warrantyBudget", "claimQuota"];
+    const sc680 = (models: { code: string }[]) =>
+      models.find((m) => m.code === "SC680") as Record<string, unknown>;
+    expect(sc680(s.get("admin", "/models").body)).toMatchObject({
+      listPrice: 329,
+      repairCost: 99,
+      claimQuota: 3,
+    });
+    for (const who of ["dealer", "customer", null] as const) {
+      const model = sc680(s.get(who, who ? "/models" : "/public/models").body);
+      expect(model.listPrice).toBe(329);
+      expect(internal.filter((f) => f in model)).toEqual([]);
+    }
+  });
+
+  it("reports warranty cost against budget, scoped to the caller's dealers", () => {
+    const s = setup();
+    const admin = s.get("admin", "/dashboard/finance").body;
+    expect(admin).toMatchObject({
+      currency: "USD",
+      periodStart: "2025-09-29",
+      periodEnd: TODAY,
+      warrantyCost: 5596.45,
+      creditsIssued: 1657.25,
+      extensionRevenue: 1595.82,
+      extensionsSold: 18,
+      netWarrantyCost: 4000.63,
+      // Models with registered products: sum of round(list price x 2.5).
+      budget: 67701,
+      budgetUsedPct: 8,
+      averageClaimCost: 174.89,
+      costByResolution: [
+        { resolution: "REPAIR", amount: 2265, count: 18 },
+        { resolution: "REPLACE", amount: 1674.2, count: 6 },
+        { resolution: "CREDIT", amount: 1657.25, count: 8 },
+      ],
+    });
+    expect(admin.costByCategory).toHaveLength(11); // every category, zero allowed
+    expect(admin.monthly).toHaveLength(12);
+    expect(admin.monthly.at(-1).month).toBe("2026-09");
+    expect(admin.monthly.reduce((n: number, m: { cost: number }) => n + m.cost, 0)).toBeCloseTo(5596.45);
+    expect(admin.quotas.map((q: { modelCode: string }) => q.modelCode).slice(0, 4)).toEqual([
+      "SC640",
+      "SC260",
+      "MG44",
+      "VP87",
+    ]);
+    expect(admin.quotas[0]).toMatchObject({
+      units: 5,
+      budget: 498,
+      spent: 358.2,
+      budgetUsedPct: 72,
+      claims: 3,
+    });
+
+    expect(s.get("dealer", "/dashboard/finance").body).toMatchObject({
+      warrantyCost: 2622.65,
+      extensionRevenue: 631.93,
+      extensionsSold: 7,
+      budget: 46443,
+      creditsIssued: 1010.25,
+    });
+    expect(s.get("distributor", "/dashboard/finance?dealerId=d-bayou").body).toMatchObject({
+      warrantyCost: 1584.4,
+      extensionsSold: 2,
+    });
+    expect(s.get("distributor", "/dashboard/finance?dealerId=d-desertpeak").body).toMatchObject({
+      warrantyCost: 0,
+      budget: 0,
+      quotas: [],
+    });
+    expect(s.get("customer", "/dashboard/finance").status).toBe(403);
+  });
+
+  it("lets the warranty desk set a model's price and quota", () => {
+    const s = setup();
+    const patch = (who: Who, id: string, body: unknown) => s.call(who, "PATCH", `/models/${id}`, { body });
+    expect(patch("admin", "m-sc680", { listPrice: 349.5, claimQuota: 5 }).body).toMatchObject({
+      code: "SC680",
+      listPrice: 349.5,
+      repairCost: 99,
+      warrantyBudget: 823,
+      claimQuota: 5,
+      categoryName: "Clamp meters",
+    });
+    const models = s.get("dealer", "/models").body as { id: string; listPrice: number }[];
+    expect(models.find((m) => m.id === "m-sc680")?.listPrice).toBe(349.5);
+    const bad = patch("admin", "m-sc680", { repairCost: -1, warrantyBudget: 1.234, claimQuota: 2.5 });
+    expect([bad.status, bad.body.fieldErrors]).toEqual([
+      422,
+      {
+        repairCost: "validation.amount",
+        warrantyBudget: "validation.amount",
+        claimQuota: "validation.quota",
+      },
+    ]);
+    expect(patch("admin", "m-nope", { listPrice: 1 }).status).toBe(404);
+    expect(patch("dealer", "m-sc680", { listPrice: 1 }).status).toBe(403);
+  });
+
+  it("adds status counts and 12-month trends to the dashboards", () => {
+    const s = setup();
+    const admin = s.get("admin", "/dashboard/summary").body;
+    expect(admin.trend).toHaveLength(12);
+    expect(admin.trend[0].month).toBe("2025-10");
+    expect(admin.trend.at(-1).month).toBe("2026-09");
+    expect(admin.trend.reduce((n: number, m: { claims: number }) => n + m.claims, 0)).toBe(53);
+
+    const dealer = s.get("dealer", "/dashboard/summary").body;
+    expect(dealer.unitsByStatus.map((c: { status: string }) => c.status)).toEqual([
+      "ACTIVE",
+      "EXPIRING_SOON",
+      "EXPIRED",
+      "VOID",
+      "PENDING",
+    ]);
+    expect(dealer.unitsByStatus.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(
+      s.units("dealer").total,
+    );
+    expect(dealer.claimsByStatus).toHaveLength(5);
+    expect(dealer.claimsByStatus.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(18);
+    expect(dealer.trend.reduce((n: number, m: { claims: number }) => n + m.claims, 0)).toBe(18);
+    const bayou = s.get("distributor", "/dashboard/summary?dealerId=d-bayou").body;
+    expect(bayou.unitsByStatus.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(63);
+    expect(bayou.claimsByStatus.find((c: { status: string }) => c.status === "CLOSED").count).toBe(8);
   });
 });

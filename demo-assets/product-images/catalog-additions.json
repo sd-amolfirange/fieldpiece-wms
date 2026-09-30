@@ -1,0 +1,502 @@
+{
+  "categories": [
+    {
+      "id": "cat-multimeter",
+      "name": "Multimeters and electrical testers"
+    },
+    {
+      "id": "cat-thermometer",
+      "name": "Thermometers and thermocouples"
+    },
+    {
+      "id": "cat-combustion",
+      "name": "Combustion analyzers"
+    },
+    {
+      "id": "cat-accessories",
+      "name": "Accessories and cases"
+    }
+  ],
+  "models": [
+    {
+      "code": "ACH4",
+      "categoryId": "cat-clamp",
+      "name": "400A Amp Clamp Accessory Head",
+      "description": "Accessory clamp head reading up to 400 AC amps; jaw claw isolates wires for testing",
+      "imageFile": "ACH4.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/ach4-400a-amp-clamp-accessory-head/"
+    },
+    {
+      "code": "SC440",
+      "categoryId": "cat-clamp",
+      "name": "400A Clamp Meter Dual Display",
+      "description": "Essential True RMS HVACR clamp meter with inrush, temperature, capacitance and NCV",
+      "imageFile": "SC440.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sc440-essential-clamp-meter/"
+    },
+    {
+      "code": "SC640",
+      "categoryId": "cat-clamp",
+      "name": "400A Swivel Clamp Meter Dual Display",
+      "description": "Loaded swivel-head clamp meter with LED jaw flashlight, inrush and backlit display",
+      "imageFile": "SC640.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sc640-loaded-clamp-meter/"
+    },
+    {
+      "code": "GS322F",
+      "categoryId": "cat-manifold",
+      "name": "Analog Gauge Set 3 Port Manifold",
+      "description": "3-port analog manifold with R22/R32/R454B/R410A rings and integrated sight glass",
+      "imageFile": "GS322F.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/gs322f-analog-gauge-3-port/"
+    },
+    {
+      "code": "GS422F",
+      "categoryId": "cat-manifold",
+      "name": "Analog Gauge Set 4 Port Manifold",
+      "description": "4-port analog manifold with R22/R32/R454B/R410A rings and integrated sight glass",
+      "imageFile": "GS422F.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/gs422f-analog-gauge-4-port/"
+    },
+    {
+      "code": "GS434F",
+      "categoryId": "cat-manifold",
+      "name": "Analog Gauge Set 4 Port Manifold",
+      "description": "4-port analog manifold with R134A/R404A/R407C/R448A rings for refrigeration",
+      "imageFile": "GS434F.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/gs434f-new-analog-gauge-set-4-port/"
+    },
+    {
+      "code": "SM380V",
+      "categoryId": "cat-manifold",
+      "name": "SMAN Wireless Refrigerant 3-Port Manifold",
+      "description": "Rugged wireless 3-port digital manifold with data logging and tightness test",
+      "imageFile": "SM380V.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sm380v-wireless-3-port-sman-refrigerant-manifold-and-micron-gauge/"
+    },
+    {
+      "code": "SM480V",
+      "categoryId": "cat-manifold",
+      "name": "SMAN Wireless Refrigerant 4-Port Manifold",
+      "description": "Rugged wireless 4-port digital manifold with data logging and tightness test",
+      "imageFile": "SM480V.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sm480v-wireless-4-port-sman-refrigerant-manifold-and-micron-gauge/"
+    },
+    {
+      "code": "JL3KM2",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Dual Port Manometer Probe Kit",
+      "description": "Wireless dual port manometer kit for static, gas and draft pressure; 1000 ft range",
+      "imageFile": "JL3KM2.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3km2-job-link-system-dual-port-manometer-probe-kit/"
+    },
+    {
+      "code": "JL3KR4",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Probes Charge Kit",
+      "description": "Wireless pressure and pipe clamp probe kit for quick system charge checks",
+      "imageFile": "JL3KR4.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3kr4-job-link-probes-charge-kit/"
+    },
+    {
+      "code": "JL3LC",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Large Pipe Clamp",
+      "description": "Wireless large pipe clamp for 3/4 in to 4 1/8 in pipes; commercial and refrigeration",
+      "imageFile": "JL3LC.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3lc-large-pipe-clamp/"
+    },
+    {
+      "code": "JL3MN",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Single Port Wireless Manometer",
+      "description": "Single port wireless manometer for static, gas and draft pressure; 1000 ft range",
+      "imageFile": "JL3MN.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3mn-job-link-system-manometer/"
+    },
+    {
+      "code": "JL3PC",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Premium Pipe Clamp Probe",
+      "description": "Wireless pipe clamp with Rapid Rail sensor; stabilizes in 3 s with +/-1F accuracy",
+      "imageFile": "JL3PC.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3pc-job-link-system-premium-pipe-clamp-probe/"
+    },
+    {
+      "code": "JL3PR",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Pressure Probe",
+      "description": "Wireless pressure probe with 45 degree fitting, accurate at any elevation",
+      "imageFile": "JL3PR.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3pr-job-link-system-pressure-probe/"
+    },
+    {
+      "code": "JL3RH",
+      "categoryId": "cat-joblink",
+      "name": "Job Link System Flex Psychrometer Probe",
+      "description": "Flexible wireless psychrometer probe with magnetic hanger and supply/return switch",
+      "imageFile": "JL3RH.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/jl3rh-job-link-system-flex-psychrometer-probe/"
+    },
+    {
+      "code": "HV1",
+      "categoryId": "cat-vacuum",
+      "name": "3/8in Vacuum Hose",
+      "description": "A2L compatible 3/8 in vacuum hose with full-ring triple crimp",
+      "imageFile": "HV1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/hv1/"
+    },
+    {
+      "code": "VC1",
+      "categoryId": "cat-vacuum",
+      "name": "1/4in Valve Core Removal Tool",
+      "description": "Ultra-compact valve core removal tool with capture rod and magnetic cap",
+      "imageFile": "VC1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/vc1-valve-core-removal-tool/"
+    },
+    {
+      "code": "VC1G",
+      "categoryId": "cat-vacuum",
+      "name": "1/4in Valve Core Removal Tool with Sight Glass",
+      "description": "Valve core removal tool with integrated sight glass to verify core and flow",
+      "imageFile": "VC1G.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/vc1g-valve-core-removal-tool-with-sight-glass/"
+    },
+    {
+      "code": "VC2G",
+      "categoryId": "cat-vacuum",
+      "name": "1/4in Valve Core Removal Tool Dual Valve with Sight Glass",
+      "description": "Valve core removal tool with sight glass and second ball valve on the side port",
+      "imageFile": "VC2G.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/vc2g-valve-core-removal-tool-with-dual-ball-valves-and-sight-glass/"
+    },
+    {
+      "code": "VP67",
+      "categoryId": "cat-vacuum",
+      "name": "6 CFM Vacuum Pump",
+      "description": "6 CFM pump, 15 micron ultimate vacuum, 1/2 HP AC motor and RunQuick oil change",
+      "imageFile": "VP67.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/vp67-6cfm-vacuum-pump/"
+    },
+    {
+      "code": "VP833",
+      "categoryId": "cat-vacuum",
+      "name": "8 CFM A3 Vacuum Pump",
+      "description": "8 CFM pump for A3, A2L and A1 refrigerants; Class I Div 2 certified, 3/4 HP DC motor",
+      "imageFile": "VP833.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/vp833-8cfm-vacuum-pump/"
+    },
+    {
+      "code": "VPX7",
+      "categoryId": "cat-vacuum",
+      "name": "10 CFM Vacuum Pump",
+      "description": "Patented lightweight 10 CFM pump, 15 micron ultimate vacuum, 3/4 HP DC motor",
+      "imageFile": "VPX7.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/vpx7-10cfm-vacuum-pump/"
+    },
+    {
+      "code": "DR58",
+      "categoryId": "cat-leak",
+      "name": "Heated Diode Refrigerant Leak Detector",
+      "description": "Heated diode leak detector, better than 0.03 oz/yr, 18-hour rechargeable battery",
+      "imageFile": "DR58.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/dr58-heated-diode-refrigerant-leak-detector/"
+    },
+    {
+      "code": "DRX3",
+      "categoryId": "cat-leak",
+      "name": "Refrigerant and Combustible Gas Leak Detector",
+      "description": "Detects A3, A2L and A1 refrigerants plus combustible gases; replaceable sensor",
+      "imageFile": "DRX3.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/drx3-all-in-one-refrigerant-leak-detector/"
+    },
+    {
+      "code": "SR47",
+      "categoryId": "cat-scale",
+      "name": "Wireless Refrigerant Scale",
+      "description": "Wireless scale with 13 in platform, 252 lb max load and backlit remote",
+      "imageFile": "SR47.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sr47-refrigerant-scale-250-lb-capacity-wireless/"
+    },
+    {
+      "code": "SRS3",
+      "categoryId": "cat-scale",
+      "name": "Refrigerant Scale 250 lb Capacity Wireless",
+      "description": "Water resistant 252 lb wireless scale that links to Job Link App and SMAN manifolds",
+      "imageFile": "SRS3.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/srs3-wireless-refrigerant-scale/"
+    },
+    {
+      "code": "AAV3",
+      "categoryId": "cat-airflow",
+      "name": "Air Velocity and Temperature Accessory Head",
+      "description": "Vane anemometer accessory head for air velocity, temperature and CFM estimates",
+      "imageFile": "AAV3.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/aav3-air-velocity-and-temperature-accessory-head/"
+    },
+    {
+      "code": "ASP2",
+      "categoryId": "cat-airflow",
+      "name": "Static Pressure Probes",
+      "description": "Two-pack of duct static pressure probes with magnetic flange; fits all manometers",
+      "imageFile": "ASP2.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/asp2-static-pressure-probes/"
+    },
+    {
+      "code": "PRH2",
+      "categoryId": "cat-airflow",
+      "name": "Digital Psychrometer",
+      "description": "Pocket digital psychrometer for wet bulb, dry bulb, dew point and %RH",
+      "imageFile": "PRH2.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/prh2-digital-psychrometer/"
+    },
+    {
+      "code": "SDMN5",
+      "categoryId": "cat-airflow",
+      "name": "Manometer Dual Port",
+      "description": "Dual port manometer, -60 to 60 in WC range with 0.01 in WC resolution",
+      "imageFile": "SDMN5.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/dual-port-manometer-sdmn5/"
+    },
+    {
+      "code": "SDMN6",
+      "categoryId": "cat-airflow",
+      "name": "Manometer Dual Port with Pressure Switch Tester",
+      "description": "Dual port manometer for gas, static and differential pressure; tests pressure switches",
+      "imageFile": "SDMN6.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sdmn6-dual-port-manometer-and-pressure-switch-tester/"
+    },
+    {
+      "code": "HS33",
+      "categoryId": "cat-multimeter",
+      "name": "Stick Style Manual Ranging Multimeter",
+      "description": "Expandable stick multimeter with NCV, works with any accessory head; 400 AAC clamp",
+      "imageFile": "HS33.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/hs33-manual-and-auto-ranging/"
+    },
+    {
+      "code": "HS36",
+      "categoryId": "cat-multimeter",
+      "name": "True RMS Digital Multimeter with Backlight",
+      "description": "True RMS stick meter with NCV, microamps DC for flame diodes and 400 AAC clamp",
+      "imageFile": "HS36.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/hs36-true-rms-with-backlight/"
+    },
+    {
+      "code": "LT17A",
+      "categoryId": "cat-multimeter",
+      "name": "Digital Multimeter",
+      "description": "Classic HVACR multimeter: temperature to 1400F, capacitance, 400 AAC with clamp",
+      "imageFile": "LT17A.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/lt17a-digital-meter/"
+    },
+    {
+      "code": "SMG5",
+      "categoryId": "cat-multimeter",
+      "name": "Digital Megohm Meter",
+      "description": "1000VDC megohm meter measuring up to 2000 megohm to evaluate compressor insulation",
+      "imageFile": "SMG5.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/smg5-digital-megohm-meter/"
+    },
+    {
+      "code": "SNCV1",
+      "categoryId": "cat-multimeter",
+      "name": "Non-contact Voltage Detector",
+      "description": "Detects AC voltage without contact; indicators grow louder and brighter near source",
+      "imageFile": "SNCV1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sncv1-non-contact-voltage-detector/"
+    },
+    {
+      "code": "ATB1",
+      "categoryId": "cat-thermometer",
+      "name": "Type-K Thermocouple",
+      "description": "Type-K bead thermocouple for air, surface or liquid temps from -50 to 400F",
+      "imageFile": "ATB1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/atb1-k-type-thermocouple/"
+    },
+    {
+      "code": "ATC1R",
+      "categoryId": "cat-thermometer",
+      "name": "Small Clamp Thermocouple",
+      "description": "Type-K pipe clamp thermocouple for 1/8 in to 3/4 in refrigeration lines",
+      "imageFile": "ATC1R.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/atc1r-pipe-clamp-thermocouple-1-8-to-3-4-for-refrigeration/"
+    },
+    {
+      "code": "ATWB1",
+      "categoryId": "cat-thermometer",
+      "name": "Type-K Wet Bulb Thermocouple with Alligator Clip",
+      "description": "Wet bulb sock thermocouple that clips to evaporator filters for indoor wet bulb",
+      "imageFile": "ATWB1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/atwb1-k-type-wet-bulb-sock-thermocouple-with-alligator-clip/"
+    },
+    {
+      "code": "SIG1",
+      "categoryId": "cat-thermometer",
+      "name": "Gun Style IR Thermometer",
+      "description": "Gun-style IR thermometer with 10:1 field of view, laser guide and blue backlight",
+      "imageFile": "SIG1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/sig1-gun-style-ir-thermometer/"
+    },
+    {
+      "code": "SPK1",
+      "categoryId": "cat-thermometer",
+      "name": "Pocket Knife Style Thermometer",
+      "description": "Pocket thermometer with sharp probe tip for punching through flex duct",
+      "imageFile": "SPK1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/spk1-pocket-knife-style-thermometer/"
+    },
+    {
+      "code": "SPK2",
+      "categoryId": "cat-thermometer",
+      "name": "Folding Pocket In-Duct Thermometer",
+      "description": "Folding pocket thermometer with hanging hook for quick air temperatures",
+      "imageFile": "SPK2.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/spk2-folding-pocket-in-duct-thermometer/"
+    },
+    {
+      "code": "SPK3",
+      "categoryId": "cat-thermometer",
+      "name": "Compact Type K and Infrared Thermometer",
+      "description": "Folding rod in-duct thermometer with 8:1 IR for register and ambient temps",
+      "imageFile": "SPK3.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/spk3-rod-and-ir-temperature-pocket-style-tool/"
+    },
+    {
+      "code": "ST4",
+      "categoryId": "cat-thermometer",
+      "name": "Dual Temperature Meter Type K",
+      "description": "Dual K-type temperature meter with 0.1F resolution; two thermocouples included",
+      "imageFile": "ST4.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/st4-dual-temperature-meter/"
+    },
+    {
+      "code": "TC24",
+      "categoryId": "cat-thermometer",
+      "name": "Pipe Clamp Thermocouple",
+      "description": "Pipe clamp thermocouple for 3/8 in to 1 3/8 in pipes on residential cooling systems",
+      "imageFile": "TC24.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/tc24-pipe-clamp-thermocouple-3-8-to-1-3-8-for-air-conditioning/"
+    },
+    {
+      "code": "TC48",
+      "categoryId": "cat-thermometer",
+      "name": "Large Pipe Clamp",
+      "description": "Large pipe clamp thermocouple for 3/4 in to 4 1/8 in commercial pipes",
+      "imageFile": "TC48.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/tc48-large-pipe-clamp/"
+    },
+    {
+      "code": "CAT45",
+      "categoryId": "cat-combustion",
+      "name": "Combustion Analyzer",
+      "description": "Combustion analyzer measuring O2, CO, CO2 and draft pressure",
+      "imageFile": "CAT45.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/cat45/"
+    },
+    {
+      "code": "CAT85",
+      "categoryId": "cat-combustion",
+      "name": "Combustion Analyzer HC",
+      "description": "Combustion analyzer for O2, CO, CO2 and draft with built-in manometer",
+      "imageFile": "CAT85.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/cat85/"
+    },
+    {
+      "code": "CATPR",
+      "categoryId": "cat-combustion",
+      "name": "Wireless Thermal Printer",
+      "description": "Compact rechargeable wireless printer for combustion analyzer job reports",
+      "imageFile": "CATPR.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/catpr/"
+    },
+    {
+      "code": "SCM4",
+      "categoryId": "cat-combustion",
+      "name": "Carbon Monoxide Detector",
+      "description": "CO detector with fast electro-chemical sensor, ZERO button and audio/visual alarms",
+      "imageFile": "SCM4.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/carbon-monoxide-detector-scm4/"
+    },
+    {
+      "code": "SOX3",
+      "categoryId": "cat-combustion",
+      "name": "Combustion Checker with Auto Pump",
+      "description": "Measures flue temp and %O2; calculates %CO2, %EA and combustion efficiency",
+      "imageFile": "SOX3.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/combustion-check-sox3/"
+    },
+    {
+      "code": "ADK7",
+      "categoryId": "cat-accessories",
+      "name": "Deluxe Silicone Test Lead Kit",
+      "description": "Test lead kit with ADLS2 silicone leads, ASA2 alligator leads and RCT2 probe tips",
+      "imageFile": "ADK7.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/adk7-deluxe-silicone-test-lead-kit/"
+    },
+    {
+      "code": "ANC1",
+      "categoryId": "cat-accessories",
+      "name": "Deluxe Meter Case",
+      "description": "Padded nylon 4-pocket case holding 1 meter and 2 accessory heads",
+      "imageFile": "ANC1.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/anc1-deluxe-meter-case/"
+    },
+    {
+      "code": "ANC11",
+      "categoryId": "cat-accessories",
+      "name": "Manifold Case",
+      "description": "Padded case for SMAN digital manifolds; hang the manifold with hoses attached",
+      "imageFile": "ANC11.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/anc11/"
+    },
+    {
+      "code": "ANC18",
+      "categoryId": "cat-accessories",
+      "name": "Job Link System Case",
+      "description": "Padded compact carrying case for Job Link probes and small hand tools",
+      "imageFile": "ANC18.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/anc18/"
+    },
+    {
+      "code": "BG36",
+      "categoryId": "cat-accessories",
+      "name": "Inspection Tool Bag",
+      "description": "Compact rugged tool bag with magnetic closure and isolated instrument pockets",
+      "imageFile": "BG36.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/bg36-inspection-tool-bag/"
+    },
+    {
+      "code": "BG44",
+      "categoryId": "cat-accessories",
+      "name": "Service Tool Bag",
+      "description": "Service tool bag with elevated hand tool rack, padded meter pockets and magnetic tray",
+      "imageFile": "BG44.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/bg44-service-tool-bag/"
+    },
+    {
+      "code": "HR1B",
+      "categoryId": "cat-accessories",
+      "name": "1/4in Ball Valve Hose",
+      "description": "A2L compatible 1/4 in ball valve charging hose, 800 psi working pressure",
+      "imageFile": "HR1B.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/hr1b/"
+    },
+    {
+      "code": "HR3L",
+      "categoryId": "cat-accessories",
+      "name": "1/4in Low Loss Valves Hose Set 3 Pack",
+      "description": "A2L compatible 3-pack of 1/4 in low loss hoses, 800 psi working, 4000 psi burst",
+      "imageFile": "HR3L.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/hr3l/"
+    },
+    {
+      "code": "S365",
+      "categoryId": "cat-accessories",
+      "name": "Charging Jacket for TXV Systems",
+      "description": "Charging jacket to charge TXV systems at 37-70F outdoor temperatures",
+      "imageFile": "S365.png",
+      "sourceUrl": "https://www.fieldpiece.com/product/s365-charging-jacket-for-txv-systems/"
+    }
+  ]
+}

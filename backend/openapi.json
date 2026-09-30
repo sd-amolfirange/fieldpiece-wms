@@ -132,6 +132,59 @@
         ]
       }
     },
+    "/api/models/{id}": {
+      "patch": {
+        "operationId": "Catalog_updateModel",
+        "summary": "Set a model's list price, repair cost and warranty quota (A06)",
+        "description": "Omitted fields keep their value. Amounts: 0 to 1,000,000 with up to 2 decimals (`422` validation.amount); claimQuota: a whole number 0 to 10,000 (`422` validation.quota). `404` unknown model.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "listPrice": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "repairCost": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "warrantyBudget": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "claimQuota": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ModelView"
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/categories": {
       "get": {
         "operationId": "Catalog_categories",
@@ -361,8 +414,29 @@
       "get": {
         "operationId": "Units_list",
         "summary": "Registered products in the caller's scope",
-        "description": "A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. Default sort `serial`.",
+        "description": "A04, DL04, CU02. `q` matches serial, batch, customer, dealer and model. `channel` is the channel of the registration that started the warranty; APPS = either Fieldpiece app (OVERWATCH, JOBLINK). Default sort `serial`.",
         "parameters": [
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "DEALER",
+                "BULK",
+                "PORTAL",
+                "WEB",
+                "EMAIL",
+                "ERP",
+                "API",
+                "RETAIL",
+                "OVERWATCH",
+                "JOBLINK",
+                "APPS"
+              ],
+              "type": "string"
+            }
+          },
           {
             "name": "dealerId",
             "required": false,
@@ -469,6 +543,79 @@
         ]
       }
     },
+    "/api/units/{serial}/extension": {
+      "get": {
+        "operationId": "Units_extensionQuote",
+        "summary": "Extended-warranty offer for this product today",
+        "description": "Plans of 12, 24 or 36 more months (up to 36 in total) with price and new end date, while the warranty is registered, not void, not replaced and still in force; otherwise `eligible: false` with a `reason`. 404 if not visible.",
+        "parameters": [
+          {
+            "name": "serial",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ExtensionQuote"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
+    "/api/units/{serial}/extensions": {
+      "post": {
+        "operationId": "Units_extend",
+        "summary": "Buy an extended warranty",
+        "description": "`months` must be one of the offer's plans (`422` validation.extensionPlan). `409 not_extendable` when the product can't be extended (not registered, void, replaced, expired, or already extended 36 months). Moves the warranty end date, notifies the product's followers (`unit_extended`) and invoices it through Finance.",
+        "parameters": [
+          {
+            "name": "serial",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "months"
+                ],
+                "properties": {
+                  "months": {
+                    "type": "integer",
+                    "enum": [
+                      12,
+                      24,
+                      36
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "UnitView with the new warranty end and `extensions`"
+          }
+        },
+        "tags": [
+          "units"
+        ]
+      }
+    },
     "/api/units/{serial}/void": {
       "post": {
         "operationId": "Units_voidWarranty",
@@ -553,7 +700,9 @@
                 "EMAIL",
                 "ERP",
                 "API",
-                "RETAIL"
+                "RETAIL",
+                "OVERWATCH",
+                "JOBLINK"
               ],
               "type": "string"
             }
@@ -1223,7 +1372,7 @@
     "/api/partner/v1/registrations": {
       "post": {
         "operationId": "Intake_partnerRegistrations",
-        "summary": "Send registrations from a partner system (distributor ERP, marketplace, retailer)",
+        "summary": "Send registrations from a partner system (distributor ERP, marketplace, retailer, Fieldpiece app)",
         "description": "Authenticate with `X-Api-Key`. Body: one registration, or `{ registrations: [...] }` (up to 500). Each item: serial, batchNumber, modelCode, purchaseDate, customer { name, email, phone, city, state, zip }, invoiceNumber, placeOfPurchase. Clean items are registered at once; a serial that's already registered goes to review; others come back with row errors.",
         "parameters": [
           {
@@ -1352,7 +1501,9 @@
                     "enum": [
                       "API",
                       "RETAIL",
-                      "ERP"
+                      "ERP",
+                      "OVERWATCH",
+                      "JOBLINK"
                     ]
                   },
                   "dealerId": {
@@ -1438,6 +1589,29 @@
         ]
       }
     },
+    "/api/dashboard/finance": {
+      "get": {
+        "operationId": "Dashboard_finance",
+        "summary": "Warranty cost, extension revenue and model quotas over the last 12 months (finance insights)",
+        "description": "Admin: everything; dealer and distributor: their dealers' claims, extensions and products. `dealerId` (distributors only) narrows to one of its dealers. Cost counts approved and closed claims filed in the period.",
+        "parameters": [
+          {
+            "name": "dealerId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FinanceSummary"
+          }
+        },
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
     "/api/auth/demo-accounts": {
       "get": {
         "operationId": "Demo_accounts",
@@ -1503,6 +1677,36 @@
       "post": {
         "operationId": "Demo_marketplaceOrder",
         "summary": "Demo only: two online marketplace orders (through the partner API, channel RETAIL)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "RegistrationView[]"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/joblink-registration": {
+      "post": {
+        "operationId": "Demo_joblinkRegistration",
+        "summary": "Demo only: a technician registers two new products from the Job Link app (partner API, channel JOBLINK)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "RegistrationView[]"
+          }
+        },
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/api/simulate/overwatch-registration": {
+      "post": {
+        "operationId": "Demo_overwatchRegistration",
+        "summary": "Demo only: a new product registered from the Overwatch app (partner API, channel OVERWATCH)",
         "parameters": [],
         "responses": {
           "200": {

@@ -12,6 +12,7 @@ export type Permission =
   | "partners:manage" // partner API keys
   | "units:list" // A04 / DL04
   | "units:void"
+  | "units:extend" // sell / buy an extended warranty
   | "units:qr_label"
   | "models:manage" // A06
   | "claims:create" // file a warranty claim
@@ -28,6 +29,7 @@ const rolePermissions: Record<Role, readonly Permission[]> = {
     "partners:manage",
     "units:list",
     "units:void",
+    "units:extend",
     "units:qr_label",
     "models:manage",
     "claims:create",
@@ -40,10 +42,18 @@ const rolePermissions: Record<Role, readonly Permission[]> = {
     "registrations:bulk",
     "registrations:hub",
     "units:list",
+    "units:extend",
     "claims:create",
   ],
-  dealer: ["registrations:create", "registrations:bulk", "registrations:hub", "units:list", "claims:create"],
-  customer: ["registrations:self", "claims:create"],
+  dealer: [
+    "registrations:create",
+    "registrations:bulk",
+    "registrations:hub",
+    "units:list",
+    "units:extend",
+    "claims:create",
+  ],
+  customer: ["registrations:self", "units:extend", "claims:create"],
 };
 
 export function can(role: Role | undefined | null, permission: Permission): boolean {

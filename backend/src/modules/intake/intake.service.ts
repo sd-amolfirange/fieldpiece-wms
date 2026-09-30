@@ -1,10 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import {
-  modelSerial,
-  type IntakeInfo,
-  type RegistrationRowInput,
-  type RowErrors,
-} from "@wms/domain";
+import { modelSerial, type IntakeInfo, type RegistrationRowInput, type RowErrors } from "@wms/domain";
 import { timingSafeEqual } from "node:crypto";
 import type { SystemCtx } from "../../common/auth/context";
 import { AppError } from "../../common/errors/app-error";
@@ -20,7 +15,8 @@ import type { PartnerClientRow } from "./partner-clients.service";
 
 // Registration entry points besides the signed-in screens (item 6 of the Fieldpiece feedback):
 // - the public registration form (WEB): no account; always reviewed by the warranty desk;
-// - the partner API (API / RETAIL / ERP): partner systems send registrations; clean ones are registered at once;
+// - the partner API (API / RETAIL / ERP, and OVERWATCH / JOBLINK for Fieldpiece's own apps): partner systems send
+//   registrations with the channel of their key; clean ones are registered at once;
 // - email intake (EMAIL): the mail provider forwards emailed invoices; reviewed by the warranty desk.
 // Every one goes through RegistrationsService, so the rules are the same as for the dealer and customer screens.
 
@@ -164,7 +160,7 @@ export class IntakeService {
     return { registrationId, status: "PENDING" };
   }
 
-  // ── Partner API (API / RETAIL / ERP) ────────────────────────────────────────
+  // ── Partner API (API / RETAIL / ERP / OVERWATCH / JOBLINK) ──────────────────
 
   /** One or many registrations from a partner system; each item gets its own result. */
   async partnerRegistrations(

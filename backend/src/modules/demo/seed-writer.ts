@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { IsoDate } from "@wms/domain";
-import { toDbDateOpt } from "../../common/db/dates";
+import { toDbDate, toDbDateOpt } from "../../common/db/dates";
 import { COUNTER_SEQUENCES, ID_SEQUENCES, setSequence } from "../../common/db/ids";
 import { hashApiKey } from "../intake";
 import { createSeed, DEMO_PARTNER_KEYS, type SeedState } from "./seed-data";
@@ -43,6 +43,7 @@ async function clearBusinessData(tx: Tx, seed: SeedState): Promise<void> {
   await tx.bulkImportRow.deleteMany();
   await tx.bulkImport.deleteMany();
   await tx.unitEvent.deleteMany();
+  await tx.warrantyExtension.deleteMany();
   await tx.unit.deleteMany();
   await tx.integrationMessage.deleteMany();
   await tx.attachment.deleteMany();
@@ -122,7 +123,7 @@ async function writeMasterData(
     };
     await tx.user.upsert({ where: { id: u.id }, create: { id: u.id, ...data }, update: data });
   }
-  for (const p of seed.partnerClients) {
+  for (const [i, p] of seed.partnerClients.entries()) {
     const apiKey = DEMO_PARTNER_KEYS[p.id];
     await tx.partnerClient.create({
       data: {
@@ -132,7 +133,8 @@ async function writeMasterData(
         dealerId: p.dealerId,
         keyHash: hashApiKey(apiKey),
         keyPrefix: apiKey.slice(0, 12),
-        createdAt: options.now,
+        // Keeps the seed order in the partner list (and before partners added later).
+        createdAt: new Date(options.now.getTime() - (seed.partnerClients.length - i) * 1000),
       },
     });
   }
@@ -185,6 +187,11 @@ async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
       replacesSerial: u.replacesSerial ?? null,
       replacedBySerial: u.replacedBySerial ?? null,
       attachmentIds: u.attachmentIds,
+      voidReason: u.void?.reason ?? null,
+      voidNote: u.void?.note ?? null,
+      voidedBy: u.void?.by ?? null,
+      voidedByName: u.void?.byName ?? null,
+      voidedAt: u.void ? new Date(u.void.at) : null,
     })),
   });
   // Product events in the order they were recorded, product by product (ids keep that order for ties in time).
@@ -201,6 +208,23 @@ async function writeRecords(tx: Tx, seed: SeedState): Promise<void> {
           reason: e.reason ?? null,
           refId: e.refId ?? null,
         })),
+    ),
+  });
+
+  await tx.warrantyExtension.createMany({
+    data: seed.units.flatMap((u) =>
+      (u.extensions ?? []).map((e) => ({
+        id: e.id,
+        unitSerial: u.serial,
+        months: e.months,
+        price: new Prisma.Decimal(e.price),
+        previousEnd: toDbDate(e.previousEnd),
+        newEnd: toDbDate(e.newEnd),
+        soldBy: e.soldBy,
+        soldByName: e.soldByName,
+        dealerId: e.dealerId ?? null,
+        createdAt: new Date(e.at),
+      })),
     ),
   });
 

@@ -19,5 +19,8 @@ export const env = {
    */
   assistantEnabled: import.meta.env.VITE_ASSISTANT_ENABLED === "true",
   assistantUrl: import.meta.env.VITE_ASSISTANT_URL || "/assistant",
+  /** Internal Fieldpiece apps linked from the warranty desk's sidebar. [CONFIRM real URLs] */
+  overwatchUrl: import.meta.env.VITE_OVERWATCH_URL || "https://overwatch.example.com",
+  jobLinkUrl: import.meta.env.VITE_JOBLINK_URL || "https://joblink.example.com",
   mode: import.meta.env.MODE,
 } as const;

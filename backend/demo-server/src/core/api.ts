@@ -1,4 +1,4 @@
-import { todayIso, type Role, type User } from "@wms/domain";
+import { todayIso, type Role, type UnitView, type User } from "@wms/domain";
 import { templateCsv, rowsFromMatrix } from "./bulk-parse";
 import { claimTransition, createClaim, getClaim, listClaims } from "./claims";
 import { notFound, ServiceError, unauthenticated, validation } from "./errors";
@@ -48,9 +48,13 @@ import {
   orgStructure,
   requireRole,
   retryIntegration,
+  extendWarranty,
+  financeSummary,
   toSessionUser,
   transaction,
   unitCoverage,
+  unitExtensionQuote,
+  updateModel,
   voidWarranty,
   type Ctx,
   type DemoFile,
@@ -59,7 +63,13 @@ import {
   type RawQuery,
   type SystemCtx,
 } from "./services";
-import { simulateErpInvoice, simulateMarketplaceOrder, simulateRegistrationEmail } from "./simulate";
+import {
+  simulateErpInvoice,
+  simulateJoblinkRegistration,
+  simulateMarketplaceOrder,
+  simulateOverwatchRegistration,
+  simulateRegistrationEmail,
+} from "./simulate";
 import type { DemoState } from "./state";
 
 // Transport-agnostic mock of the real backend's API (backend/src): same routes, bodies, response shapes, status codes,
@@ -160,6 +170,12 @@ type Route =
       handler: (ctx: Ctx, params: Params, req: DemoRequest) => unknown;
     };
 
+/** The certificate's extended-warranty line, when the warranty was extended. */
+function extendedWarrantyLine(unit: UnitView): [string, string][] {
+  const months = (unit.extensions ?? []).reduce((n, e) => n + e.months, 0);
+  return months ? [["Extended warranty", `+${months} months (to ${unit.warrantyEnd ?? "-"})`]] : [];
+}
+
 const ALL: Role[] = ["admin", "dealer", "distributor", "customer"];
 const STAFF: Role[] = ["admin", "dealer", "distributor"];
 const ADMIN: Role[] = ["admin"];
@@ -228,6 +244,7 @@ export const routes: Route[] = [
           ["Owner", unit.customerName ?? "-"],
           ["Purchased", `${unit.purchaseDate ?? "-"}${unit.dealerName ? ` from ${unit.dealerName}` : ""}`],
           ["Warranty", `${unit.warrantyStart ?? "-"} to ${unit.warrantyEnd ?? "-"}`],
+          ...extendedWarrantyLine(unit),
           ["Status", unit.status],
         ]),
       });
@@ -238,6 +255,18 @@ export const routes: Route[] = [
     path: "/units/:serial/coverage",
     roles: ALL,
     handler: (ctx, p) => unitCoverage(ctx, p.serial ?? ""),
+  },
+  {
+    method: "GET",
+    path: "/units/:serial/extension",
+    roles: ALL,
+    handler: (ctx, p) => unitExtensionQuote(ctx, p.serial ?? ""),
+  },
+  {
+    method: "POST",
+    path: "/units/:serial/extensions",
+    roles: ALL,
+    handler: (ctx, p, req) => extendWarranty(ctx, p.serial ?? "", body(req)),
   },
   {
     method: "POST",
@@ -366,7 +395,18 @@ export const routes: Route[] = [
   },
 
   // ---- catalogue, organisation, intake ----
-  { method: "GET", path: "/models", roles: ALL, handler: (ctx) => listModels(ctx.state) },
+  {
+    method: "GET",
+    path: "/models",
+    roles: ALL,
+    handler: (ctx) => listModels(ctx.state, ctx.user.role === "admin"),
+  },
+  {
+    method: "PATCH",
+    path: "/models/:id",
+    roles: ADMIN,
+    handler: (ctx, p, req) => updateModel(ctx, p.id ?? "", body(req)),
+  },
   { method: "GET", path: "/categories", roles: ALL, handler: (ctx) => listCategories(ctx.state) },
   { method: "GET", path: "/dealers", roles: STAFF, handler: (ctx) => listDealers(ctx) },
   { method: "GET", path: "/admin/org", roles: ADMIN, handler: (ctx) => orgStructure(ctx) },
@@ -404,6 +444,12 @@ export const routes: Route[] = [
     path: "/dashboard/summary",
     roles: ALL,
     handler: (ctx, _p, req) => dashboardSummary(ctx, req.query),
+  },
+  {
+    method: "GET",
+    path: "/dashboard/finance",
+    roles: STAFF,
+    handler: (ctx, _p, req) => financeSummary(ctx, req.query),
   },
   { method: "GET", path: "/notifications", handler: (ctx) => listNotifications(ctx) },
   {
@@ -445,6 +491,18 @@ export const routes: Route[] = [
     path: "/simulate/marketplace-order",
     roles: ADMIN,
     handler: (ctx) => simulateMarketplaceOrder(ctx),
+  },
+  {
+    method: "POST",
+    path: "/simulate/joblink-registration",
+    roles: ADMIN,
+    handler: (ctx) => simulateJoblinkRegistration(ctx),
+  },
+  {
+    method: "POST",
+    path: "/simulate/overwatch-registration",
+    roles: ADMIN,
+    handler: (ctx) => simulateOverwatchRegistration(ctx),
   },
 ];
 

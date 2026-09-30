@@ -62,8 +62,8 @@ test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
   await test.step("5. A02 Registration inbox, Duplicates: only the known serial needs a human", async () => {
     await admin.goto("/registrations");
     await admin.getByLabel("Filter by exception").selectOption("DUPLICATE");
-    await expect(admin.getByRole("table").getByText("MG44-252811902")).toBeVisible();
-    await expect(admin.getByRole("table").locator("tbody tr")).toHaveCount(1);
+    // The seed inbox has other duplicates too; this upload's is the one row for the known serial.
+    await expect(admin.getByRole("table").locator("tbody tr", { hasText: "MG44-252811902" })).toHaveCount(1);
   });
 
   await test.step("6. A03: compare with the existing record and reject with a reason", async () => {
@@ -81,7 +81,10 @@ test("W1: dealer bulk registration", async ({ browser, baseURL }) => {
     await admin.goto("/units");
     await admin.getByLabel("Filter by dealer").selectOption({ label: "Lone Star Refrigeration Supply" });
     await expect(admin).toHaveURL(/dealerId=d-lonestar/);
-    await expect(admin.getByText("31 results")).toBeVisible();
+    // Every product on the page is Lone Star's (the seed has other dealers' products too).
+    const rows = admin.getByRole("table").locator("tbody tr");
+    await expect(rows.first()).toBeVisible();
+    for (const row of await rows.all()) await expect(row).toContainText("Lone Star Refrigeration Supply");
   });
 
   await test.step("8. A01: Registrations by channel, Dealer bar +24", async () => {

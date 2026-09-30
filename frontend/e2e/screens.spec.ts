@@ -201,8 +201,9 @@ test("screens: every must-contain item is present", async ({ browser, baseURL })
 
   await test.step("DL01 Dealer home (dealer and distributor)", async () => {
     await dealer.goto("/");
+    // The KPI tiles come first; the claim-status donut's legend repeats some labels (e.g. "Rejected") further down.
     for (const t of ["Registrations this month", "Pending", "Rejected", "Open claims"]) {
-      await expect(dealer.getByText(t, { exact: true })).toBeVisible();
+      await expect(dealer.getByText(t, { exact: true }).first()).toBeVisible();
     }
     await distributor.goto("/");
     await expect(distributor.getByLabel("Show")).toBeVisible();

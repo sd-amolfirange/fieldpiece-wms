@@ -46,9 +46,11 @@ serial is already registered go to the warranty desk.
 ## Other ways registrations arrive
 
 Registrations also come in from a distributor's ERP sales feed, from emails with the invoice attached sent to the
-registration mailbox, and from partners such as online marketplaces through the partner API. Registrations from
+registration mailbox, from partners such as online marketplaces through the partner API, and from Fieldpiece's own
+apps: Job Link (technicians register the probes and tools they use on the job) and Overwatch. Registrations from
 the ERP feed and email are reviewed by the warranty desk; trusted partner registrations are approved at once
-when they pass all checks.
+when they pass all checks. Registrations from Job Link and Overwatch are also approved at once when clean. Every
+product shows which channel it was registered through ("Registered via").
 
 ## Common registration errors
 

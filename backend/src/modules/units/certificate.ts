@@ -85,6 +85,8 @@ export function certificatePdf(unit: UnitView): Promise<Buffer> {
     `${longDate(unit.purchaseDate)}${unit.dealerName ? ` from ${unit.dealerName}` : unit.placeOfPurchase ? ` from ${unit.placeOfPurchase}` : ""}`,
   );
   row("Warranty", `${longDate(unit.warrantyStart)} to ${longDate(unit.warrantyEnd)}`);
+  const extendedMonths = (unit.extensions ?? []).reduce((n, e) => n + e.months, 0);
+  if (extendedMonths) row("Extended warranty", `+${extendedMonths} months (to ${longDate(unit.warrantyEnd)})`);
   if (unit.replacesSerial) row("Replaces", unit.replacesSerial);
   if (unit.replacedBySerial) row("Status", `Replaced by ${unit.replacedBySerial}`);
   if (unit.void) row("Status", `VOID (${unit.void.reason.replace(/_/g, " ").toLowerCase()})`);

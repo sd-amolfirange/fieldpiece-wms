@@ -2,13 +2,16 @@ import {
   Boxes,
   ClipboardList,
   LayoutDashboard,
+  Link2,
   Network,
   Package,
+  Radar,
   Settings,
   ShieldCheck,
   Upload,
   type LucideIcon,
 } from "lucide-react";
+import { env } from "@/lib/env";
 import type { Role } from "@/types";
 
 // Menus per role (docs/implementation-plan.md, section 5). Keep in sync with app/router.tsx.
@@ -61,6 +64,26 @@ export const navItems: NavItem[] = [
 export const publicNavItems: NavItem[] = [
   { to: "/check", labelKey: "nav.checkWarranty", icon: Boxes, roles: "all" },
 ];
+
+/** Another Fieldpiece app, opened in a new tab (not a route of this app). */
+export interface AppLink {
+  id: string;
+  labelKey: string;
+  href: string;
+  icon: LucideIcon;
+  roles: readonly Role[];
+}
+
+// Entry points to Fieldpiece's internal apps, for the warranty desk. URLs come from the build settings
+// (VITE_OVERWATCH_URL, VITE_JOBLINK_URL); an empty setting falls back to a placeholder. [CONFIRM real URLs]
+export const appLinks: AppLink[] = [
+  { id: "overwatch", labelKey: "nav.apps.overwatch", href: env.overwatchUrl, icon: Radar, roles: ["admin"] },
+  { id: "joblink", labelKey: "nav.apps.joblink", href: env.jobLinkUrl, icon: Link2, roles: ["admin"] },
+];
+
+export function appLinksFor(role: Role | undefined): AppLink[] {
+  return role ? appLinks.filter((a) => a.roles.includes(role)) : [];
+}
 
 export function navItemsFor(role: Role | undefined): NavItem[] {
   if (!role) return [];

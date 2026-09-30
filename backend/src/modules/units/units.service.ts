@@ -1,20 +1,32 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import {
   coverageFor,
+  extensionQuote,
+  FIELDPIECE_APP_CHANNELS,
+  REGISTRATION_CHANNELS,
   VOID_REASONS,
   WARRANTY_STATUSES,
   type Coverage,
+  type ExtensionBlock,
+  type ExtensionQuote,
   type Paginated,
+  type RegistrationChannel,
   type UnitEventType,
   type UnitView,
   type VoidReason,
 } from "@wms/domain";
 import type { Ctx } from "../../common/auth/context";
+import { toDbDate } from "../../common/db/dates";
+import { nextId } from "../../common/db/ids";
 import { AppError } from "../../common/errors/app-error";
 import { listQuery, queryEnum, queryString, type RawQuery } from "../../common/http/list-query";
 import { type Db, PrismaService } from "../../infra/prisma/prisma.service";
+import { ENV } from "../../config/config.module";
+import type { Env } from "../../config/env";
 import { canSee, requireRole } from "../../domain/scope";
-import { toUnit, toUnitView, type UnitRow } from "../../domain/views";
+import { moneyOf, toUnit, toUnitView, type UnitRow } from "../../domain/views";
+import { IntegrationLog } from "../integrations";
 import { Notifier } from "../notifications";
 import { certificatePdf } from "./certificate";
 import { UnitsRepository } from "./units.repository";
@@ -28,12 +40,31 @@ export interface NewUnitEvent {
   refId?: string;
 }
 
+/** `channel` of the product list: one registration channel, or APPS for either Fieldpiece app. Else no filter. */
+export const UNIT_CHANNEL_FILTERS = [...REGISTRATION_CHANNELS, "APPS"] as const;
+
+function channelFilter(query: RawQuery): readonly RegistrationChannel[] | undefined {
+  const value = queryEnum(query, "channel", UNIT_CHANNEL_FILTERS);
+  return value === "APPS" ? FIELDPIECE_APP_CHANNELS : value ? [value] : undefined;
+}
+
+/** Why a product can't get an extended warranty (409 not_extendable). */
+const NOT_EXTENDABLE: Record<ExtensionBlock, string> = {
+  NOT_REGISTERED: "This product isn't registered yet.",
+  VOID: "This warranty is void, so it can't be extended.",
+  REPLACED: "This product was replaced; extend the replacement's warranty instead.",
+  EXPIRED: "This warranty has expired; only a warranty still in force can be extended.",
+  LIMIT_REACHED: "This warranty was already extended by the maximum 36 months.",
+};
+
 @Injectable()
 export class UnitsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly units: UnitsRepository,
     private readonly notifier: Notifier,
+    private readonly integrations: IntegrationLog,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async list(ctx: Ctx, query: RawQuery): Promise<Paginated<UnitView>> {
@@ -41,6 +72,7 @@ export class UnitsService {
     const { serials, total } = await this.units.search(ctx.user, ctx.today, list, {
       status: queryEnum(query, "status", WARRANTY_STATUSES),
       dealerId: queryString(query, "dealerId"),
+      channels: channelFilter(query),
     });
     const rows = await this.units.load(this.prisma, serials);
     return {
@@ -117,6 +149,80 @@ export class UnitsService {
     return this.get(ctx, normalized);
   }
 
+  /** Extended-warranty offer for this product today: the plans still open, their price and new end date. */
+  async extensionQuote(ctx: Ctx, serial: string): Promise<ExtensionQuote> {
+    return quoteFor(await this.findVisible(this.prisma, ctx, serial), ctx);
+  }
+
+  /**
+   * Sells an extended warranty: moves the warranty end date by the chosen plan, records who sold it (the dealer
+   * is credited when a dealer sells it) and invoices it through Finance. Anyone who can see the product can buy one.
+   */
+  async extend(ctx: Ctx, serial: string, body: { months?: unknown }): Promise<UnitView> {
+    const normalized = serial.trim().toUpperCase();
+    await this.prisma.tx(async (tx) => {
+      await this.units.lock(tx, normalized);
+      const unit = await this.findVisible(tx, ctx, normalized);
+      const quote = quoteFor(unit, ctx);
+      if (!quote.eligible || !unit.warrantyEnd) {
+        throw AppError.conflict("not_extendable", NOT_EXTENDABLE[quote.reason ?? "NOT_REGISTERED"]);
+      }
+      const option = quote.options.find((o) => o.months === body.months);
+      if (!option) throw AppError.validation("Choose a plan.", { months: "validation.extensionPlan" });
+
+      const id = await nextId(tx, "EXT");
+      const dealerId = ctx.user.role === "dealer" && ctx.user.dealerId ? ctx.user.dealerId : unit.dealerId;
+      const newEnd = toDbDate(option.newEnd);
+      await tx.warrantyExtension.create({
+        data: {
+          id,
+          unitSerial: unit.serial,
+          months: option.months,
+          price: new Prisma.Decimal(option.price.toFixed(2)),
+          previousEnd: unit.warrantyEnd,
+          newEnd,
+          soldBy: ctx.user.id,
+          soldByName: ctx.user.name,
+          dealerId,
+          createdAt: ctx.now,
+        },
+      });
+      await tx.unit.update({ where: { serial: unit.serial }, data: { warrantyEnd: newEnd } });
+      await this.addEvent(tx, unit.serial, {
+        at: ctx.now,
+        type: "extended",
+        byName: ctx.user.name,
+        text: `Warranty extended by ${option.months} months to ${option.newEnd}`,
+        refId: id,
+      });
+      await this.notifier.notify(tx, await this.notifier.followers(tx, unit), "unit_extended", ctx.now, {
+        params: { serial: unit.serial, months: option.months, newEnd: option.newEnd },
+        link: `/units/${unit.serial}`,
+      });
+      await this.integrations.log(
+        tx,
+        {
+          system: "FINANCE",
+          direction: "OUT",
+          type: "extension_invoice",
+          refId: id,
+          payload: {
+            extensionId: id,
+            serial: unit.serial,
+            model: unit.model.code,
+            months: option.months,
+            price: option.price,
+            currency: this.env.APP_CURRENCY,
+            soldBy: ctx.user.id,
+            dealerId,
+          },
+        },
+        ctx.now,
+      );
+    });
+    return this.get(ctx, normalized);
+  }
+
   async addEvent(db: Db, serial: string, event: NewUnitEvent): Promise<void> {
     await db.unitEvent.create({
       data: {
@@ -131,3 +237,6 @@ export class UnitsService {
     });
   }
 }
+
+const quoteFor = (row: UnitRow, ctx: Pick<Ctx, "today">): ExtensionQuote =>
+  extensionQuote(toUnit(row), { listPrice: moneyOf(row.model.listPrice) }, ctx.today);

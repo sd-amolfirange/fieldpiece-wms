@@ -8,8 +8,8 @@ import type {
   Model,
   Notification,
   ProductCategory,
+  PartnerChannel,
   Registration,
-  RegistrationChannel,
   Unit,
   User,
   WarrantyClaim,
@@ -21,7 +21,7 @@ import type {
 export interface PartnerClientRecord {
   id: string;
   name: string;
-  channel: Extract<RegistrationChannel, "API" | "RETAIL" | "ERP">;
+  channel: PartnerChannel;
   dealerId?: string;
   /**
    * The key itself. The real backend keeps only its SHA-256; the mock keeps it in plain text (it's demo data and the
@@ -36,7 +36,7 @@ export interface PartnerClientRecord {
 
 export interface DemoState {
   /** Bumped when the shape changes, so a saved file from an older mock is replaced by the seed. */
-  version: 2;
+  version: 4;
   categories: ProductCategory[];
   models: Model[];
   distributors: Distributor[];

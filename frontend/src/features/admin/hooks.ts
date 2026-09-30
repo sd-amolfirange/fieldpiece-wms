@@ -46,6 +46,8 @@ export function useSimulator() {
     erpInvoice: useMutation({ mutationFn: adminApi.simulateErpInvoice, onSuccess }),
     registrationEmail: useMutation({ mutationFn: adminApi.simulateRegistrationEmail, onSuccess }),
     marketplaceOrder: useMutation({ mutationFn: adminApi.simulateMarketplaceOrder, onSuccess }),
+    jobLink: useMutation({ mutationFn: adminApi.simulateJobLinkRegistration, onSuccess }),
+    overwatch: useMutation({ mutationFn: adminApi.simulateOverwatchRegistration, onSuccess }),
     reset: useMutation({ mutationFn: adminApi.resetDemo, onSuccess }),
   };
 }

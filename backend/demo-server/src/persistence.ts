@@ -36,7 +36,7 @@ export function loadState(path: string, today?: string): DemoState {
   if (existsSync(path)) {
     try {
       const state = JSON.parse(readFileSync(path, "utf8")) as DemoState;
-      if (state.version === 2) return state;
+      if (state.version === 4) return state;
     } catch {
       // unreadable file: start from the seed again
     }

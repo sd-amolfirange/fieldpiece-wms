@@ -23,6 +23,27 @@
       "warrantyMonths": 12
     },
     {
+      "code": "ACH4",
+      "category": "Clamp meters",
+      "name": "400A Amp Clamp Accessory Head",
+      "description": "Accessory clamp head reading up to 400 AC amps; jaw claw isolates wires for testing",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SC440",
+      "category": "Clamp meters",
+      "name": "400A Clamp Meter Dual Display",
+      "description": "Essential True RMS HVACR clamp meter with inrush, temperature, capacitance and NCV",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SC640",
+      "category": "Clamp meters",
+      "name": "400A Swivel Clamp Meter Dual Display",
+      "description": "Loaded swivel-head clamp meter with LED jaw flashlight, inrush and backlit display",
+      "warrantyMonths": 12
+    },
+    {
       "code": "SM482V",
       "category": "Digital manifolds",
       "name": "SMAN Wireless 4-Port Digital Manifold",
@@ -37,10 +58,94 @@
       "warrantyMonths": 12
     },
     {
+      "code": "GS322F",
+      "category": "Digital manifolds",
+      "name": "Analog Gauge Set 3 Port Manifold",
+      "description": "3-port analog manifold with R22/R32/R454B/R410A rings and integrated sight glass",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "GS422F",
+      "category": "Digital manifolds",
+      "name": "Analog Gauge Set 4 Port Manifold",
+      "description": "4-port analog manifold with R22/R32/R454B/R410A rings and integrated sight glass",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "GS434F",
+      "category": "Digital manifolds",
+      "name": "Analog Gauge Set 4 Port Manifold",
+      "description": "4-port analog manifold with R134A/R404A/R407C/R448A rings for refrigeration",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SM380V",
+      "category": "Digital manifolds",
+      "name": "SMAN Wireless Refrigerant 3-Port Manifold",
+      "description": "Rugged wireless 3-port digital manifold with data logging and tightness test",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SM480V",
+      "category": "Digital manifolds",
+      "name": "SMAN Wireless Refrigerant 4-Port Manifold",
+      "description": "Rugged wireless 4-port digital manifold with data logging and tightness test",
+      "warrantyMonths": 12
+    },
+    {
       "code": "JL3KH6",
       "category": "Job Link probes",
       "name": "Job Link Probes Charging and Air Kit",
       "description": "Six wireless probes for charging and airflow",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3KM2",
+      "category": "Job Link probes",
+      "name": "Job Link System Dual Port Manometer Probe Kit",
+      "description": "Wireless dual port manometer kit for static, gas and draft pressure; 1000 ft range",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3KR4",
+      "category": "Job Link probes",
+      "name": "Job Link System Probes Charge Kit",
+      "description": "Wireless pressure and pipe clamp probe kit for quick system charge checks",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3LC",
+      "category": "Job Link probes",
+      "name": "Job Link System Large Pipe Clamp",
+      "description": "Wireless large pipe clamp for 3/4 in to 4 1/8 in pipes; commercial and refrigeration",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3MN",
+      "category": "Job Link probes",
+      "name": "Job Link System Single Port Wireless Manometer",
+      "description": "Single port wireless manometer for static, gas and draft pressure; 1000 ft range",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3PC",
+      "category": "Job Link probes",
+      "name": "Job Link System Premium Pipe Clamp Probe",
+      "description": "Wireless pipe clamp with Rapid Rail sensor; stabilizes in 3 s with +/-1F accuracy",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3PR",
+      "category": "Job Link probes",
+      "name": "Job Link System Pressure Probe",
+      "description": "Wireless pressure probe with 45 degree fitting, accurate at any elevation",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "JL3RH",
+      "category": "Job Link probes",
+      "name": "Job Link System Flex Psychrometer Probe",
+      "description": "Flexible wireless psychrometer probe with magnetic hanger and supply/return switch",
       "warrantyMonths": 12
     },
     {
@@ -65,10 +170,73 @@
       "warrantyMonths": 12
     },
     {
+      "code": "HV1",
+      "category": "Vacuum and recovery",
+      "name": "3/8in Vacuum Hose",
+      "description": "A2L compatible 3/8 in vacuum hose with full-ring triple crimp",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VC1",
+      "category": "Vacuum and recovery",
+      "name": "1/4in Valve Core Removal Tool",
+      "description": "Ultra-compact valve core removal tool with capture rod and magnetic cap",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VC1G",
+      "category": "Vacuum and recovery",
+      "name": "1/4in Valve Core Removal Tool with Sight Glass",
+      "description": "Valve core removal tool with integrated sight glass to verify core and flow",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VC2G",
+      "category": "Vacuum and recovery",
+      "name": "1/4in Valve Core Removal Tool Dual Valve with Sight Glass",
+      "description": "Valve core removal tool with sight glass and second ball valve on the side port",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VP67",
+      "category": "Vacuum and recovery",
+      "name": "6 CFM Vacuum Pump",
+      "description": "6 CFM pump, 15 micron ultimate vacuum, 1/2 HP AC motor and RunQuick oil change",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VP833",
+      "category": "Vacuum and recovery",
+      "name": "8 CFM A3 Vacuum Pump",
+      "description": "8 CFM pump for A3, A2L and A1 refrigerants; Class I Div 2 certified, 3/4 HP DC motor",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "VPX7",
+      "category": "Vacuum and recovery",
+      "name": "10 CFM Vacuum Pump",
+      "description": "Patented lightweight 10 CFM pump, 15 micron ultimate vacuum, 3/4 HP DC motor",
+      "warrantyMonths": 12
+    },
+    {
       "code": "DR82",
       "category": "Leak detectors",
       "name": "Infrared Refrigerant Leak Detector",
       "description": "Infrared refrigerant leak detector",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "DR58",
+      "category": "Leak detectors",
+      "name": "Heated Diode Refrigerant Leak Detector",
+      "description": "Heated diode leak detector, better than 0.03 oz/yr, 18-hour rechargeable battery",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "DRX3",
+      "category": "Leak detectors",
+      "name": "Refrigerant and Combustible Gas Leak Detector",
+      "description": "Detects A3, A2L and A1 refrigerants plus combustible gases; replaceable sensor",
       "warrantyMonths": 12
     },
     {
@@ -79,10 +247,262 @@
       "warrantyMonths": 12
     },
     {
+      "code": "SR47",
+      "category": "Refrigerant scales",
+      "name": "Wireless Refrigerant Scale",
+      "description": "Wireless scale with 13 in platform, 252 lb max load and backlit remote",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SRS3",
+      "category": "Refrigerant scales",
+      "name": "Refrigerant Scale 250 lb Capacity Wireless",
+      "description": "Water resistant 252 lb wireless scale that links to Job Link App and SMAN manifolds",
+      "warrantyMonths": 12
+    },
+    {
       "code": "STA2",
       "category": "Airflow and temperature",
       "name": "In-Duct Hot Wire Anemometer",
       "description": "In-duct hot wire anemometer",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "AAV3",
+      "category": "Airflow and temperature",
+      "name": "Air Velocity and Temperature Accessory Head",
+      "description": "Vane anemometer accessory head for air velocity, temperature and CFM estimates",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ASP2",
+      "category": "Airflow and temperature",
+      "name": "Static Pressure Probes",
+      "description": "Two-pack of duct static pressure probes with magnetic flange; fits all manometers",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "PRH2",
+      "category": "Airflow and temperature",
+      "name": "Digital Psychrometer",
+      "description": "Pocket digital psychrometer for wet bulb, dry bulb, dew point and %RH",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SDMN5",
+      "category": "Airflow and temperature",
+      "name": "Manometer Dual Port",
+      "description": "Dual port manometer, -60 to 60 in WC range with 0.01 in WC resolution",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SDMN6",
+      "category": "Airflow and temperature",
+      "name": "Manometer Dual Port with Pressure Switch Tester",
+      "description": "Dual port manometer for gas, static and differential pressure; tests pressure switches",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "HS33",
+      "category": "Multimeters and electrical testers",
+      "name": "Stick Style Manual Ranging Multimeter",
+      "description": "Expandable stick multimeter with NCV, works with any accessory head; 400 AAC clamp",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "HS36",
+      "category": "Multimeters and electrical testers",
+      "name": "True RMS Digital Multimeter with Backlight",
+      "description": "True RMS stick meter with NCV, microamps DC for flame diodes and 400 AAC clamp",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "LT17A",
+      "category": "Multimeters and electrical testers",
+      "name": "Digital Multimeter",
+      "description": "Classic HVACR multimeter: temperature to 1400F, capacitance, 400 AAC with clamp",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SMG5",
+      "category": "Multimeters and electrical testers",
+      "name": "Digital Megohm Meter",
+      "description": "1000VDC megohm meter measuring up to 2000 megohm to evaluate compressor insulation",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SNCV1",
+      "category": "Multimeters and electrical testers",
+      "name": "Non-contact Voltage Detector",
+      "description": "Detects AC voltage without contact; indicators grow louder and brighter near source",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ATB1",
+      "category": "Thermometers and thermocouples",
+      "name": "Type-K Thermocouple",
+      "description": "Type-K bead thermocouple for air, surface or liquid temps from -50 to 400F",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ATC1R",
+      "category": "Thermometers and thermocouples",
+      "name": "Small Clamp Thermocouple",
+      "description": "Type-K pipe clamp thermocouple for 1/8 in to 3/4 in refrigeration lines",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ATWB1",
+      "category": "Thermometers and thermocouples",
+      "name": "Type-K Wet Bulb Thermocouple with Alligator Clip",
+      "description": "Wet bulb sock thermocouple that clips to evaporator filters for indoor wet bulb",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SIG1",
+      "category": "Thermometers and thermocouples",
+      "name": "Gun Style IR Thermometer",
+      "description": "Gun-style IR thermometer with 10:1 field of view, laser guide and blue backlight",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SPK1",
+      "category": "Thermometers and thermocouples",
+      "name": "Pocket Knife Style Thermometer",
+      "description": "Pocket thermometer with sharp probe tip for punching through flex duct",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SPK2",
+      "category": "Thermometers and thermocouples",
+      "name": "Folding Pocket In-Duct Thermometer",
+      "description": "Folding pocket thermometer with hanging hook for quick air temperatures",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SPK3",
+      "category": "Thermometers and thermocouples",
+      "name": "Compact Type K and Infrared Thermometer",
+      "description": "Folding rod in-duct thermometer with 8:1 IR for register and ambient temps",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ST4",
+      "category": "Thermometers and thermocouples",
+      "name": "Dual Temperature Meter Type K",
+      "description": "Dual K-type temperature meter with 0.1F resolution; two thermocouples included",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "TC24",
+      "category": "Thermometers and thermocouples",
+      "name": "Pipe Clamp Thermocouple",
+      "description": "Pipe clamp thermocouple for 3/8 in to 1 3/8 in pipes on residential cooling systems",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "TC48",
+      "category": "Thermometers and thermocouples",
+      "name": "Large Pipe Clamp",
+      "description": "Large pipe clamp thermocouple for 3/4 in to 4 1/8 in commercial pipes",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "CAT45",
+      "category": "Combustion analyzers",
+      "name": "Combustion Analyzer",
+      "description": "Combustion analyzer measuring O2, CO, CO2 and draft pressure",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "CAT85",
+      "category": "Combustion analyzers",
+      "name": "Combustion Analyzer HC",
+      "description": "Combustion analyzer for O2, CO, CO2 and draft with built-in manometer",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "CATPR",
+      "category": "Combustion analyzers",
+      "name": "Wireless Thermal Printer",
+      "description": "Compact rechargeable wireless printer for combustion analyzer job reports",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SCM4",
+      "category": "Combustion analyzers",
+      "name": "Carbon Monoxide Detector",
+      "description": "CO detector with fast electro-chemical sensor, ZERO button and audio/visual alarms",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "SOX3",
+      "category": "Combustion analyzers",
+      "name": "Combustion Checker with Auto Pump",
+      "description": "Measures flue temp and %O2; calculates %CO2, %EA and combustion efficiency",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ADK7",
+      "category": "Accessories and cases",
+      "name": "Deluxe Silicone Test Lead Kit",
+      "description": "Test lead kit with ADLS2 silicone leads, ASA2 alligator leads and RCT2 probe tips",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ANC1",
+      "category": "Accessories and cases",
+      "name": "Deluxe Meter Case",
+      "description": "Padded nylon 4-pocket case holding 1 meter and 2 accessory heads",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ANC11",
+      "category": "Accessories and cases",
+      "name": "Manifold Case",
+      "description": "Padded case for SMAN digital manifolds; hang the manifold with hoses attached",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "ANC18",
+      "category": "Accessories and cases",
+      "name": "Job Link System Case",
+      "description": "Padded compact carrying case for Job Link probes and small hand tools",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "BG36",
+      "category": "Accessories and cases",
+      "name": "Inspection Tool Bag",
+      "description": "Compact rugged tool bag with magnetic closure and isolated instrument pockets",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "BG44",
+      "category": "Accessories and cases",
+      "name": "Service Tool Bag",
+      "description": "Service tool bag with elevated hand tool rack, padded meter pockets and magnetic tray",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "HR1B",
+      "category": "Accessories and cases",
+      "name": "1/4in Ball Valve Hose",
+      "description": "A2L compatible 1/4 in ball valve charging hose, 800 psi working pressure",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "HR3L",
+      "category": "Accessories and cases",
+      "name": "1/4in Low Loss Valves Hose Set 3 Pack",
+      "description": "A2L compatible 3-pack of 1/4 in low loss hoses, 800 psi working, 4000 psi burst",
+      "warrantyMonths": 12
+    },
+    {
+      "code": "S365",
+      "category": "Accessories and cases",
+      "name": "Charging Jacket for TXV Systems",
+      "description": "Charging jacket to charge TXV systems at 37-70F outdoor temperatures",
       "warrantyMonths": 12
     }
   ]

@@ -27,6 +27,7 @@ export const ERROR_CODES = [
   // units
   "already_void",
   "not_registered",
+  "not_extendable",
   // warranty claims and integrations
   "claim_open",
   "invalid_transition",

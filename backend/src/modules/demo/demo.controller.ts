@@ -61,4 +61,27 @@ export class DemoController {
   marketplaceOrder(@Ctx() ctx: RequestCtx): Promise<RegistrationView[]> {
     return this.demo.marketplaceOrder(ctx);
   }
+
+  @Post("simulate/joblink-registration")
+  @HttpCode(200)
+  @Roles("admin")
+  @ApiOperation({
+    summary:
+      "Demo only: a technician registers two new products from the Job Link app (partner API, channel JOBLINK)",
+  })
+  @ApiOkResponse({ description: "RegistrationView[]" })
+  joblinkRegistration(@Ctx() ctx: RequestCtx): Promise<RegistrationView[]> {
+    return this.demo.joblinkRegistration(ctx);
+  }
+
+  @Post("simulate/overwatch-registration")
+  @HttpCode(200)
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Demo only: a new product registered from the Overwatch app (partner API, channel OVERWATCH)",
+  })
+  @ApiOkResponse({ description: "RegistrationView[]" })
+  overwatchRegistration(@Ctx() ctx: RequestCtx): Promise<RegistrationView[]> {
+    return this.demo.overwatchRegistration(ctx);
+  }
 }

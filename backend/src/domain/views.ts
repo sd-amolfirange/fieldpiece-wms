@@ -31,9 +31,10 @@ import {
   type UnitView,
   type VoidReason,
   type WarrantyClaimView,
+  type WarrantyExtension,
 } from "@wms/domain";
 import type { Actor } from "../common/auth/context";
-import { fromDbDateOpt, opt } from "../common/db/dates";
+import { fromDbDate, fromDbDateOpt, opt } from "../common/db/dates";
 
 // Database rows -> the API shapes in shared/wms-domain (views.ts), which the frontend reads. Absent values are
 // omitted (never null), exactly as the domain's optional fields. Warranty status is always computed here, for
@@ -48,6 +49,10 @@ export interface ViewCtx {
 
 const iso = (d: Date) => d.toISOString();
 const isoOpt = (d: Date | null | undefined) => (d ? d.toISOString() : undefined);
+
+/** Money columns (numeric) as numbers for the API; whole cents are exact in a double. */
+export const moneyOf = (value: Prisma.Decimal): number => Number(value.toFixed(2));
+const money = (value: Prisma.Decimal | null) => (value === null ? undefined : moneyOf(value));
 
 // ── Attachments ───────────────────────────────────────────────────────────────
 
@@ -89,6 +94,10 @@ export const toModelView = (row: ModelRow): ModelView => ({
   warrantyMonths: row.warrantyMonths,
   serialPattern: row.serialPattern,
   batchPattern: row.batchPattern,
+  listPrice: moneyOf(row.listPrice),
+  repairCost: moneyOf(row.repairCost),
+  warrantyBudget: moneyOf(row.warrantyBudget),
+  claimQuota: row.claimQuota,
   categoryName: row.category.name,
 });
 
@@ -115,9 +124,23 @@ export const unitInclude = {
   model: { include: { category: true } },
   dealer: true,
   customer: true,
+  registration: { select: { channel: true } },
   events: { orderBy: { id: "asc" } },
+  extensions: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
 } satisfies Prisma.UnitInclude;
 export type UnitRow = Prisma.UnitGetPayload<{ include: typeof unitInclude }>;
+
+export const toWarrantyExtension = (e: Prisma.WarrantyExtensionGetPayload<object>): WarrantyExtension => ({
+  id: e.id,
+  months: e.months,
+  price: moneyOf(e.price),
+  previousEnd: fromDbDate(e.previousEnd),
+  newEnd: fromDbDate(e.newEnd),
+  soldBy: e.soldBy,
+  soldByName: e.soldByName,
+  dealerId: opt(e.dealerId),
+  at: iso(e.createdAt),
+});
 
 type UnitEventRow = Prisma.UnitEventGetPayload<object>;
 
@@ -145,7 +168,7 @@ export const voidRecordOf = (row: VoidColumns): Unit["void"] =>
     : undefined;
 
 /** The stored product as the domain type, for the shared warranty rules. */
-export function toUnit(row: Omit<UnitRow, "model" | "dealer" | "customer">): Unit {
+export function toUnit(row: Omit<UnitRow, "model" | "dealer" | "customer" | "registration">): Unit {
   return {
     serial: row.serial,
     batchNumber: opt(row.batchNumber),
@@ -162,6 +185,7 @@ export function toUnit(row: Omit<UnitRow, "model" | "dealer" | "customer">): Uni
     replacedBySerial: opt(row.replacedBySerial),
     attachmentIds: row.attachmentIds,
     history: row.events.map(toUnitEvent),
+    extensions: row.extensions.map(toWarrantyExtension),
   };
 }
 
@@ -179,6 +203,7 @@ export function toUnitView(row: UnitRow, today: IsoDate): UnitView {
     customerName: opt(row.customer?.name),
     status: warranty.status,
     daysRemaining: warranty.daysRemaining,
+    registrationChannel: row.registration?.channel as RegistrationChannel | undefined,
   };
 }
 
@@ -273,9 +298,6 @@ export const claimInclude = {
   events: { orderBy: { id: "asc" } },
 } satisfies Prisma.WarrantyClaimInclude;
 export type ClaimRow = Prisma.WarrantyClaimGetPayload<{ include: typeof claimInclude }>;
-
-/** Money columns (numeric) as numbers for the API; whole cents are exact in a double. */
-const money = (value: Prisma.Decimal | null) => (value === null ? undefined : Number(value.toFixed(2)));
 
 export function toClaimView(
   row: ClaimRow,

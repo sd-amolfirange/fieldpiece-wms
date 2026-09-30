@@ -3,11 +3,14 @@ import type {
   ClaimStatus,
   Dealer,
   Distributor,
+  FieldpieceAppChannel,
   IsoDate,
   Model,
   ProductCategory,
   Registration,
   RegistrationChannel,
+  PartnerChannel,
+  Resolution,
   Role,
   Unit,
   UnitEvent,
@@ -52,6 +55,8 @@ export interface UnitView extends Unit {
   customerName?: string;
   status: WarrantyStatus;
   daysRemaining: number;
+  /** Channel of the registration that started the warranty (absent while not registered). */
+  registrationChannel?: RegistrationChannel;
 }
 
 export interface RegistrationView extends Registration {
@@ -84,8 +89,20 @@ export interface BulkImportView extends BulkImport {
   counts: ReturnType<typeof bulkCounts>;
 }
 
-export interface ModelView extends Model {
+/** Internal finance figures of a model: sent to the warranty desk only (never to other roles or the public API). */
+export const INTERNAL_MODEL_FIELDS = ["repairCost", "warrantyBudget", "claimQuota"] as const;
+type InternalModelField = (typeof INTERNAL_MODEL_FIELDS)[number];
+
+/** A model as the API returns it. `listPrice` (the retail price) is public; the internal figures are admin-only. */
+export interface ModelView extends Omit<Model, InternalModelField>, Partial<Pick<Model, InternalModelField>> {
   categoryName: string;
+}
+
+/** The model without its internal finance figures, for every caller except the warranty desk. */
+export function publicModelView(model: ModelView): ModelView {
+  const view: ModelView = { ...model };
+  for (const field of INTERNAL_MODEL_FIELDS) delete view[field];
+  return view;
 }
 
 export interface DealerView extends Dealer {
@@ -128,6 +145,20 @@ export interface ActivityItem extends UnitEvent {
   serial: string;
 }
 
+/** One month of activity for trend charts ("YYYY-MM"), the last 12 months, oldest first. */
+export interface MonthlyTrend {
+  month: string;
+  /** Registrations approved that month. */
+  registrations: number;
+  /** Warranty claims filed that month. */
+  claims: number;
+}
+
+export interface WarrantyStatusCount {
+  status: WarrantyStatus;
+  count: number;
+}
+
 export interface DealerStats {
   dealerId: string;
   dealerName: string;
@@ -156,6 +187,9 @@ export type DashboardSummary =
       claimsByCategory: CategoryCount[];
       expiringSoon: ExpiringUnit[];
       recentActivity: ActivityItem[];
+      trend: MonthlyTrend[];
+      /** Warranties registered from Fieldpiece's apps, one entry per app. */
+      apps: AppChannelStats[];
     }
   | {
       role: "dealer" | "distributor";
@@ -164,6 +198,10 @@ export type DashboardSummary =
       rejected: number;
       openClaims: number;
       dealers: DealerStats[];
+      /** Products sold by the dealer(s) in scope, by warranty status today. */
+      unitsByStatus: WarrantyStatusCount[];
+      claimsByStatus: { status: ClaimStatus; count: number }[];
+      trend: MonthlyTrend[];
     }
   | {
       role: "customer";
@@ -171,7 +209,69 @@ export type DashboardSummary =
       active: number;
       expiringSoon: number;
       openClaims: number;
+      unitsByStatus: WarrantyStatusCount[];
     };
+
+// ── Finance (A01 / DL01 finance insights) ────────────────────────────────────────────────────────────────────────
+
+/** A01 "Fieldpiece apps": warranties registered from Overwatch and Job Link. */
+export interface AppChannelStats {
+  channel: FieldpieceAppChannel;
+  /** Registered products whose registration came from this app. */
+  units: number;
+  active: number;
+  expiringSoon: number;
+  expired: number;
+  /** Registrations from this app waiting for review. */
+  pendingRegistrations: number;
+  /** Products registered from this app in the last 30 days. */
+  last30Days: number;
+  /** Warranty claims on these products (any status). */
+  claims: number;
+}
+
+/** A model's warranty quota and how much of it the last 12 months used. */
+export interface ModelQuota {
+  modelId: string;
+  modelCode: string;
+  modelName: string;
+  categoryName: string;
+  imageUrl?: string;
+  /** Registered products of this model (in scope). */
+  units: number;
+  budget: number;
+  /** Cost of approved and closed claims in the period. */
+  spent: number;
+  budgetUsedPct: number;
+  claimQuota: number;
+  claims: number;
+  claimQuotaUsedPct: number;
+}
+
+export interface FinanceSummary {
+  currency: string;
+  /** Rolling 12 months: periodStart .. periodEnd (today), inclusive. */
+  periodStart: IsoDate;
+  periodEnd: IsoDate;
+  /** Cost of approved and closed claims (repairs, replacements, credits). */
+  warrantyCost: number;
+  creditsIssued: number;
+  extensionRevenue: number;
+  extensionsSold: number;
+  /** warrantyCost - extensionRevenue. */
+  netWarrantyCost: number;
+  /** Sum of the warranty budgets of the models in scope. */
+  budget: number;
+  budgetUsedPct: number;
+  /** Average cost per settled claim. */
+  averageClaimCost: number;
+  costByResolution: { resolution: Resolution; amount: number; count: number }[];
+  costByCategory: { categoryId: string; categoryName: string; amount: number }[];
+  /** Last 12 months, oldest first. */
+  monthly: { month: string; cost: number; extensionRevenue: number }[];
+  /** Models with activity or a budget, highest budget use first. */
+  quotas: ModelQuota[];
+}
 
 /** Where registrations can come in (the registration hub). */
 export interface IntakeInfo {
@@ -187,7 +287,7 @@ export interface IntakeInfo {
 export interface PartnerClientView {
   id: string;
   name: string;
-  channel: Extract<RegistrationChannel, "API" | "RETAIL" | "ERP">;
+  channel: PartnerChannel;
   dealerId?: string;
   dealerName?: string;
   keyPrefix: string;

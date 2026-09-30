@@ -117,9 +117,13 @@ describe("W1: dealer bulk registration", () => {
 
       // A02: only the duplicate needs a human.
       await signInAs("admin@wms.local");
-      const duplicates = await registrationsApi.list({ flag: "DUPLICATE" });
-      expect(duplicates.items.map((r) => r.serial)).toEqual(["MG44-252811902"]);
-      expect(duplicates.items[0]?.duplicateOf?.customerName).toBe("James Nguyen");
+      // The seed inbox has other duplicates too; this upload added exactly one, pending, with the existing record.
+      const duplicates = await registrationsApi.list({ flag: "DUPLICATE", status: "PENDING", pageSize: 100 });
+      const fromUpload = duplicates.items.filter(
+        (r) => r.channel === "BULK" && r.serial === "MG44-252811902",
+      );
+      expect(fromUpload).toHaveLength(1);
+      expect(fromUpload[0]?.duplicateOf?.customerName).toBe("James Nguyen");
     },
     WORKFLOW_TIMEOUT,
   );

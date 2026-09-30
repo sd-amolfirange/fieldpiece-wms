@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { addDaysIso, type RegistrationView, serialNumberPart } from "@wms/domain";
+import { addDaysIso, type PartnerChannel, type RegistrationView, serialNumberPart } from "@wms/domain";
 import type { Ctx } from "../../common/auth/context";
 import { nextCounter } from "../../common/db/ids";
 import { AppError } from "../../common/errors/app-error";
@@ -17,8 +17,19 @@ import { DEMO_ACCOUNTS } from "./seed-data";
 import { writeSeed } from "./seed-writer";
 
 // Demo-only (DEMO_FEATURES_ENABLED): the sign-in picker's accounts and the System events page (A13), which sends
-// the messages the connected systems would: an ERP sales invoice, a registration email, a marketplace order. The
-// email and the marketplace order go through the same intake code as the real webhook and partner API.
+// the messages the connected systems would: an ERP sales invoice, a registration email, a marketplace order, and
+// registrations from Fieldpiece's apps (Job Link, Overwatch). The email, the marketplace order and the app
+// registrations go through the same intake code as the real webhook and partner API.
+
+/** A customer as a partner system sends it. */
+interface PartnerCustomer {
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  state: string;
+  zip: string;
+}
 
 /** The emailed invoice: a minimal one-page PDF, so it passes the same file checks as a real invoice. */
 function invoicePdf(lines: [string, string][]): Buffer {
@@ -241,6 +252,67 @@ export class DemoService {
             },
           },
         ],
+      },
+    );
+    const ids = results.flatMap((r) => r.registrationId ?? []);
+    return Promise.all(ids.map((id) => this.registrations.get(ctx, id)));
+  }
+
+  /** Job Link: a technician registers two new products for a customer from the app (partner API, channel JOBLINK). */
+  joblinkRegistration(ctx: Ctx): Promise<RegistrationView[]> {
+    return this.appRegistration(ctx, "pc-joblink", ["JL3KH6", "MG44"], 0, {
+      name: "Owen Castillo",
+      email: "owen.castillo@example.com",
+      phone: "(512) 555-0158",
+      city: "Austin",
+      state: "TX",
+      zip: "78704",
+    });
+  }
+
+  /** Overwatch: one new product registered from the app (partner API, channel OVERWATCH). */
+  overwatchRegistration(ctx: Ctx): Promise<RegistrationView[]> {
+    return this.appRegistration(ctx, "pc-overwatch", ["SM482V"], 2, {
+      name: "Grace Whitfield",
+      email: "grace.whitfield@example.com",
+      phone: "(615) 555-0173",
+      city: "Nashville",
+      state: "TN",
+      zip: "37203",
+    });
+  }
+
+  /** New products bought `purchasedDaysAgo` sent by a Fieldpiece app with its own partner key: registered at once. */
+  private async appRegistration(
+    ctx: Ctx,
+    clientId: "pc-joblink" | "pc-overwatch",
+    models: string[],
+    purchasedDaysAgo: number,
+    customer: PartnerCustomer,
+  ): Promise<RegistrationView[]> {
+    requireRole(ctx.user, "admin");
+    const client = await this.prisma.partnerClient.findUnique({ where: { id: clientId } });
+    if (!client?.active) throw AppError.notFound("Active Fieldpiece app partner");
+    const serials: string[] = [];
+    for (const model of models) {
+      serials.push(await this.freeSerial(this.prisma, ctx.today, model, new Set(serials)));
+    }
+    const { results } = await this.intake.partnerRegistrations(
+      ctx,
+      {
+        id: client.id,
+        name: client.name,
+        channel: client.channel as PartnerChannel,
+        dealerId: client.dealerId,
+      },
+      {
+        registrations: models.map((modelCode, i) => ({
+          serial: serials[i],
+          batchNumber: this.batchFor(ctx.today, i + 1),
+          modelCode,
+          purchaseDate: addDaysIso(ctx.today, -purchasedDaysAgo),
+          customer,
+        })),
       },
     );
     const ids = results.flatMap((r) => r.registrationId ?? []);
